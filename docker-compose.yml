@@ -1,0 +1,14 @@
+services:
+  platform:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PLATFORM_API_KEY=${PLATFORM_API_KEY:-}
+      - DATABASE_URL=sqlite+aiosqlite:////data/platform.db
+    volumes:
+      - platform_data:/data
+
+volumes:
+  platform_data:

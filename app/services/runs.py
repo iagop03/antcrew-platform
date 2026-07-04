@@ -1,12 +1,17 @@
 """Run persistence and query helpers."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, desc
 
 from app.models.run import Run, Event as DBEvent, Ticket
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 async def list_runs(
@@ -81,6 +86,7 @@ async def upsert_tickets_from_run(
             existing.priority = priority
             existing.status = status
             existing.run_id = run_id
+            existing.updated_at = _utcnow()
             session.add(existing)
         else:
             session.add(Ticket(

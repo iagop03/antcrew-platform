@@ -12,7 +12,6 @@ import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from antcrew.core.events import bus
@@ -53,21 +52,22 @@ async def _persist_event(event: "Event") -> None:
             session.add(db_event)
 
             # Update or create Run row on lifecycle events
+            from sqlmodel import select
             if event.type == "pipeline.start" and event.run_id:
-                run = Run(
-                    run_id=event.run_id,
-                    thread_id=event.thread_id or "default",
-                    team=event.payload.get("team", "unknown"),
-                    request=event.payload.get("request", ""),
-                    status="running",
-                )
-                await session.merge(run)
+                stmt = select(Run).where(Run.run_id == event.run_id)
+                existing = (await session.exec(stmt)).first()
+                if not existing:
+                    session.add(Run(
+                        run_id=event.run_id,
+                        thread_id=event.thread_id or "default",
+                        team=event.payload.get("team", "unknown"),
+                        request=event.payload.get("request", ""),
+                        status="running",
+                    ))
 
             elif event.type == "pipeline.end" and event.run_id:
-                from sqlmodel import select
                 stmt = select(Run).where(Run.run_id == event.run_id)
-                result = await session.exec(stmt)
-                run = result.first()
+                run = (await session.exec(stmt)).first()
                 if run:
                     run.status = "success" if event.payload.get("success") else "error"
                     run.cost_usd = event.payload.get("cost_usd", 0.0)
