@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tickets — antcrew</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="kanban()" x-init="init()">
+
+<nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
+  <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
+  <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
+  <a href="/tickets" class="text-sm text-white font-medium">Tickets</a>
+</nav>
+
+<div class="px-6 py-5">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-xl font-semibold">Tickets</h1>
+      <p class="text-gray-400 text-sm mt-0.5">Kanban board — click a card to move it</p>
+    </div>
+    <div class="text-sm text-gray-500" x-text="`${tickets.length} total`"></div>
+  </div>
+
+  <div class="grid grid-cols-4 gap-4">
+    <template x-for="col in columns" :key="col.status">
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-3">
+        <!-- Column header -->
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded"
+            :class="col.headerClass"
+            x-text="col.label"></span>
+          <span class="text-xs text-gray-500"
+            x-text="ticketsByStatus(col.status).length"></span>
+        </div>
+
+        <!-- Cards -->
+        <div class="space-y-2 min-h-20">
+          <template x-if="ticketsByStatus(col.status).length === 0">
+            <p class="text-gray-700 text-xs text-center py-4">Empty</p>
+          </template>
+          <template x-for="t in ticketsByStatus(col.status)" :key="t.ticket_id">
+            <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 cursor-pointer hover:border-gray-500 transition"
+                 @click="openTicket(t)">
+              <div class="font-mono text-xs text-gray-500 mb-1" x-text="t.ticket_id"></div>
+              <div class="text-sm text-white leading-snug" x-text="t.title"></div>
+              <div class="flex items-center gap-2 mt-2">
+                <span class="text-xs px-1.5 py-0.5 rounded"
+                  :class="{
+                    'bg-red-900/50 text-red-300': t.priority === 'high' || t.priority === 'critical',
+                    'bg-yellow-900/50 text-yellow-300': t.priority === 'medium',
+                    'bg-gray-700 text-gray-400': t.priority === 'low',
+                  }"
+                  x-text="t.priority"></span>
+                <span class="text-xs text-gray-500 truncate" x-text="t.prd_title"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<!-- Ticket detail modal -->
+<div x-show="selected" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-lg shadow-2xl" @click.stop>
+    <template x-if="selected">
+      <div>
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="font-mono text-xs text-gray-500 mb-1" x-text="selected.ticket_id"></div>
+            <h2 class="text-lg font-semibold" x-text="selected.title"></h2>
+            <p class="text-sm text-gray-400 mt-1" x-text="selected.prd_title"></p>
+          </div>
+          <button @click="selected = null" class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+        </div>
+
+        <p class="text-sm text-gray-300 mb-5" x-text="selected.description || 'No description.'"></p>
+
+        <div class="mb-4">
+          <label class="block text-xs text-gray-400 uppercase tracking-wide mb-2">Move to</label>
+          <div class="flex gap-2 flex-wrap">
+            <template x-for="col in columns" :key="col.status">
+              <button @click="moveTicket(selected.ticket_id, col.status)"
+                :disabled="selected.status === col.status"
+                class="text-xs px-3 py-1.5 rounded-lg border transition"
+                :class="selected.status === col.status
+                  ? 'border-indigo-500 text-indigo-300 bg-indigo-950 cursor-default'
+                  : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white'"
+                x-text="col.label"></button>
+            </template>
+          </div>
+        </div>
+
+        <div class="text-xs text-gray-600 flex gap-4">
+          <span>Priority: <span class="text-gray-400" x-text="selected.priority"></span></span>
+          <a :href="'/run/' + selected.run_id" class="text-indigo-400 hover:underline">
+            View run →
+          </a>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+function kanban() {
+  return {
+    tickets: [],
+    selected: null,
+    columns: [
+      { status: 'open',        label: 'Open',        headerClass: 'bg-gray-800 text-gray-300' },
+      { status: 'in_progress', label: 'In Progress',  headerClass: 'bg-yellow-900/50 text-yellow-300' },
+      { status: 'done',        label: 'Done',         headerClass: 'bg-green-900/50 text-green-300' },
+      { status: 'blocked',     label: 'Blocked',      headerClass: 'bg-red-900/50 text-red-300' },
+    ],
+
+    async init() {
+      await this.load();
+    },
+
+    async load() {
+      try {
+        const r = await fetch('/tickets/');
+        if (r.ok) this.tickets = await r.json();
+      } catch {}
+    },
+
+    ticketsByStatus(status) {
+      return this.tickets.filter(t => t.status === status);
+    },
+
+    openTicket(t) {
+      this.selected = { ...t };
+    },
+
+    async moveTicket(ticketId, newStatus) {
+      try {
+        const r = await fetch(`/tickets/${ticketId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (r.ok) {
+          const updated = await r.json();
+          const idx = this.tickets.findIndex(t => t.ticket_id === ticketId);
+          if (idx !== -1) this.tickets[idx] = updated;
+          this.selected = { ...updated };
+        }
+      } catch {}
+    },
+  }
+}
+</script>
+</body>
+</html>

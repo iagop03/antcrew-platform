@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import require_api_key
 from app.core.database import get_session
 from app.models.run import Run, Event as DBEvent
-from app.services.runs import get_run, get_run_events, list_runs
+from app.services.runs import get_run, get_run_events, get_run_tickets, list_runs
 
 router = APIRouter(
     prefix="/runs",
@@ -54,6 +54,15 @@ async def state(run_id: str, session: AsyncSession = Depends(get_session)) -> di
             f"State not available yet — run {run_id!r} is still {run.status!r}",
         )
     return run.state
+
+
+@router.get("/{run_id}/tickets")
+async def tickets(run_id: str, session: AsyncSession = Depends(get_session)):
+    """Return tickets produced by a specific run."""
+    run = await get_run(session, run_id)
+    if not run:
+        raise HTTPException(404, f"Run {run_id!r} not found")
+    return await get_run_tickets(session, run_id)
 
 
 @router.get("/{run_id}/events", response_model=list[DBEvent])

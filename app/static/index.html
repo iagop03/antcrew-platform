@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>antcrew platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="dashboard()" x-init="init()">
+
+<!-- Nav -->
+<nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
+  <span class="font-mono font-bold text-indigo-400">antcrew</span>
+  <a href="/" class="text-sm text-white font-medium">Runs</a>
+  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+</nav>
+
+<!-- Header -->
+<div class="px-6 py-5 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">Pipeline Runs</h1>
+    <p class="text-gray-400 text-sm mt-0.5">Live updates via WebSocket</p>
+  </div>
+  <button @click="showModal = true"
+    class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+    + New Run
+  </button>
+</div>
+
+<!-- Stats -->
+<div class="px-6 grid grid-cols-4 gap-3 mb-6">
+  <template x-for="[label, key, color] in [['Total','total','indigo'],['Running','running','yellow'],['Success','success','green'],['Error','error','red']]">
+    <div class="bg-gray-900 rounded-lg p-3 border border-gray-800">
+      <div class="text-xs text-gray-400 mb-1" x-text="label"></div>
+      <div class="text-2xl font-bold" :class="`text-${color}-400`" x-text="stats[key]"></div>
+    </div>
+  </template>
+</div>
+
+<!-- Runs table -->
+<div class="px-6">
+  <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="border-b border-gray-800">
+        <tr class="text-gray-400 text-xs uppercase tracking-wide">
+          <th class="px-4 py-3 text-left">Run ID</th>
+          <th class="px-4 py-3 text-left">Team</th>
+          <th class="px-4 py-3 text-left">Request</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-right">Cost</th>
+          <th class="px-4 py-3 text-right">Started</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-if="runs.length === 0">
+          <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No runs yet. Click "+ New Run" to start one.</td></tr>
+        </template>
+        <template x-for="run in runs" :key="run.run_id">
+          <tr class="border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer transition"
+              @click="window.location='/run/' + run.run_id">
+            <td class="px-4 py-3 font-mono text-xs text-gray-400" x-text="run.run_id.slice(0,12) + '…'"></td>
+            <td class="px-4 py-3 text-indigo-300 font-medium" x-text="run.team"></td>
+            <td class="px-4 py-3 text-gray-300 max-w-xs truncate" x-text="run.request"></td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                :class="{
+                  'bg-yellow-900/50 text-yellow-300': run.status === 'running',
+                  'bg-green-900/50 text-green-300': run.status === 'success',
+                  'bg-red-900/50 text-red-300': run.status === 'error',
+                  'bg-gray-800 text-gray-400': !['running','success','error'].includes(run.status)
+                }"
+                x-text="run.status"></span>
+            </td>
+            <td class="px-4 py-3 text-right text-gray-300 font-mono text-xs"
+                x-text="run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '—'"></td>
+            <td class="px-4 py-3 text-right text-gray-400 text-xs" x-text="timeAgo(run.created_at)"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- New Run Modal -->
+<div x-show="showModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
+       @click.stop>
+    <h2 class="text-lg font-semibold mb-4">New Run</h2>
+    <form @submit.prevent="triggerRun()">
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Team</label>
+        <select x-model="form.team" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          <template x-for="t in availableTeams" :key="t">
+            <option :value="t" x-text="t"></option>
+          </template>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Request</label>
+        <textarea x-model="form.request" rows="3"
+          placeholder="Build an auth module with JWT and refresh tokens…"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+      </div>
+      <div class="mb-5">
+        <label class="block text-sm text-gray-400 mb-1">Max cost (USD, optional)</label>
+        <input type="number" step="0.01" min="0.01" x-model.number="form.max_cost_usd"
+          placeholder="e.g. 2.00"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="flex gap-3">
+        <button type="button" @click="showModal = false"
+          class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition">Cancel</button>
+        <button type="submit" :disabled="submitting"
+          class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
+          x-text="submitting ? 'Starting…' : 'Start Run'"></button>
+      </div>
+      <p x-show="formError" class="text-red-400 text-xs mt-3" x-text="formError"></p>
+    </form>
+  </div>
+</div>
+
+<script>
+function dashboard() {
+  return {
+    runs: [],
+    stats: { total: 0, running: 0, success: 0, error: 0 },
+    showModal: false,
+    submitting: false,
+    formError: '',
+    availableTeams: [],
+    form: { team: 'DevTeam', request: '', max_cost_usd: null },
+    ws: null,
+
+    async init() {
+      await this.loadTeams();
+      await this.loadRuns();
+      this.connectWs();
+    },
+
+    async loadTeams() {
+      try {
+        const r = await fetch('/run/teams');
+        const d = await r.json();
+        this.availableTeams = d.teams;
+        this.form.team = d.teams[0] || 'DevTeam';
+      } catch {}
+    },
+
+    async loadRuns() {
+      try {
+        const r = await fetch('/runs/?limit=50');
+        this.runs = await r.json();
+        this.calcStats();
+      } catch {}
+    },
+
+    calcStats() {
+      this.stats = this.runs.reduce((acc, r) => {
+        acc.total++;
+        if (r.status === 'running') acc.running++;
+        if (r.status === 'success') acc.success++;
+        if (r.status === 'error') acc.error++;
+        return acc;
+      }, { total: 0, running: 0, success: 0, error: 0 });
+    },
+
+    connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/events`);
+      this.ws.onmessage = (e) => {
+        const ev = JSON.parse(e.data);
+        if (ev.type === 'pipeline.start') {
+          this.loadRuns();
+        } else if (ev.type === 'pipeline.end' && ev.run_id) {
+          const run = this.runs.find(r => r.run_id === ev.run_id);
+          if (run) {
+            run.status = ev.payload.success ? 'success' : 'error';
+            run.cost_usd = ev.payload.cost_usd || 0;
+            this.calcStats();
+          }
+        }
+      };
+      this.ws.onclose = () => setTimeout(() => this.connectWs(), 3000);
+    },
+
+    async triggerRun() {
+      this.submitting = true;
+      this.formError = '';
+      try {
+        const body = { team: this.form.team, request: this.form.request };
+        if (this.form.max_cost_usd) body.max_cost_usd = this.form.max_cost_usd;
+        const r = await fetch('/run/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          const d = await r.json();
+          this.formError = d.detail || 'Error starting run';
+          return;
+        }
+        const d = await r.json();
+        this.showModal = false;
+        this.form.request = '';
+        this.form.max_cost_usd = null;
+        await this.loadRuns();
+        if (d.run_id) window.location = '/run/' + d.run_id;
+      } catch (err) {
+        this.formError = err.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    timeAgo(iso) {
+      if (!iso) return '—';
+      const diff = (Date.now() - new Date(iso)) / 1000;
+      if (diff < 60) return `${Math.floor(diff)}s ago`;
+      if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+      return `${Math.floor(diff/3600)}h ago`;
+    },
+  }
+}
+</script>
+</body>
+</html>

@@ -37,7 +37,7 @@ _TEAM_REGISTRY: dict[str, tuple[str, str]] = {
 AVAILABLE_TEAMS = list(_TEAM_REGISTRY)
 
 
-def _make_team(team_name: str):
+def _make_team(team_name: str, max_cost_usd: Optional[float] = None):
     """Instantiate a team with default LLM (reads ANTHROPIC_API_KEY from env)."""
     if team_name not in _TEAM_REGISTRY:
         raise ValueError(f"Unknown team {team_name!r}. Available: {AVAILABLE_TEAMS}")
@@ -45,12 +45,15 @@ def _make_team(team_name: str):
     import importlib
     module = importlib.import_module(module_path)
     cls = getattr(module, class_name)
-    return cls()  # model=None → AnthropicModel() default
+    kwargs = {}
+    if max_cost_usd is not None:
+        kwargs["max_cost_usd"] = max_cost_usd
+    return cls(**kwargs)
 
 
-def _run_sync(team_name: str, request: str, thread_id: str):
+def _run_sync(team_name: str, request: str, thread_id: str, max_cost_usd: Optional[float]):
     """Synchronous team run — called inside ThreadPoolExecutor."""
-    team = _make_team(team_name)
+    team = _make_team(team_name, max_cost_usd=max_cost_usd)
     return team.run(request, thread_id=thread_id)
 
 
@@ -82,6 +85,8 @@ async def dispatch(
     team_name: str,
     request: str,
     thread_id: str = "default",
+    *,
+    max_cost_usd: Optional[float] = None,
 ) -> Optional[str]:
     """Start a team run in the background. Returns run_id once pipeline.start fires.
 
@@ -100,7 +105,7 @@ async def dispatch(
     async def _bg() -> None:
         try:
             result = await loop.run_in_executor(
-                _executor, _run_sync, team_name, request, thread_id
+                _executor, _run_sync, team_name, request, thread_id, max_cost_usd
             )
             await _store_result(result)
         except Exception as exc:

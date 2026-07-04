@@ -16,6 +16,7 @@ class RunRequest(BaseModel):
     team: str
     request: str
     thread_id: str = "default"
+    max_cost_usd: Optional[float] = None
 
     @field_validator("team")
     @classmethod
@@ -30,6 +31,13 @@ class RunRequest(BaseModel):
         if not v.strip():
             raise ValueError("request must not be empty")
         return v.strip()
+
+    @field_validator("max_cost_usd")
+    @classmethod
+    def cost_positive(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v <= 0:
+            raise ValueError("max_cost_usd must be positive")
+        return v
 
 
 class RunAccepted(BaseModel):
@@ -48,7 +56,10 @@ async def trigger_run(body: RunRequest):
     or stream WS /ws/events?run_id=<run_id> for real-time events.
     """
     try:
-        run_id = await dispatch(body.team, body.request, body.thread_id)
+        run_id = await dispatch(
+            body.team, body.request, body.thread_id,
+            max_cost_usd=body.max_cost_usd,
+        )
     except ValueError as exc:
         raise HTTPException(422, str(exc))
 

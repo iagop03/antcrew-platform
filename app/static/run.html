@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Run detail — antcrew</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="runDetail()" x-init="init()">
+
+<nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
+  <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
+  <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
+  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+</nav>
+
+<div class="px-6 py-5">
+  <!-- Breadcrumb -->
+  <div class="text-sm text-gray-500 mb-4">
+    <a href="/" class="hover:text-white">Runs</a>
+    <span class="mx-2">/</span>
+    <span class="font-mono" x-text="runId ? runId.slice(0,16) + '…' : '…'"></span>
+  </div>
+
+  <!-- Run header -->
+  <template x-if="run">
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-5 mb-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="flex items-center gap-3 mb-2">
+            <span class="font-mono text-sm text-gray-400" x-text="run.run_id"></span>
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+              :class="{
+                'bg-yellow-900/50 text-yellow-300': run.status === 'running',
+                'bg-green-900/50 text-green-300': run.status === 'success',
+                'bg-red-900/50 text-red-300': run.status === 'error',
+              }"
+              x-text="run.status"></span>
+          </div>
+          <h1 class="text-lg font-semibold text-white" x-text="run.request"></h1>
+          <p class="text-sm text-indigo-300 mt-1" x-text="run.team"></p>
+        </div>
+        <div class="text-right text-sm text-gray-400">
+          <div x-text="run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '—'"></div>
+          <div class="text-xs mt-1" x-text="formatDate(run.created_at)"></div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <div class="grid grid-cols-3 gap-6">
+    <!-- Events timeline -->
+    <div class="col-span-2">
+      <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">Event Timeline</h2>
+      <div class="space-y-1">
+        <template x-if="events.length === 0">
+          <p class="text-gray-500 text-sm py-4">No events yet.</p>
+        </template>
+        <template x-for="ev in events" :key="ev.id">
+          <div class="flex gap-3 text-sm">
+            <div class="text-gray-600 font-mono text-xs w-24 pt-0.5 shrink-0"
+                 x-text="formatTime(ev.timestamp)"></div>
+            <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-mono text-xs px-1.5 py-0.5 rounded text-indigo-300 bg-indigo-950"
+                      x-text="ev.event_type"></span>
+                <span class="text-xs text-gray-500"
+                      x-show="ev.payload.agent_name"
+                      x-text="ev.payload.agent_name"></span>
+              </div>
+              <div class="text-xs text-gray-400 font-mono"
+                   x-show="Object.keys(ev.payload).length > 0"
+                   x-text="payloadSummary(ev.payload)"></div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Sidebar: tickets + state -->
+    <div class="space-y-5">
+      <!-- Tickets -->
+      <div>
+        <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
+          Tickets <span class="text-gray-600 normal-case" x-text="'(' + tickets.length + ')'"></span>
+        </h2>
+        <div class="space-y-2">
+          <template x-if="tickets.length === 0">
+            <p class="text-gray-500 text-sm">None produced yet.</p>
+          </template>
+          <template x-for="t in tickets" :key="t.ticket_id">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg p-3">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="font-mono text-xs text-gray-500 mb-0.5" x-text="t.ticket_id"></div>
+                  <div class="text-sm text-white" x-text="t.title"></div>
+                </div>
+                <span class="text-xs px-1.5 py-0.5 rounded shrink-0"
+                  :class="{
+                    'bg-red-900/50 text-red-300': t.priority === 'high' || t.priority === 'critical',
+                    'bg-yellow-900/50 text-yellow-300': t.priority === 'medium',
+                    'bg-gray-800 text-gray-400': t.priority === 'low',
+                  }"
+                  x-text="t.priority"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- State JSON -->
+      <div x-show="stateJson">
+        <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">State</h2>
+        <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <button @click="stateExpanded = !stateExpanded"
+            class="w-full px-3 py-2 text-xs text-gray-400 hover:text-white text-left transition flex justify-between">
+            <span>RunResult.to_dict()</span>
+            <span x-text="stateExpanded ? '▲ collapse' : '▼ expand'"></span>
+          </button>
+          <pre x-show="stateExpanded"
+               class="px-3 py-2 text-xs text-green-300 font-mono overflow-auto max-h-80 border-t border-gray-800"
+               x-text="stateJson"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function runDetail() {
+  return {
+    runId: null,
+    run: null,
+    events: [],
+    tickets: [],
+    stateJson: '',
+    stateExpanded: false,
+    ws: null,
+
+    async init() {
+      this.runId = location.pathname.split('/').pop();
+      await Promise.all([this.loadRun(), this.loadEvents(), this.loadTickets(), this.loadState()]);
+      this.connectWs();
+    },
+
+    async loadRun() {
+      try {
+        const r = await fetch(`/runs/${this.runId}`);
+        if (r.ok) this.run = await r.json();
+      } catch {}
+    },
+
+    async loadEvents() {
+      try {
+        const r = await fetch(`/runs/${this.runId}/events`);
+        if (r.ok) this.events = await r.json();
+      } catch {}
+    },
+
+    async loadTickets() {
+      try {
+        const r = await fetch(`/runs/${this.runId}/tickets`);
+        if (r.ok) this.tickets = await r.json();
+      } catch {}
+    },
+
+    async loadState() {
+      try {
+        const r = await fetch(`/runs/${this.runId}/state`);
+        if (r.ok) this.stateJson = JSON.stringify(await r.json(), null, 2);
+      } catch {}
+    },
+
+    connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/events?run_id=${this.runId}`);
+      this.ws.onmessage = async (e) => {
+        const ev = JSON.parse(e.data);
+        await this.loadEvents();
+        if (ev.type === 'pipeline.end') {
+          await Promise.all([this.loadRun(), this.loadTickets(), this.loadState()]);
+        }
+      };
+      this.ws.onclose = () => setTimeout(() => this.connectWs(), 3000);
+    },
+
+    payloadSummary(payload) {
+      const skip = ['agent_name'];
+      const parts = Object.entries(payload)
+        .filter(([k]) => !skip.includes(k))
+        .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+      return parts.join('  ·  ');
+    },
+
+    formatDate(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleString();
+    },
+
+    formatTime(ts) {
+      if (!ts) return '';
+      return new Date(ts * 1000).toLocaleTimeString();
+    },
+  }
+}
+</script>
+</body>
+</html>

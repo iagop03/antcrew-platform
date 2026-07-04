@@ -94,6 +94,13 @@ async def upsert_tickets_from_run(
     return count
 
 
+async def get_run_tickets(session: AsyncSession, run_id: str) -> list[Ticket]:
+    result = await session.exec(
+        select(Ticket).where(Ticket.run_id == run_id).order_by(Ticket.created_at)
+    )
+    return list(result.all())
+
+
 async def list_tickets(
     session: AsyncSession,
     *,
