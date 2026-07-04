@@ -7,11 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.core.auth import require_api_key
 from app.core.database import get_session
 from app.models.run import Ticket
 from app.services.runs import list_tickets
 
-router = APIRouter(prefix="/tickets", tags=["tickets"])
+router = APIRouter(prefix="/tickets", tags=["tickets"], dependencies=[Depends(require_api_key)])
 
 
 @router.get("/", response_model=list[Ticket])

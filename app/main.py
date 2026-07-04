@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.database import init_db
 from app.core.listener import start_listening, stop_listening
-from app.api import runs, tickets, stream
+from app.api import runs, tickets, stream, pipeline
 
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(pipeline.router)
 app.include_router(runs.router)
 app.include_router(tickets.router)
 app.include_router(stream.router)

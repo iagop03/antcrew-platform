@@ -12,8 +12,11 @@ import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 from antcrew.core.events import bus
-from app.core.database import AsyncSessionLocal
+from app.core.database import engine
 from app.models.run import Run, Event as DBEvent
 
 if TYPE_CHECKING:
@@ -38,7 +41,7 @@ def _sync_handler(event: "Event") -> None:
 
 async def _persist_event(event: "Event") -> None:
     try:
-        async with AsyncSessionLocal() as session:
+        async with AsyncSession(engine, expire_on_commit=False) as session:
             # Always record the raw event
             db_event = DBEvent(
                 run_id=event.run_id,
