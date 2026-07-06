@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "antcrew-platform"
-version = "0.1.0"
+version = "0.3.0"
 description = "Commercial dashboard and API layer for antcrew pipelines"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,10 +13,9 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "sqlmodel>=0.0.21",
     "aiosqlite>=0.20",
-    "python-multipart>=0.0.9",
-    "python-jose[cryptography]>=3.3",
-    "passlib[bcrypt]>=1.7",
     "httpx>=0.27",
+    "asyncpg>=0.29",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
@@ -24,8 +23,13 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",
     "httpx>=0.27",
+    "asyncpg>=0.29",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+    # SQLModel warns on session.execute(); we use it intentionally for raw SQL aggregate queries
+    "ignore:.*session.execute.*:DeprecationWarning",
+]

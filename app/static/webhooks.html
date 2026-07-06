@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>antcrew — Webhooks</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="webhooks()" x-init="init()">
+
+<!-- Nav -->
+<nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
+  <span class="font-mono font-bold text-indigo-400">antcrew</span>
+  <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
+  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/reviews" class="text-sm text-gray-400 hover:text-white">Reviews</a>
+  <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
+  <a href="/webhooks" class="text-sm text-white font-medium">Webhooks</a>
+</nav>
+
+<!-- Header -->
+<div class="px-6 py-5 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">Webhook Management</h1>
+    <p class="text-gray-400 text-sm mt-0.5">Register and manage per-workspace webhook URLs</p>
+  </div>
+</div>
+
+<!-- Error banner -->
+<div x-show="error" class="px-6 mb-4">
+  <div class="bg-red-950 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300 flex items-center gap-3">
+    <span>⚠</span>
+    <span x-text="error"></span>
+    <button @click="error = null" class="ml-auto text-xs text-red-400 hover:text-red-200">✕</button>
+  </div>
+</div>
+
+<!-- Workspace selector -->
+<div class="px-6 mb-6 flex items-center gap-3">
+  <label class="text-sm text-gray-400">Workspace:</label>
+  <select x-model="selectedWsId" @change="loadHooks()"
+    class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+    <option value="">— select —</option>
+    <template x-for="ws in workspaces" :key="ws.id">
+      <option :value="ws.id" x-text="`${ws.name} (${ws.slug})`"></option>
+    </template>
+  </select>
+  <span x-show="loading" class="text-xs text-gray-500 animate-pulse">loading…</span>
+</div>
+
+<!-- Webhooks table -->
+<div class="px-6" x-show="selectedWsId">
+  <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden mb-6">
+    <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+      <span class="text-sm font-medium">Registered webhooks</span>
+      <button @click="showCreate = true"
+        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition">
+        + Register
+      </button>
+    </div>
+
+    <template x-if="hooks.length === 0 && !loading">
+      <div class="px-4 py-8 text-center text-gray-500 text-sm">No webhooks registered for this workspace.</div>
+    </template>
+
+    <template x-if="hooks.length > 0">
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-800">
+          <tr class="text-gray-400 text-xs uppercase tracking-wide">
+            <th class="px-4 py-3 text-left">URL</th>
+            <th class="px-4 py-3 text-left">Events</th>
+            <th class="px-4 py-3 text-left">Label</th>
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Created</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="hook in hooks" :key="hook.id">
+            <tr class="border-b border-gray-800 last:border-0 hover:bg-gray-800/40 transition">
+              <td class="px-4 py-3 font-mono text-xs text-indigo-300 max-w-xs truncate" x-text="hook.url" :title="hook.url"></td>
+              <td class="px-4 py-3">
+                <template x-for="ev in hook.events" :key="ev">
+                  <span class="inline-block mr-1 px-2 py-0.5 rounded text-xs bg-gray-700 text-gray-300 font-mono" x-text="ev"></span>
+                </template>
+              </td>
+              <td class="px-4 py-3 text-gray-400 text-xs" x-text="hook.label || '—'"></td>
+              <td class="px-4 py-3">
+                <span :class="hook.enabled ? 'text-green-400' : 'text-gray-500'" class="text-xs font-medium"
+                  x-text="hook.enabled ? 'active' : 'disabled'"></span>
+              </td>
+              <td class="px-4 py-3 text-gray-500 text-xs" x-text="fmtDate(hook.created_at)"></td>
+              <td class="px-4 py-3 text-right">
+                <button @click="deleteHook(hook.id)"
+                  class="text-xs text-red-400 hover:text-red-300 transition px-2 py-1 rounded hover:bg-red-950">
+                  Delete
+                </button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </template>
+  </div>
+</div>
+
+<!-- Create modal -->
+<div x-show="showCreate" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+  @keydown.escape.window="showCreate = false">
+  <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 shadow-xl"
+    @click.outside="showCreate = false">
+    <h2 class="text-base font-semibold mb-4">Register Webhook</h2>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">URL <span class="text-red-400">*</span></label>
+        <input x-model="form.url" type="url" placeholder="https://example.com/webhook"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
+        <p class="text-xs text-gray-500 mt-1">Must start with https://</p>
+      </div>
+
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Event types</label>
+        <div class="space-y-1">
+          <template x-for="ev in availableEvents" :key="ev">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" :value="ev" x-model="form.events"
+                class="rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500">
+              <span class="text-sm font-mono text-gray-300" x-text="ev"></span>
+            </label>
+          </template>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs text-gray-400 mb-1">Label <span class="text-gray-600">(optional)</span></label>
+        <input x-model="form.label" type="text" placeholder="e.g. CI notifier"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-6">
+      <button @click="showCreate = false"
+        class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
+      <button @click="createHook()"
+        :disabled="!form.url || form.events.length === 0 || saving"
+        class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed
+               text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        <span x-text="saving ? 'Registering…' : 'Register'"></span>
+      </button>
+    </div>
+    <p x-show="formError" class="text-xs text-red-400 mt-2" x-text="formError"></p>
+  </div>
+</div>
+
+<script>
+function webhooks() {
+  return {
+    workspaces: [],
+    selectedWsId: '',
+    hooks: [],
+    loading: false,
+    error: null,
+    showCreate: false,
+    saving: false,
+    formError: null,
+    availableEvents: ['pipeline.end', 'hitl.review_required', '*'],
+    form: { url: '', events: ['pipeline.end'], label: '' },
+
+    async init() {
+      try {
+        const r = await fetch('/workspaces/', { headers: apiHeaders() });
+        if (!r.ok) throw new Error(`${r.status}`);
+        this.workspaces = await r.json();
+        if (this.workspaces.length === 1) {
+          this.selectedWsId = String(this.workspaces[0].id);
+          await this.loadHooks();
+        }
+      } catch (e) {
+        this.error = 'Failed to load workspaces: ' + e.message;
+      }
+    },
+
+    async loadHooks() {
+      if (!this.selectedWsId) return;
+      this.loading = true;
+      this.hooks = [];
+      try {
+        const r = await fetch(`/workspaces/${this.selectedWsId}/webhooks`, { headers: apiHeaders() });
+        if (!r.ok) throw new Error(`${r.status}`);
+        this.hooks = await r.json();
+      } catch (e) {
+        this.error = 'Failed to load webhooks: ' + e.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async createHook() {
+      this.formError = null;
+      if (!this.form.url.startsWith('https://')) {
+        this.formError = 'URL must start with https://';
+        return;
+      }
+      if (this.form.events.length === 0) {
+        this.formError = 'Select at least one event type.';
+        return;
+      }
+      this.saving = true;
+      try {
+        const r = await fetch(`/workspaces/${this.selectedWsId}/webhooks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+          body: JSON.stringify({
+            url: this.form.url,
+            events: this.form.events,
+            label: this.form.label || null,
+          }),
+        });
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          this.formError = body?.detail || `HTTP ${r.status}`;
+          return;
+        }
+        this.showCreate = false;
+        this.form = { url: '', events: ['pipeline.end'], label: '' };
+        await this.loadHooks();
+      } catch (e) {
+        this.formError = e.message;
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    async deleteHook(id) {
+      if (!confirm('Delete this webhook?')) return;
+      try {
+        const r = await fetch(`/workspaces/${this.selectedWsId}/webhooks/${id}`, {
+          method: 'DELETE',
+          headers: apiHeaders(),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        this.hooks = this.hooks.filter(h => h.id !== id);
+      } catch (e) {
+        this.error = 'Failed to delete webhook: ' + e.message;
+      }
+    },
+
+    fmtDate(iso) {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleString(); } catch { return iso; }
+    },
+  };
+}
+
+function apiHeaders() {
+  const key = localStorage.getItem('antcrew_api_key') || '';
+  return key ? { 'X-Api-Key': key } : {};
+}
+</script>
+</body>
+</html>

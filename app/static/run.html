@@ -13,6 +13,13 @@
   <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
   <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
   <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/reviews" class="text-sm text-gray-400 hover:text-white">Reviews</a>
+  <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
+  <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
+    <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500"></span>
+    <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500"></span>
+    <span x-text="wsConnected ? 'Live' : 'Reconnecting…'"></span>
+  </div>
 </nav>
 
 <div class="px-6 py-5">
@@ -22,6 +29,19 @@
     <span class="mx-2">/</span>
     <span class="font-mono" x-text="runId ? runId.slice(0,16) + '…' : '…'"></span>
   </div>
+
+  <!-- Run header loading skeleton -->
+  <template x-if="loadingRun">
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-5 mb-6 animate-pulse">
+      <div class="h-5 bg-gray-800 rounded w-48 mb-3"></div>
+      <div class="h-4 bg-gray-800 rounded w-96"></div>
+    </div>
+  </template>
+
+  <!-- Run not found -->
+  <template x-if="!loadingRun && !run && runError">
+    <div class="bg-red-950 border border-red-800 rounded-xl p-5 mb-6 text-red-300 text-sm" x-text="runError"></div>
+  </template>
 
   <!-- Run header -->
   <template x-if="run">
@@ -35,15 +55,23 @@
                 'bg-yellow-900/50 text-yellow-300': run.status === 'running',
                 'bg-green-900/50 text-green-300': run.status === 'success',
                 'bg-red-900/50 text-red-300': run.status === 'error',
+                'bg-gray-800 text-gray-400': !['running','success','error'].includes(run.status)
               }"
               x-text="run.status"></span>
+            <template x-if="run.status === 'running'">
+              <button @click="cancelRun()"
+                class="text-xs px-2 py-0.5 rounded border border-red-800 text-red-400 hover:bg-red-950 transition">
+                Cancel
+              </button>
+            </template>
           </div>
           <h1 class="text-lg font-semibold text-white" x-text="run.request"></h1>
           <p class="text-sm text-indigo-300 mt-1" x-text="run.team"></p>
         </div>
-        <div class="text-right text-sm text-gray-400">
+        <div class="text-right text-sm text-gray-400 space-y-1">
           <div x-text="run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '—'"></div>
-          <div class="text-xs mt-1" x-text="formatDate(run.created_at)"></div>
+          <div class="text-xs" x-text="run.duration_s ? run.duration_s.toFixed(0) + 's' : ''"></div>
+          <div class="text-xs" x-text="formatDate(run.created_at)"></div>
         </div>
       </div>
     </div>
@@ -52,12 +80,25 @@
   <div class="grid grid-cols-3 gap-6">
     <!-- Events timeline -->
     <div class="col-span-2">
-      <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">Event Timeline</h2>
-      <div class="space-y-1">
-        <template x-if="events.length === 0">
+      <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
+        Event Timeline
+        <span class="text-gray-600 normal-case font-normal" x-text="'(' + events.length + ')'"></span>
+      </h2>
+
+      <!-- Loading -->
+      <template x-if="loadingEvents">
+        <div class="space-y-1">
+          <template x-for="i in [1,2,3,4]" :key="i">
+            <div class="h-10 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+          </template>
+        </div>
+      </template>
+
+      <div class="space-y-1" x-show="!loadingEvents">
+        <template x-if="events.length === 0 && !loadingEvents">
           <p class="text-gray-500 text-sm py-4">No events yet.</p>
         </template>
-        <template x-for="ev in events" :key="ev.id">
+        <template x-for="ev in events" :key="(ev.id || '') + '-' + ev.event_type + '-' + ev.timestamp">
           <div class="flex gap-3 text-sm">
             <div class="text-gray-600 font-mono text-xs w-24 pt-0.5 shrink-0"
                  x-text="formatTime(ev.timestamp)"></div>
@@ -66,11 +107,11 @@
                 <span class="font-mono text-xs px-1.5 py-0.5 rounded text-indigo-300 bg-indigo-950"
                       x-text="ev.event_type"></span>
                 <span class="text-xs text-gray-500"
-                      x-show="ev.payload.agent_name"
-                      x-text="ev.payload.agent_name"></span>
+                      x-show="ev.payload && ev.payload.agent_name"
+                      x-text="ev.payload && ev.payload.agent_name"></span>
               </div>
               <div class="text-xs text-gray-400 font-mono"
-                   x-show="Object.keys(ev.payload).length > 0"
+                   x-show="ev.payload && Object.keys(ev.payload).length > 0"
                    x-text="payloadSummary(ev.payload)"></div>
             </div>
           </div>
@@ -85,12 +126,18 @@
         <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
           Tickets <span class="text-gray-600 normal-case" x-text="'(' + tickets.length + ')'"></span>
         </h2>
-        <div class="space-y-2">
+        <template x-if="loadingTickets">
+          <div class="space-y-2">
+            <div class="h-16 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+            <div class="h-16 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+          </div>
+        </template>
+        <div class="space-y-2" x-show="!loadingTickets">
           <template x-if="tickets.length === 0">
             <p class="text-gray-500 text-sm">None produced yet.</p>
           </template>
           <template x-for="t in tickets" :key="t.ticket_id">
-            <div class="bg-gray-900 border border-gray-800 rounded-lg p-3">
+            <a :href="'/tickets'" class="block bg-gray-900 border border-gray-800 rounded-lg p-3 hover:border-gray-600 transition">
               <div class="flex items-start justify-between gap-2">
                 <div>
                   <div class="font-mono text-xs text-gray-500 mb-0.5" x-text="t.ticket_id"></div>
@@ -104,9 +151,21 @@
                   }"
                   x-text="t.priority"></span>
               </div>
-            </div>
+            </a>
           </template>
         </div>
+      </div>
+
+      <!-- Download artifacts -->
+      <div x-show="run && run.status === 'success' && stateJson">
+        <a :href="'/runs/' + runId + '/artifacts.zip'"
+           class="flex items-center justify-center gap-2 w-full bg-gray-900 border border-gray-700 hover:border-indigo-500 rounded-lg px-3 py-2 text-sm text-gray-300 hover:text-indigo-300 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+          </svg>
+          Download artifacts (.zip)
+        </a>
       </div>
 
       <!-- State JSON -->
@@ -137,57 +196,138 @@ function runDetail() {
     stateJson: '',
     stateExpanded: false,
     ws: null,
+    wsConnected: false,
+    _wsBackoff: 1000,
+    loadingRun: true,
+    loadingEvents: true,
+    loadingTickets: true,
+    runError: '',
+    _nextEventKey: 0,
+    hitlReview: null,
+    hitlFeedback: '',
+    hitlEditedJson: '',
+    hitlSubmitting: false,
 
     async init() {
-      this.runId = location.pathname.split('/').pop();
+      // Extract run_id safely from /run/<id> path
+      const match = location.pathname.match(/^\/run\/(.+?)\/?$/);
+      this.runId = match ? match[1] : null;
+      if (!this.runId) { this.runError = 'Invalid URL — no run ID found.'; this.loadingRun = false; return; }
+
       await Promise.all([this.loadRun(), this.loadEvents(), this.loadTickets(), this.loadState()]);
+      await this.loadPendingReview();
       this.connectWs();
     },
 
     async loadRun() {
+      this.loadingRun = true;
+      this.runError = '';
       try {
-        const r = await fetch(`/runs/${this.runId}`);
-        if (r.ok) this.run = await r.json();
-      } catch {}
+        const r = await fetch(`/runs/${this.runId}`, { headers: this.apiHeaders() });
+        if (!r.ok) throw new Error(r.status === 404 ? 'Run not found.' : `HTTP ${r.status}`);
+        this.run = await r.json();
+      } catch (err) {
+        this.runError = err.message;
+      } finally {
+        this.loadingRun = false;
+      }
     },
 
     async loadEvents() {
+      this.loadingEvents = true;
       try {
-        const r = await fetch(`/runs/${this.runId}/events`);
+        const r = await fetch(`/runs/${this.runId}/events`, { headers: this.apiHeaders() });
         if (r.ok) this.events = await r.json();
-      } catch {}
+      } catch {} finally {
+        this.loadingEvents = false;
+      }
     },
 
     async loadTickets() {
+      this.loadingTickets = true;
       try {
-        const r = await fetch(`/runs/${this.runId}/tickets`);
+        const r = await fetch(`/runs/${this.runId}/tickets`, { headers: this.apiHeaders() });
         if (r.ok) this.tickets = await r.json();
-      } catch {}
+      } catch {} finally {
+        this.loadingTickets = false;
+      }
     },
 
     async loadState() {
       try {
-        const r = await fetch(`/runs/${this.runId}/state`);
+        const r = await fetch(`/runs/${this.runId}/state`, { headers: this.apiHeaders() });
         if (r.ok) this.stateJson = JSON.stringify(await r.json(), null, 2);
+      } catch {}
+    },
+
+    apiHeaders(extra = {}) {
+      const k = localStorage.getItem('antcrew_api_key');
+      const h = { 'Content-Type': 'application/json', ...extra };
+      if (k) h['X-Api-Key'] = k;
+      return h;
+    },
+
+    async loadPendingReview() {
+      try {
+        const r = await fetch(`/reviews/?run_id=${this.runId}&status=pending&limit=1`, { headers: this.apiHeaders() });
+        if (r.ok) {
+          const reviews = await r.json();
+          if (reviews.length > 0) {
+            const rv = reviews[0];
+            this.hitlReview = {
+              review_id: rv.review_id,
+              agent_name: rv.agent_name,
+              artifact: rv.artifact,
+              options: rv.options || ['approve', 'reject'],
+            };
+          }
+        }
       } catch {}
     },
 
     connectWs() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      this.ws = new WebSocket(`${proto}://${location.host}/ws/events?run_id=${this.runId}`);
-      this.ws.onmessage = async (e) => {
+      const k = localStorage.getItem('antcrew_api_key') || '';
+      const qs = `run_id=${this.runId}${k ? '&api_key=' + encodeURIComponent(k) : ''}`;
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/events?${qs}`);
+      this.ws.onopen = () => { this.wsConnected = true; this._wsBackoff = 1000; };
+      this.ws.onmessage = (e) => {
         const ev = JSON.parse(e.data);
-        await this.loadEvents();
+        if (ev.type === 'ping') return;
+        // Append event to timeline (avoid full reload on every event)
+        this.events.push({
+          _key: ++this._nextEventKey,
+          event_type: ev.type,
+          run_id: ev.run_id,
+          payload: ev.payload || {},
+          timestamp: ev.timestamp,
+        });
         if (ev.type === 'pipeline.end') {
-          await Promise.all([this.loadRun(), this.loadTickets(), this.loadState()]);
+          Promise.all([this.loadRun(), this.loadTickets(), this.loadState()]);
+        }
+        if (ev.type === 'hitl.review_required' && ev.run_id === this.runId) {
+          this.hitlReview = ev.payload;
+          this.hitlFeedback = '';
+          this.hitlEditedJson = ev.payload.artifact ? JSON.stringify(ev.payload.artifact, null, 2) : '';
         }
       };
-      this.ws.onclose = () => setTimeout(() => this.connectWs(), 3000);
+      this.ws.onclose = () => {
+        this.wsConnected = false;
+        setTimeout(() => this.connectWs(), this._wsBackoff);
+        this._wsBackoff = Math.min(this._wsBackoff * 2, 30000);
+      };
+    },
+
+    async cancelRun() {
+      try {
+        const r = await fetch(`/runs/${this.runId}/cancel`, { method: 'POST', headers: this.apiHeaders() });
+        if (r.ok) this.run = await r.json();
+      } catch {}
     },
 
     payloadSummary(payload) {
       const skip = ['agent_name'];
-      const parts = Object.entries(payload)
+      const parts = Object.entries(payload || {})
         .filter(([k]) => !skip.includes(k))
         .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`);
       return parts.join('  ·  ');
@@ -202,8 +342,85 @@ function runDetail() {
       if (!ts) return '';
       return new Date(ts * 1000).toLocaleTimeString();
     },
+
+    async submitReview(decision) {
+      if (!this.hitlReview || this.hitlSubmitting) return;
+      this.hitlSubmitting = true;
+      try {
+        const body = { decision };
+        if (decision === 'feedback') body.feedback = this.hitlFeedback;
+        if (decision === 'edit') body.edited = this.hitlEditedJson;
+        const r = await fetch(`/reviews/${this.hitlReview.review_id}`, {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          body: JSON.stringify(body),
+        });
+        if (r.ok) this.hitlReview = null;
+      } catch (err) {
+        console.error('HITL submit failed:', err);
+      } finally {
+        this.hitlSubmitting = false;
+      }
+    },
   }
 }
 </script>
+
+<!-- HITL Review Modal -->
+<div x-show="hitlReview" x-cloak
+     class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+  <div class="bg-gray-900 border border-indigo-700 rounded-xl w-full max-w-2xl shadow-2xl" @click.stop>
+    <template x-if="hitlReview">
+      <div>
+        <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-semibold text-white">Human Review Required</h2>
+            <p class="text-xs text-gray-400 mt-0.5">
+              Agent: <span class="text-indigo-300 font-mono" x-text="hitlReview.agent_name"></span>
+            </p>
+          </div>
+          <span class="text-xs text-yellow-400 bg-yellow-900/30 border border-yellow-800 px-2 py-0.5 rounded-full">
+            Waiting for approval
+          </span>
+        </div>
+
+        <div class="px-6 py-4">
+          <div class="text-xs text-gray-400 uppercase tracking-wide mb-2">Artifact</div>
+          <pre class="bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-green-300 font-mono overflow-auto max-h-64"
+               x-text="JSON.stringify(hitlReview.artifact, null, 2)"></pre>
+        </div>
+
+        <div class="px-6 pb-4">
+          <div class="text-xs text-gray-400 uppercase tracking-wide mb-2">Feedback (optional)</div>
+          <textarea x-model="hitlFeedback" rows="2"
+            placeholder="Add feedback for the agent…"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none text-gray-200"></textarea>
+        </div>
+
+        <div class="px-6 pb-6 flex gap-3 flex-wrap">
+          <template x-for="opt in (hitlReview.options || ['approve', 'reject'])" :key="opt">
+            <button
+              @click="submitReview(opt)"
+              :disabled="hitlSubmitting"
+              class="px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-50"
+              :class="{
+                'bg-green-700 hover:bg-green-600 text-white': opt === 'approve',
+                'bg-red-800 hover:bg-red-700 text-white': opt === 'reject',
+                'bg-indigo-700 hover:bg-indigo-600 text-white': opt === 'edit',
+                'bg-gray-700 hover:bg-gray-600 text-white': !['approve','reject','edit'].includes(opt),
+              }"
+              x-text="hitlSubmitting ? '…' : opt"></button>
+          </template>
+          <button
+            @click="submitReview('feedback')"
+            :disabled="hitlSubmitting || !hitlFeedback"
+            class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-700 hover:bg-gray-600 text-white transition disabled:opacity-50">
+            Send feedback
+          </button>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
 </body>
 </html>

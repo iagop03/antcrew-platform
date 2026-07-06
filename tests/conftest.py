@@ -1,6 +1,8 @@
 """Shared test fixtures for antcrew-platform."""
 from __future__ import annotations
 
+import os
+
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -10,7 +12,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.main import app
 from app.core.database import get_session
 
-TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+# Override with TEST_DB_URL env var to run against PostgreSQL in CI
+TEST_DB_URL = os.environ.get("TEST_DB_URL", "sqlite+aiosqlite:///:memory:")
 
 
 @pytest.fixture(scope="function")

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reviews — antcrew</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>[x-cloak]{display:none}</style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="reviewQueue()" x-init="init()">
+
+<!-- Nav -->
+<nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
+  <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
+  <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
+  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
+  <a href="/reviews" class="text-sm text-white font-medium flex items-center gap-1.5">
+    Reviews
+    <span x-show="reviews.length > 0"
+      class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-black text-xs font-bold"
+      x-text="reviews.length"></span>
+  </a>
+  <div class="ml-auto flex items-center gap-2">
+    <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500" title="Live"></span>
+    <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500" title="Reconnecting…"></span>
+  </div>
+</nav>
+
+<!-- Header -->
+<div class="px-6 py-5 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">HITL Review Queue</h1>
+    <p class="text-gray-400 text-sm mt-0.5">Approve or reject agent output — the pipeline resumes immediately after.</p>
+  </div>
+  <div class="flex items-center gap-2 text-sm text-gray-400">
+    <span x-show="reviews.length === 0 && !loading">All clear</span>
+    <span x-show="reviews.length > 0" class="text-amber-400 font-medium" x-text="reviews.length + ' pending'"></span>
+  </div>
+</div>
+
+<!-- Loading -->
+<template x-if="loading">
+  <div class="px-6 space-y-4">
+    <template x-for="i in [1,2]" :key="i">
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-5 animate-pulse">
+        <div class="h-4 bg-gray-800 rounded w-40 mb-3"></div>
+        <div class="h-20 bg-gray-800 rounded mb-4"></div>
+        <div class="flex gap-2">
+          <div class="h-8 bg-gray-800 rounded w-24"></div>
+          <div class="h-8 bg-gray-800 rounded w-24"></div>
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
+
+<!-- Empty state -->
+<template x-if="!loading && reviews.length === 0">
+  <div class="px-6">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
+      <div class="text-4xl mb-3">✓</div>
+      <p class="text-gray-300 font-medium mb-1">No pending reviews</p>
+      <p class="text-gray-500 text-sm">
+        Runs with <code class="bg-gray-800 px-1 rounded text-xs">hitl: true</code> will appear here when an agent needs approval.
+      </p>
+    </div>
+  </div>
+</template>
+
+<!-- Review cards -->
+<div class="px-6 space-y-5" x-show="!loading && reviews.length > 0">
+  <template x-for="review in reviews" :key="review.review_id">
+    <div class="bg-gray-900 border border-amber-800/50 rounded-xl overflow-hidden">
+
+      <!-- Card header -->
+      <div class="px-5 py-3 border-b border-gray-800 flex items-center justify-between bg-amber-900/10">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center gap-1.5 bg-amber-900/40 text-amber-300 text-xs font-medium px-2.5 py-1 rounded-full">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <span x-text="review.agent_name"></span>
+          </span>
+          <a :href="'/run/' + review.run_id"
+            class="text-xs text-gray-500 hover:text-indigo-400 font-mono transition"
+            x-text="'run:' + review.run_id.slice(0,12) + '…'"></a>
+          <!-- Reviewer assignment -->
+          <template x-if="review.assigned_to">
+            <span class="text-xs text-gray-500 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+              <span x-text="review.assigned_to"></span>
+            </span>
+          </template>
+          <template x-if="!review.assigned_to">
+            <button @click="claimReview(review)"
+              class="text-xs text-gray-600 hover:text-blue-400 transition">
+              Claim
+            </button>
+          </template>
+          <template x-if="review.assigned_to && review.assigned_to !== myName">
+            <button @click="claimReview(review)"
+              class="text-xs text-gray-600 hover:text-yellow-400 transition">
+              Reassign to me
+            </button>
+          </template>
+        </div>
+        <span class="text-xs text-gray-500" x-text="timeAgo(review.created_at)"></span>
+      </div>
+
+      <!-- Artifact -->
+      <div class="p-5">
+
+        <!-- PRD artifact -->
+        <template x-if="artifactType(review) === 'prd'">
+          <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Product Requirements Document</p>
+            <h3 class="text-base font-semibold mb-1" x-text="parsedArtifact(review).title"></h3>
+            <p class="text-gray-300 text-sm mb-3" x-text="parsedArtifact(review).summary"></p>
+            <template x-if="parsedArtifact(review).functional_requirements?.length">
+              <div>
+                <p class="text-xs text-gray-500 mb-1.5">Functional requirements</p>
+                <ul class="space-y-1">
+                  <template x-for="(req, i) in parsedArtifact(review).functional_requirements" :key="i">
+                    <li class="text-sm text-gray-300 flex gap-2">
+                      <span class="text-gray-600 shrink-0" x-text="(i+1) + '.'"></span>
+                      <span x-text="req"></span>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Tickets artifact -->
+        <template x-if="artifactType(review) === 'tickets'">
+          <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Tickets</p>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-gray-500 text-xs border-b border-gray-800">
+                    <th class="text-left pb-2 pr-4">ID</th>
+                    <th class="text-left pb-2 pr-4">Title</th>
+                    <th class="text-left pb-2">Priority</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(t, i) in parsedArtifact(review)" :key="i">
+                    <tr class="border-t border-gray-800/50">
+                      <td class="py-1.5 pr-4 font-mono text-xs text-gray-400" x-text="t.id || t.ticket_id || '—'"></td>
+                      <td class="py-1.5 pr-4 text-gray-200" x-text="t.title"></td>
+                      <td class="py-1.5">
+                        <span class="text-xs px-1.5 py-0.5 rounded"
+                          :class="{
+                            'bg-red-900/40 text-red-300': ['high','critical'].includes(t.priority),
+                            'bg-yellow-900/40 text-yellow-300': t.priority === 'medium',
+                            'bg-gray-800 text-gray-400': t.priority === 'low' || !t.priority
+                          }"
+                          x-text="t.priority || '—'"></span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+
+        <!-- Code artifact -->
+        <template x-if="artifactType(review) === 'code'">
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-wide">Code artifacts</p>
+            <template x-for="(f, i) in parsedArtifact(review)" :key="i">
+              <div class="bg-gray-950 rounded-lg border border-gray-800 overflow-hidden">
+                <div class="px-3 py-1.5 border-b border-gray-800 flex items-center justify-between">
+                  <span class="font-mono text-xs text-indigo-300" x-text="f.file_path"></span>
+                  <span class="text-xs text-gray-500" x-text="f.language || ''"></span>
+                </div>
+                <pre class="px-3 py-3 text-xs text-gray-300 overflow-x-auto max-h-40 font-mono leading-relaxed"
+                  x-text="(f.content || '').slice(0, 2000) + ((f.content?.length > 2000) ? '\n…' : '')"></pre>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Code review artifact -->
+        <template x-if="artifactType(review) === 'code_review'">
+          <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Code Review</p>
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-sm font-medium px-2 py-0.5 rounded"
+                :class="{
+                  'bg-green-900/40 text-green-300': parsedArtifact(review).verdict === 'approve',
+                  'bg-yellow-900/40 text-yellow-300': parsedArtifact(review).verdict === 'request_changes',
+                  'bg-red-900/40 text-red-300': parsedArtifact(review).verdict === 'reject'
+                }"
+                x-text="(parsedArtifact(review).verdict || '').toUpperCase()"></span>
+            </div>
+            <p class="text-sm text-gray-300 mb-3" x-text="parsedArtifact(review).summary"></p>
+            <template x-if="parsedArtifact(review).findings?.length">
+              <div class="space-y-1.5">
+                <template x-for="(f, i) in parsedArtifact(review).findings" :key="i">
+                  <div class="flex gap-2 text-xs">
+                    <span class="text-gray-500 font-mono" x-text="f.file_path || '—'"></span>
+                    <span class="text-gray-300" x-text="f.message"></span>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- Fallback: pretty JSON -->
+        <template x-if="artifactType(review) === 'json'">
+          <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Artifact</p>
+            <pre class="bg-gray-950 rounded-lg border border-gray-800 px-4 py-3 text-xs text-gray-300 font-mono overflow-x-auto max-h-64"
+              x-text="JSON.stringify(review.artifact, null, 2)"></pre>
+          </div>
+        </template>
+
+      </div><!-- /artifact -->
+
+      <!-- Edit mode: inline JSON editor -->
+      <template x-if="editingId === review.review_id">
+        <div class="px-5 pb-4 space-y-2 border-t border-gray-800 pt-4">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Edit artifact — modify JSON then submit</p>
+          <textarea x-model="editedJson" rows="10"
+            class="w-full bg-gray-950 border border-indigo-600 rounded-lg px-3 py-2 text-xs font-mono text-gray-200 focus:outline-none resize-y"></textarea>
+          <div class="flex gap-2">
+            <button @click="submitEdit(review)"
+              :disabled="resolving[review.review_id]"
+              class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-700 hover:bg-indigo-600 text-white transition disabled:opacity-50"
+              x-text="resolving[review.review_id] ? '…' : 'Submit edit'">
+            </button>
+            <button @click="editingId = null; editedJson = ''"
+              class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Actions -->
+      <div class="px-5 pb-5 space-y-3" x-show="editingId !== review.review_id">
+        <!-- Feedback note (included with any decision) -->
+        <input
+          :id="'fb-' + review.review_id"
+          x-model="feedbacks[review.review_id]"
+          placeholder="Optional note sent alongside any decision (approve, reject, etc.)…"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+
+        <!-- Resolve buttons -->
+        <div class="flex gap-2 flex-wrap">
+          <template x-for="opt in parseOptions(review)" :key="opt">
+            <button
+              @click="opt === 'edit' ? startEdit(review) : resolve(review, opt)"
+              :disabled="resolving[review.review_id]"
+              :class="{
+                'bg-green-700 hover:bg-green-600 text-white': opt === 'approve',
+                'bg-red-800 hover:bg-red-700 text-white': opt === 'reject',
+                'bg-indigo-800 hover:bg-indigo-700 text-indigo-100': opt === 'edit',
+                'bg-gray-700 hover:bg-gray-600 text-gray-200': opt === 'feedback',
+                'bg-gray-800 hover:bg-gray-700 text-gray-300': !['approve','reject','feedback','edit'].includes(opt),
+                'opacity-50 cursor-not-allowed': resolving[review.review_id],
+              }"
+              class="px-4 py-2 rounded-lg text-sm font-medium transition capitalize"
+              x-text="resolving[review.review_id] ? '…' : opt">
+            </button>
+          </template>
+        </div>
+
+        <p x-show="resolveErrors[review.review_id]" class="text-red-400 text-xs"
+          x-text="resolveErrors[review.review_id]"></p>
+      </div><!-- /actions -->
+
+    </div><!-- /card -->
+  </template>
+</div>
+
+<!-- Toast: new review arrived -->
+<div x-show="toast" x-cloak x-transition
+  class="fixed bottom-6 right-6 bg-amber-700 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50">
+  <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+  <span x-text="toast"></span>
+  <button @click="toast=''" class="ml-2 text-amber-200 hover:text-white">✕</button>
+</div>
+
+<script>
+function reviewQueue() {
+  return {
+    reviews: [],
+    loading: true,
+    feedbacks: {},
+    resolving: {},
+    resolveErrors: {},
+    editingId: null,
+    editedJson: '',
+    ws: null,
+    wsConnected: false,
+    _wsBackoff: 1000,
+    toast: '',
+    myName: localStorage.getItem('antcrew_reviewer') || '',
+
+    async init() {
+      if (!this.myName) {
+        const name = prompt('Your reviewer name (saved locally):');
+        if (name?.trim()) {
+          this.myName = name.trim();
+          localStorage.setItem('antcrew_reviewer', this.myName);
+        }
+      }
+      await this.loadReviews();
+      this.connectWs();
+    },
+
+    apiHeaders(extra = {}) {
+      const k = localStorage.getItem('antcrew_api_key');
+      const h = { 'Content-Type': 'application/json', ...extra };
+      if (k) h['X-Api-Key'] = k;
+      return h;
+    },
+
+    async loadReviews() {
+      this.loading = true;
+      try {
+        const r = await fetch('/reviews/?status=pending&limit=50', { headers: this.apiHeaders() });
+        if (r.ok) this.reviews = await r.json();
+      } catch {}
+      this.loading = false;
+    },
+
+    artifactType(review) {
+      try {
+        const a = review.artifact;          // HitlReviewPublic already parses this
+        if (!a) return 'empty';
+        if (Array.isArray(a)) {
+          if (a[0]?.file_path && a[0]?.content !== undefined) return 'code';
+          if (a[0]?.id !== undefined && a[0]?.title !== undefined) return 'tickets';
+          if (a[0]?.ticket_id !== undefined && a[0]?.title !== undefined) return 'tickets';
+          return 'json';
+        }
+        if (a.verdict && a.summary && a.findings !== undefined) return 'code_review';
+        if (a.title && a.summary !== undefined) return 'prd';
+        return 'json';
+      } catch { return 'json'; }
+    },
+
+    parsedArtifact(review) {
+      return review.artifact || {};
+    },
+
+    parseOptions(review) {
+      return review.options?.length ? review.options : ['approve', 'reject'];
+    },
+
+    async claimReview(review) {
+      const name = this.myName || prompt('Your reviewer name:');
+      if (!name?.trim()) return;
+      this.myName = name.trim();
+      localStorage.setItem('antcrew_reviewer', this.myName);
+      try {
+        const r = await fetch(`/reviews/${review.review_id}/assign`, {
+          method: 'PATCH',
+          headers: this.apiHeaders(),
+          body: JSON.stringify({ assigned_to: this.myName }),
+        });
+        if (r.ok) {
+          const updated = await r.json();
+          const idx = this.reviews.findIndex(rv => rv.review_id === review.review_id);
+          if (idx !== -1) this.reviews[idx] = updated;
+        }
+      } catch {}
+    },
+
+    startEdit(review) {
+      this.editingId = review.review_id;
+      this.editedJson = JSON.stringify(review.artifact, null, 2);
+    },
+
+    async submitEdit(review) {
+      // Validate JSON before submitting
+      try { JSON.parse(this.editedJson); }
+      catch (e) {
+        this.resolveErrors[review.review_id] = 'Invalid JSON: ' + e.message;
+        return;
+      }
+      await this.resolve(review, 'edit', null, this.editedJson);
+      if (!this.resolveErrors[review.review_id]) {
+        this.editingId = null;
+        this.editedJson = '';
+      }
+    },
+
+    async resolve(review, decision, _unused, editedJson) {
+      if (this.resolving[review.review_id]) return;
+      this.resolving[review.review_id] = true;
+      this.resolveErrors[review.review_id] = '';
+      try {
+        const body = { decision };
+        // Include feedback note with any decision if the user typed one
+        const fb = this.feedbacks[review.review_id]?.trim();
+        if (fb) body.feedback = fb;
+        if (editedJson) body.edited = editedJson;
+        const r = await fetch(`/reviews/${review.review_id}`, {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          body: JSON.stringify(body),
+        });
+        if (r.ok) {
+          this.reviews = this.reviews.filter(rv => rv.review_id !== review.review_id);
+          delete this.feedbacks[review.review_id];
+        } else {
+          const d = await r.json().catch(() => ({}));
+          this.resolveErrors[review.review_id] = d.detail || `HTTP ${r.status}`;
+        }
+      } catch (e) {
+        this.resolveErrors[review.review_id] = e.message;
+      } finally {
+        this.resolving[review.review_id] = false;
+      }
+    },
+
+    connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const k = localStorage.getItem('antcrew_api_key') || '';
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/events${k ? '?api_key=' + encodeURIComponent(k) : ''}`);
+      this.ws.onopen = () => { this.wsConnected = true; this._wsBackoff = 1000; };
+      this.ws.onmessage = (e) => {
+        const ev = JSON.parse(e.data);
+        if (ev.type === 'ping') return;
+        if (ev.type === 'hitl.review_required') {
+          this.loadReviews();
+          this.toast = 'New review request — ' + (ev.payload?.agent_name || 'agent');
+          setTimeout(() => { this.toast = ''; }, 5000);
+        }
+      };
+      this.ws.onclose = () => {
+        this.wsConnected = false;
+        setTimeout(() => this.connectWs(), this._wsBackoff);
+        this._wsBackoff = Math.min(this._wsBackoff * 2, 30000);
+      };
+    },
+
+    timeAgo(iso) {
+      if (!iso) return '';
+      const diff = (Date.now() - new Date(iso)) / 1000;
+      if (diff < 60) return Math.floor(diff) + 's ago';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      return Math.floor(diff / 3600) + 'h ago';
+    },
+  };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evals — antcrew</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>[x-cloak]{display:none}</style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="evalsPage()" x-init="init()">
+
+<!-- Nav -->
+<nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
+  <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
+  <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
+  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/reviews" class="text-sm text-gray-400 hover:text-white">Reviews</a>
+  <a href="/evals" class="text-sm text-white font-medium">Evals</a>
+  <div class="ml-auto flex items-center gap-2">
+    <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500" title="Live"></span>
+    <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500" title="Reconnecting…"></span>
+  </div>
+</nav>
+
+<!-- Header -->
+<div class="px-6 py-5 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">Pipeline Evals</h1>
+    <p class="text-gray-400 text-sm mt-0.5">Run quality checks against your teams without manual review.</p>
+  </div>
+  <div class="flex items-center gap-3">
+    <button x-show="compareIds.length === 2" @click="openCompare()"
+      class="border border-indigo-500 text-indigo-300 hover:bg-indigo-950 text-sm font-medium px-4 py-2 rounded-lg transition">
+      Compare 2 selected
+    </button>
+    <button @click="showModal = true"
+      class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+      + New Eval
+    </button>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="px-6">
+  <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="border-b border-gray-800">
+        <tr class="text-gray-400 text-xs uppercase tracking-wide">
+          <th class="px-3 py-3 text-left w-8">
+            <span class="text-gray-600 text-xs">cmp</span>
+          </th>
+          <th class="px-4 py-3 text-left">Name / Request</th>
+          <th class="px-4 py-3 text-left">Team</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-right">Score</th>
+          <th class="px-4 py-3 text-right">Cost</th>
+          <th class="px-4 py-3 text-right">Time</th>
+          <th class="px-4 py-3 text-right">Started</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-if="loading">
+          <template x-for="i in [1,2,3]" :key="i">
+            <tr class="border-t border-gray-800">
+              <td colspan="8" class="px-4 py-3">
+                <div class="h-4 bg-gray-800 animate-pulse rounded w-full"></div>
+              </td>
+            </tr>
+          </template>
+        </template>
+        <template x-if="!loading && evals.length === 0">
+          <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">
+            No eval runs yet. Click "+ New Eval" to score a pipeline.
+          </td></tr>
+        </template>
+        <template x-for="ev in evals" :key="ev.eval_id">
+          <tr class="border-t border-gray-800 hover:bg-gray-800/40 transition"
+              :class="compareIds.includes(ev.eval_id) ? 'bg-indigo-950/20' : ''">
+            <td class="px-3 py-3">
+              <input type="checkbox"
+                :value="ev.eval_id"
+                :checked="compareIds.includes(ev.eval_id)"
+                @change="toggleCompare(ev.eval_id)"
+                :disabled="!compareIds.includes(ev.eval_id) && compareIds.length >= 2"
+                class="rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 cursor-pointer disabled:opacity-30">
+            </td>
+            <td class="px-4 py-3 cursor-pointer" @click="selected = selected?.eval_id === ev.eval_id ? null : ev">
+              <div class="font-medium text-gray-200 truncate max-w-xs" x-text="ev.name || ev.request"></div>
+              <div class="text-xs text-gray-500 font-mono mt-0.5" x-text="ev.eval_id.slice(0,16) + '…'"></div>
+            </td>
+            <td class="px-4 py-3 text-indigo-300 font-medium" x-text="ev.team"></td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                :class="{
+                  'bg-yellow-900/50 text-yellow-300': ev.status === 'running',
+                  'bg-green-900/50 text-green-300': ev.status === 'done' && ev.report?.passed,
+                  'bg-red-900/50 text-red-300': ev.status === 'done' && !ev.report?.passed,
+                  'bg-red-950 text-red-400': ev.status === 'error',
+                }"
+                x-text="ev.status === 'done' ? (ev.report?.passed ? 'PASS' : 'FAIL') : ev.status"></span>
+            </td>
+            <td class="px-4 py-3 text-right font-mono text-sm"
+                x-text="ev.report ? (ev.report.overall_score * 100).toFixed(0) + '%' : '—'"></td>
+            <td class="px-4 py-3 text-right text-gray-300 font-mono text-xs"
+                x-text="ev.cost_usd ? '$' + ev.cost_usd.toFixed(4) : '—'"></td>
+            <td class="px-4 py-3 text-right text-gray-400 text-xs"
+                x-text="ev.elapsed_ms ? (ev.elapsed_ms / 1000).toFixed(1) + 's' : '—'"></td>
+            <td class="px-4 py-3 text-right text-gray-400 text-xs" x-text="timeAgo(ev.created_at)"></td>
+          </tr>
+          <!-- Inline expanded report -->
+          <template x-if="selected?.eval_id === ev.eval_id && ev.report">
+            <tr class="border-t border-gray-800 bg-gray-900/60">
+              <td colspan="8" class="px-4 py-4">
+                <div class="space-y-3">
+                  <div x-show="Object.keys(ev.report.agent_scores || {}).length">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Agent scores</p>
+                    <div class="flex flex-wrap gap-3">
+                      <template x-for="[agent, s] in Object.entries(ev.report.agent_scores || {})" :key="agent">
+                        <div class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs">
+                          <div class="text-gray-400 mb-1" x-text="agent"></div>
+                          <div class="text-lg font-bold"
+                            :class="s.score >= 0.8 ? 'text-green-400' : s.score >= 0.5 ? 'text-yellow-400' : 'text-red-400'"
+                            x-text="(s.score * 100).toFixed(0) + '%'"></div>
+                          <div class="text-gray-600 mt-1">
+                            <template x-for="[k, v] in Object.entries(s.metrics || {})" :key="k">
+                              <span x-text="`${k}: ${(v*100).toFixed(0)}%  `"></span>
+                            </template>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                  <template x-if="ev.report.errors?.length">
+                    <div>
+                      <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Failures</p>
+                      <ul class="space-y-0.5">
+                        <template x-for="(e, i) in ev.report.errors" :key="i">
+                          <li class="text-xs text-red-400" x-text="'! ' + e"></li>
+                        </template>
+                      </ul>
+                    </div>
+                  </template>
+                  <p class="text-xs text-gray-500"
+                    x-text="`tokens: ${ev.report.token_count?.toLocaleString() || '—'}  · cost: $${ev.report.cost_usd?.toFixed(4) || '0.0000'}  · time: ${(ev.report.elapsed_ms/1000).toFixed(1)}s`">
+                  </p>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <template x-if="selected?.eval_id === ev.eval_id && ev.error">
+            <tr class="border-t border-gray-800 bg-red-950/20">
+              <td colspan="8" class="px-4 py-3 text-xs text-red-300 font-mono" x-text="ev.error"></td>
+            </tr>
+          </template>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Schedules section -->
+<div class="px-6 mt-8 mb-8">
+  <div class="flex items-center justify-between mb-3">
+    <button @click="schedOpen = !schedOpen" class="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition">
+      <span x-text="schedOpen ? '▾' : '▸'" class="text-gray-500"></span>
+      Recurring Schedules
+      <span class="text-xs text-gray-500 font-normal" x-text="`(${schedules.length})`"></span>
+    </button>
+    <button x-show="schedOpen" @click="showSchedModal = true"
+      class="text-xs border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition">
+      + New Schedule
+    </button>
+  </div>
+
+  <div x-show="schedOpen" x-cloak>
+    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-800">
+          <tr class="text-gray-400 text-xs uppercase tracking-wide">
+            <th class="px-4 py-3 text-left">Name</th>
+            <th class="px-4 py-3 text-left">Team</th>
+            <th class="px-4 py-3 text-right">Every</th>
+            <th class="px-4 py-3 text-right">Next run</th>
+            <th class="px-4 py-3 text-center">Status</th>
+            <th class="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-if="schedules.length === 0">
+            <tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">No schedules yet.</td></tr>
+          </template>
+          <template x-for="s in schedules" :key="s.id">
+            <tr class="border-t border-gray-800 hover:bg-gray-800/30 transition">
+              <td class="px-4 py-3">
+                <div class="font-medium text-gray-200" x-text="s.name"></div>
+                <div class="text-xs text-gray-500 truncate max-w-xs" x-text="s.request"></div>
+              </td>
+              <td class="px-4 py-3 text-indigo-300" x-text="s.team"></td>
+              <td class="px-4 py-3 text-right text-gray-300"
+                  x-text="s.interval_hours >= 24 ? (s.interval_hours/24).toFixed(0) + 'd' : s.interval_hours + 'h'"></td>
+              <td class="px-4 py-3 text-right text-gray-400 text-xs" x-text="timeAgo(s.next_run_at)"></td>
+              <td class="px-4 py-3 text-center">
+                <span class="px-2 py-0.5 rounded-full text-xs"
+                  :class="s.enabled ? 'bg-green-900/50 text-green-300' : 'bg-gray-800 text-gray-500'"
+                  x-text="s.enabled ? 'active' : 'paused'"></span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <button @click="toggleSched(s)" class="text-xs text-gray-400 hover:text-white transition"
+                    x-text="s.enabled ? 'Pause' : 'Resume'"></button>
+                  <button @click="deleteSched(s.id)" class="text-xs text-red-400 hover:text-red-200 transition">Delete</button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- New Eval Modal -->
+<div x-show="showModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
+    <h2 class="text-lg font-semibold mb-4">New Eval Run</h2>
+    <form @submit.prevent="submitEval()">
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Team</label>
+        <select x-model="form.team" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          <template x-for="t in availableTeams" :key="t">
+            <option :value="t" x-text="t"></option>
+          </template>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Request / task</label>
+        <textarea x-model="form.request" rows="2"
+          placeholder="Build a login module with JWT…"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Name (optional)</label>
+        <input x-model="form.name" placeholder="auth-module-v2"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="mb-4 grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Min tickets expected</label>
+          <input type="number" min="0" x-model.number="form.expect_min_tickets"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Min code files expected</label>
+          <input type="number" min="0" x-model.number="form.expect_min_code_files"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button type="button" @click="showModal = false; formError = ''"
+          class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition">Cancel</button>
+        <button type="submit" :disabled="submitting"
+          class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
+          x-text="submitting ? 'Starting…' : 'Run Eval'"></button>
+      </div>
+      <p x-show="formError" class="text-red-400 text-xs mt-3" x-text="formError"></p>
+    </form>
+  </div>
+</div>
+
+<!-- New Schedule Modal -->
+<div x-show="showSchedModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
+    <h2 class="text-lg font-semibold mb-4">New Recurring Schedule</h2>
+    <form @submit.prevent="submitSched()">
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Schedule name</label>
+        <input x-model="schedForm.name" placeholder="nightly-auth-check"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Team</label>
+        <select x-model="schedForm.team" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          <template x-for="t in availableTeams" :key="t">
+            <option :value="t" x-text="t"></option>
+          </template>
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Request</label>
+        <textarea x-model="schedForm.request" rows="2"
+          placeholder="Build a login module with JWT…"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+      </div>
+      <div class="mb-4 grid grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Every (hours)</label>
+          <input type="number" min="1" step="0.5" x-model.number="schedForm.interval_hours"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Min tickets</label>
+          <input type="number" min="0" x-model.number="schedForm.expect_min_tickets"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Min code files</label>
+          <input type="number" min="0" x-model.number="schedForm.expect_min_code_files"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button type="button" @click="showSchedModal = false; schedError = ''"
+          class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition">Cancel</button>
+        <button type="submit" :disabled="schedSubmitting"
+          class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
+          x-text="schedSubmitting ? 'Saving…' : 'Create Schedule'"></button>
+      </div>
+      <p x-show="schedError" class="text-red-400 text-xs mt-3" x-text="schedError"></p>
+    </form>
+  </div>
+</div>
+
+<!-- Comparison Modal -->
+<div x-show="compareModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click="compareModal = false">
+  <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-2xl shadow-2xl" @click.stop>
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold">Eval Comparison</h2>
+      <button @click="compareModal = false" class="text-gray-500 hover:text-white text-xl">&times;</button>
+    </div>
+    <template x-if="compareLoading">
+      <div class="py-8 text-center text-gray-400">Loading comparison…</div>
+    </template>
+    <template x-if="compareError">
+      <div class="py-4 text-red-400 text-sm" x-text="compareError"></div>
+    </template>
+    <template x-if="compareData && !compareLoading">
+      <div class="space-y-5">
+        <!-- Header row -->
+        <div class="grid grid-cols-3 gap-4 text-sm">
+          <div class="text-gray-500 uppercase text-xs tracking-wide pt-6">Metric</div>
+          <div class="bg-gray-800 rounded-lg p-3">
+            <p class="text-xs text-gray-500 mb-1">Baseline</p>
+            <p class="font-medium text-gray-200 truncate" x-text="compareData.baseline.name || compareData.baseline.eval_id?.slice(0,12)"></p>
+          </div>
+          <div class="bg-gray-800 rounded-lg p-3">
+            <p class="text-xs text-gray-500 mb-1">Candidate</p>
+            <p class="font-medium text-gray-200 truncate" x-text="compareData.candidate.name || compareData.candidate.eval_id?.slice(0,12)"></p>
+          </div>
+        </div>
+
+        <!-- Score row -->
+        <div class="grid grid-cols-3 gap-4 text-sm items-center">
+          <div class="text-gray-400">Overall score</div>
+          <div class="font-mono text-center"
+            x-text="compareData.baseline.overall_score != null ? (compareData.baseline.overall_score*100).toFixed(1)+'%' : '—'"></div>
+          <div class="font-mono text-center font-semibold"
+            :class="compareData.delta.improved ? 'text-green-400' : compareData.delta.regression ? 'text-red-400' : 'text-gray-200'"
+            x-text="compareData.candidate.overall_score != null ? (compareData.candidate.overall_score*100).toFixed(1)+'%' : '—'">
+          </div>
+        </div>
+
+        <!-- Delta row -->
+        <div class="grid grid-cols-3 gap-4 text-sm items-center">
+          <div class="text-gray-400">Delta</div>
+          <div class="text-gray-600">—</div>
+          <div class="font-mono font-semibold"
+            :class="compareData.delta.improved ? 'text-green-400' : compareData.delta.regression ? 'text-red-400' : 'text-gray-400'"
+            x-text="compareData.delta.overall_score != null
+              ? (compareData.delta.overall_score >= 0 ? '+' : '') + (compareData.delta.overall_score*100).toFixed(1) + '%'
+              : '—'">
+          </div>
+        </div>
+
+        <!-- Verdict -->
+        <div class="rounded-lg px-4 py-3 text-sm"
+          :class="compareData.delta.improved
+            ? 'bg-green-950 border border-green-800 text-green-300'
+            : compareData.delta.regression
+            ? 'bg-red-950 border border-red-800 text-red-300'
+            : 'bg-gray-800 border border-gray-700 text-gray-400'">
+          <template x-if="compareData.delta.improved">
+            <span>Improvement detected — candidate scores higher than baseline.</span>
+          </template>
+          <template x-if="compareData.delta.regression">
+            <span>Regression detected — candidate scores lower than baseline.</span>
+          </template>
+          <template x-if="!compareData.delta.improved && !compareData.delta.regression">
+            <span>No significant change detected.</span>
+          </template>
+        </div>
+
+        <!-- Cost / time -->
+        <div class="grid grid-cols-3 gap-4 text-xs text-gray-500">
+          <div>Cost / Time</div>
+          <div x-text="`$${(compareData.baseline.cost_usd||0).toFixed(4)}  ·  ${((compareData.baseline.elapsed_ms||0)/1000).toFixed(1)}s`"></div>
+          <div x-text="`$${(compareData.candidate.cost_usd||0).toFixed(4)}  ·  ${((compareData.candidate.elapsed_ms||0)/1000).toFixed(1)}s`"></div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+function evalsPage() {
+  return {
+    evals: [],
+    loading: true,
+    selected: null,
+    showModal: false,
+    submitting: false,
+    formError: '',
+    availableTeams: [],
+    form: { team: 'DevTeam', request: '', name: '', expect_min_tickets: 0, expect_min_code_files: 0 },
+    ws: null,
+    wsConnected: false,
+    _wsBackoff: 1000,
+    _pollTimer: null,
+
+    // Compare
+    compareIds: [],
+    compareModal: false,
+    compareData: null,
+    compareLoading: false,
+    compareError: '',
+
+    // Schedules
+    schedules: [],
+    schedOpen: false,
+    showSchedModal: false,
+    schedSubmitting: false,
+    schedError: '',
+    schedForm: { name: '', team: 'DevTeam', request: '', interval_hours: 24, expect_min_tickets: 0, expect_min_code_files: 0 },
+
+    apiHeaders(extra = {}) {
+      const k = localStorage.getItem('antcrew_api_key');
+      const h = { 'Content-Type': 'application/json', ...extra };
+      if (k) h['X-Api-Key'] = k;
+      return h;
+    },
+
+    async init() {
+      await Promise.all([this.loadTeams(), this.load(), this.loadSchedules()]);
+      this.connectWs();
+    },
+
+    connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const k = localStorage.getItem('antcrew_api_key') || '';
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/events${k ? '?api_key=' + encodeURIComponent(k) : ''}`);
+      this.ws.onopen = () => { this.wsConnected = true; this._wsBackoff = 1000; };
+      this.ws.onmessage = (e) => {
+        const ev = JSON.parse(e.data);
+        if (ev.type === 'ping') return;
+        if (ev.type === 'eval.done') {
+          const evalId = ev.payload?.eval_id;
+          if (evalId) {
+            fetch(`/evals/${evalId}`, { headers: this.apiHeaders() })
+              .then(r => r.ok ? r.json() : null)
+              .then(updated => {
+                if (!updated) return;
+                const idx = this.evals.findIndex(e => e.eval_id === evalId);
+                if (idx !== -1) this.evals[idx] = updated;
+                else this.evals.unshift(updated);
+              }).catch(() => {});
+          }
+        } else if (ev.type === 'eval.start') {
+          this.load();
+        }
+      };
+      this.ws.onclose = () => {
+        this.wsConnected = false;
+        setTimeout(() => this.connectWs(), this._wsBackoff);
+        this._wsBackoff = Math.min(this._wsBackoff * 2, 30000);
+      };
+    },
+
+    async loadTeams() {
+      try {
+        const r = await fetch('/run/teams', { headers: this.apiHeaders() });
+        if (r.ok) {
+          const d = await r.json();
+          this.availableTeams = d.teams;
+          this.form.team = d.teams[0] || 'DevTeam';
+          this.schedForm.team = d.teams[0] || 'DevTeam';
+        }
+      } catch {}
+    },
+
+    async load() {
+      this.loading = true;
+      try {
+        const r = await fetch('/evals/?limit=50', { headers: this.apiHeaders() });
+        if (r.ok) this.evals = await r.json();
+      } catch {} finally {
+        this.loading = false;
+      }
+    },
+
+    _pollRunning() {
+      clearTimeout(this._pollTimer);
+      if (!this.wsConnected && this.evals.some(e => e.status === 'running')) {
+        this._pollTimer = setTimeout(async () => {
+          await this.load();
+          this._pollRunning();
+        }, 5000);
+      }
+    },
+
+    async submitEval() {
+      this.submitting = true;
+      this.formError = '';
+      try {
+        const r = await fetch('/evals/', {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          body: JSON.stringify(this.form),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.formError = d.detail || `HTTP ${r.status}`;
+          return;
+        }
+        this.showModal = false;
+        this.form = { team: this.form.team, request: '', name: '', expect_min_tickets: 0, expect_min_code_files: 0 };
+        await this.load();
+        if (!this.wsConnected) this._pollRunning();
+      } catch (e) {
+        this.formError = e.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    // Compare
+    toggleCompare(evalId) {
+      const idx = this.compareIds.indexOf(evalId);
+      if (idx === -1) {
+        if (this.compareIds.length < 2) this.compareIds.push(evalId);
+      } else {
+        this.compareIds.splice(idx, 1);
+      }
+    },
+
+    async openCompare() {
+      if (this.compareIds.length !== 2) return;
+      this.compareModal = true;
+      this.compareLoading = true;
+      this.compareError = '';
+      this.compareData = null;
+      try {
+        const [a, b] = this.compareIds;
+        const r = await fetch(`/evals/compare?a=${a}&b=${b}`, { headers: this.apiHeaders() });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.compareError = d.detail || `HTTP ${r.status}`;
+          return;
+        }
+        this.compareData = await r.json();
+      } catch (e) {
+        this.compareError = e.message;
+      } finally {
+        this.compareLoading = false;
+      }
+    },
+
+    // Schedules
+    async loadSchedules() {
+      try {
+        const r = await fetch('/eval-schedules/', { headers: this.apiHeaders() });
+        if (r.ok) this.schedules = await r.json();
+      } catch {}
+    },
+
+    async submitSched() {
+      this.schedSubmitting = true;
+      this.schedError = '';
+      try {
+        const r = await fetch('/eval-schedules/', {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          body: JSON.stringify(this.schedForm),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.schedError = d.detail || `HTTP ${r.status}`;
+          return;
+        }
+        this.showSchedModal = false;
+        this.schedForm = { name: '', team: this.schedForm.team, request: '', interval_hours: 24, expect_min_tickets: 0, expect_min_code_files: 0 };
+        await this.loadSchedules();
+        this.schedOpen = true;
+      } catch (e) {
+        this.schedError = e.message;
+      } finally {
+        this.schedSubmitting = false;
+      }
+    },
+
+    async toggleSched(s) {
+      try {
+        const r = await fetch(`/eval-schedules/${s.id}/toggle`, { method: 'PATCH', headers: this.apiHeaders() });
+        if (r.ok) {
+          const updated = await r.json();
+          const idx = this.schedules.findIndex(x => x.id === s.id);
+          if (idx !== -1) this.schedules[idx] = updated;
+        }
+      } catch {}
+    },
+
+    async deleteSched(id) {
+      if (!confirm('Delete this schedule?')) return;
+      try {
+        const r = await fetch(`/eval-schedules/${id}`, { method: 'DELETE', headers: this.apiHeaders() });
+        if (r.ok || r.status === 204) {
+          this.schedules = this.schedules.filter(s => s.id !== id);
+        }
+      } catch {}
+    },
+
+    timeAgo(iso) {
+      if (!iso) return '';
+      const diff = (Date.now() - new Date(iso)) / 1000;
+      if (diff < 60) return Math.floor(diff) + 's ago';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return Math.floor(diff / 86400) + 'd ago';
+    },
+  };
+}
+</script>
+</body>
+</html>

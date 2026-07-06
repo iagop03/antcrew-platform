@@ -14,6 +14,23 @@
   <span class="font-mono font-bold text-indigo-400">antcrew</span>
   <a href="/" class="text-sm text-white font-medium">Runs</a>
   <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/reviews" class="text-sm text-gray-400 hover:text-white flex items-center gap-1.5">
+    Reviews
+    <span x-show="pendingReviews > 0"
+      class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-black text-xs font-bold"
+      x-text="pendingReviews"></span>
+  </a>
+  <a href="/evals" class="text-sm text-gray-400 hover:text-white flex items-center gap-1.5">
+    Evals
+    <span x-show="runningEvals > 0"
+      class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-500 text-white text-xs font-bold animate-pulse"
+      x-text="runningEvals"></span>
+  </a>
+  <a href="/webhooks" class="text-sm text-gray-400 hover:text-white">Webhooks</a>
+  <div class="ml-auto flex items-center gap-2">
+    <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500" title="Live"></span>
+    <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500" title="Reconnecting…"></span>
+  </div>
 </nav>
 
 <!-- Header -->
@@ -33,9 +50,25 @@
   <template x-for="[label, key, color] in [['Total','total','indigo'],['Running','running','yellow'],['Success','success','green'],['Error','error','red']]">
     <div class="bg-gray-900 rounded-lg p-3 border border-gray-800">
       <div class="text-xs text-gray-400 mb-1" x-text="label"></div>
-      <div class="text-2xl font-bold" :class="`text-${color}-400`" x-text="stats[key]"></div>
+      <div class="text-2xl font-bold" :class="`text-${color}-400`">
+        <template x-if="loadingStats">
+          <span class="inline-block w-8 h-6 bg-gray-800 animate-pulse rounded"></span>
+        </template>
+        <template x-if="!loadingStats">
+          <span x-text="stats[key] ?? 0"></span>
+        </template>
+      </div>
     </div>
   </template>
+</div>
+
+<!-- Error banner -->
+<div x-show="loadError" class="px-6 mb-4">
+  <div class="bg-red-950 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300 flex items-center gap-3">
+    <span>⚠</span>
+    <span x-text="loadError"></span>
+    <button @click="loadRuns()" class="ml-auto text-xs text-red-400 hover:text-red-200 underline">Retry</button>
+  </div>
 </div>
 
 <!-- Runs table -->
@@ -49,13 +82,26 @@
           <th class="px-4 py-3 text-left">Request</th>
           <th class="px-4 py-3 text-left">Status</th>
           <th class="px-4 py-3 text-right">Cost</th>
+          <th class="px-4 py-3 text-right">Duration</th>
           <th class="px-4 py-3 text-right">Started</th>
         </tr>
       </thead>
       <tbody>
-        <template x-if="runs.length === 0">
-          <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No runs yet. Click "+ New Run" to start one.</td></tr>
+        <!-- Loading skeleton -->
+        <template x-if="loadingRuns">
+          <template x-for="i in [1,2,3]" :key="i">
+            <tr class="border-t border-gray-800">
+              <td colspan="7" class="px-4 py-3">
+                <div class="h-4 bg-gray-800 animate-pulse rounded w-full"></div>
+              </td>
+            </tr>
+          </template>
         </template>
+        <!-- Empty state -->
+        <template x-if="!loadingRuns && runs.length === 0 && !loadError">
+          <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No runs yet. Click "+ New Run" to start one.</td></tr>
+        </template>
+        <!-- Rows -->
         <template x-for="run in runs" :key="run.run_id">
           <tr class="border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer transition"
               @click="window.location='/run/' + run.run_id">
@@ -74,6 +120,8 @@
             </td>
             <td class="px-4 py-3 text-right text-gray-300 font-mono text-xs"
                 x-text="run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '—'"></td>
+            <td class="px-4 py-3 text-right text-gray-400 text-xs"
+                x-text="run.duration_s ? run.duration_s.toFixed(0) + 's' : '—'"></td>
             <td class="px-4 py-3 text-right text-gray-400 text-xs" x-text="timeAgo(run.created_at)"></td>
           </tr>
         </template>
@@ -84,10 +132,21 @@
 
 <!-- New Run Modal -->
 <div x-show="showModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-  <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
-       @click.stop>
+  <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
     <h2 class="text-lg font-semibold mb-4">New Run</h2>
     <form @submit.prevent="triggerRun()">
+      <template x-if="templates.length > 0">
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1">Load from template</label>
+          <div class="flex flex-wrap gap-1.5">
+            <template x-for="t in templates" :key="t.id">
+              <button type="button" @click="loadTemplate(t)"
+                class="text-xs px-2.5 py-1 rounded-lg border border-gray-700 text-gray-300 hover:border-indigo-500 hover:text-indigo-300 transition"
+                x-text="t.name"></button>
+            </template>
+          </div>
+        </div>
+      </template>
       <div class="mb-4">
         <label class="block text-sm text-gray-400 mb-1">Team</label>
         <select x-model="form.team" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
@@ -102,11 +161,25 @@
           placeholder="Build an auth module with JWT and refresh tokens…"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
       </div>
-      <div class="mb-5">
+      <div class="mb-4">
         <label class="block text-sm text-gray-400 mb-1">Max cost (USD, optional)</label>
         <input type="number" step="0.01" min="0.01" x-model.number="form.max_cost_usd"
           placeholder="e.g. 2.00"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="mb-4 flex items-center gap-2.5">
+        <input type="checkbox" id="hitl-toggle" x-model="form.hitl"
+          class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0">
+        <label for="hitl-toggle" class="text-sm text-gray-300 select-none cursor-pointer">
+          Enable HITL — pause for human review at each checkpoint
+        </label>
+      </div>
+      <div class="mb-5">
+        <label class="block text-sm text-gray-400 mb-1">Repo URL (optional)</label>
+        <input type="url" x-model="form.repo_url"
+          placeholder="https://github.com/org/repo"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        <p class="text-xs text-gray-500 mt-1">Clone this repo and inject its contents as context. Leave blank to use the workspace default.</p>
       </div>
       <div class="flex gap-3">
         <button type="button" @click="showModal = false"
@@ -114,6 +187,14 @@
         <button type="submit" :disabled="submitting"
           class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
           x-text="submitting ? 'Starting…' : 'Start Run'"></button>
+      </div>
+      <div class="mt-3 flex items-center gap-2">
+        <input type="text" x-model="form.templateName" placeholder="Template name (optional)"
+          class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
+        <button type="button" @click="saveTemplate()" :disabled="!form.templateName.trim()"
+          class="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-indigo-500 hover:text-indigo-300 transition disabled:opacity-40">
+          Save template
+        </button>
       </div>
       <p x-show="formError" class="text-red-400 text-xs mt-3" x-text="formError"></p>
     </form>
@@ -125,22 +206,59 @@ function dashboard() {
   return {
     runs: [],
     stats: { total: 0, running: 0, success: 0, error: 0 },
+    loadingRuns: true,
+    loadingStats: true,
+    loadError: '',
     showModal: false,
     submitting: false,
     formError: '',
     availableTeams: [],
-    form: { team: 'DevTeam', request: '', max_cost_usd: null },
+    templates: [],
+    pendingReviews: 0,
+    runningEvals: 0,
+    form: { team: 'DevTeam', request: '', max_cost_usd: null, hitl: false, repo_url: '', templateName: '' },
     ws: null,
+    wsConnected: false,
+    _wsBackoff: 1000,
+
+    apiHeaders(extra = {}) {
+      const k = localStorage.getItem('antcrew_api_key');
+      const h = { 'Content-Type': 'application/json', ...extra };
+      if (k) h['X-Api-Key'] = k;
+      return h;
+    },
 
     async init() {
-      await this.loadTeams();
-      await this.loadRuns();
+      await Promise.all([this.loadTeams(), this.loadRuns(), this.loadStats(), this.loadTemplates(), this.loadPendingReviews()]);
       this.connectWs();
+    },
+
+    async loadPendingReviews() {
+      try {
+        const r = await fetch('/reviews/?status=pending&limit=100', { headers: this.apiHeaders() });
+        if (r.ok) this.pendingReviews = (await r.json()).length;
+      } catch {}
+    },
+
+    async loadTemplates() {
+      try {
+        const r = await fetch('/templates/', { headers: this.apiHeaders() });
+        if (r.ok) this.templates = await r.json();
+      } catch {}
+    },
+
+    loadTemplate(t) {
+      this.form.team = t.team;
+      this.form.request = t.request;
+      this.form.max_cost_usd = t.max_cost_usd || null;
+      this.form.hitl = t.hitl || false;
+      this.form.repo_url = t.repo_url || '';
     },
 
     async loadTeams() {
       try {
-        const r = await fetch('/run/teams');
+        const r = await fetch('/run/teams', { headers: this.apiHeaders() });
+        if (!r.ok) return;
         const d = await r.json();
         this.availableTeams = d.teams;
         this.form.team = d.teams[0] || 'DevTeam';
@@ -148,40 +266,79 @@ function dashboard() {
     },
 
     async loadRuns() {
+      this.loadingRuns = true;
+      this.loadError = '';
       try {
-        const r = await fetch('/runs/?limit=50');
+        const r = await fetch('/runs/?limit=50', { headers: this.apiHeaders() });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
         this.runs = await r.json();
-        this.calcStats();
-      } catch {}
+      } catch (err) {
+        this.loadError = `Failed to load runs: ${err.message}`;
+      } finally {
+        this.loadingRuns = false;
+      }
     },
 
-    calcStats() {
-      this.stats = this.runs.reduce((acc, r) => {
-        acc.total++;
-        if (r.status === 'running') acc.running++;
-        if (r.status === 'success') acc.success++;
-        if (r.status === 'error') acc.error++;
-        return acc;
-      }, { total: 0, running: 0, success: 0, error: 0 });
+    async loadStats() {
+      this.loadingStats = true;
+      try {
+        const r = await fetch('/runs/stats', { headers: this.apiHeaders() });
+        if (r.ok) this.stats = await r.json();
+      } catch {} finally {
+        this.loadingStats = false;
+      }
     },
 
     connectWs() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-      this.ws = new WebSocket(`${proto}://${location.host}/ws/events`);
+      const k = localStorage.getItem('antcrew_api_key') || '';
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/events${k ? '?api_key=' + encodeURIComponent(k) : ''}`);
+      this.ws.onopen = () => { this.wsConnected = true; this._wsBackoff = 1000; };
       this.ws.onmessage = (e) => {
         const ev = JSON.parse(e.data);
-        if (ev.type === 'pipeline.start') {
-          this.loadRuns();
+        if (ev.type === 'ping') return;
+        if (ev.type === 'hitl.review_required') {
+          this.pendingReviews++;
+        } else if (ev.type === 'eval.done') {
+          this.runningEvals = Math.max(0, this.runningEvals - 1);
+        } else if (ev.type === 'eval.start') {
+          this.runningEvals++;
+        } else if (ev.type === 'pipeline.start') {
+          this.loadRuns(); this.loadStats();
         } else if (ev.type === 'pipeline.end' && ev.run_id) {
           const run = this.runs.find(r => r.run_id === ev.run_id);
           if (run) {
             run.status = ev.payload.success ? 'success' : 'error';
             run.cost_usd = ev.payload.cost_usd || 0;
-            this.calcStats();
           }
+          this.loadStats();
         }
       };
-      this.ws.onclose = () => setTimeout(() => this.connectWs(), 3000);
+      this.ws.onclose = () => {
+        this.wsConnected = false;
+        setTimeout(() => this.connectWs(), this._wsBackoff);
+        this._wsBackoff = Math.min(this._wsBackoff * 2, 30000);
+      };
+    },
+
+    async saveTemplate() {
+      const name = this.form.templateName.trim();
+      if (!name) return;
+      try {
+        const body = { name, team: this.form.team, request: this.form.request, hitl: this.form.hitl };
+        if (this.form.max_cost_usd) body.max_cost_usd = this.form.max_cost_usd;
+        if (this.form.repo_url.trim()) body.repo_url = this.form.repo_url.trim();
+        const r = await fetch('/templates/', {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          body: JSON.stringify(body),
+        });
+        if (r.ok) {
+          const t = await r.json();
+          this.templates.push(t);
+          this.form.templateName = '';
+        }
+      } catch {}
     },
 
     async triggerRun() {
@@ -190,9 +347,11 @@ function dashboard() {
       try {
         const body = { team: this.form.team, request: this.form.request };
         if (this.form.max_cost_usd) body.max_cost_usd = this.form.max_cost_usd;
+        if (this.form.hitl) body.hitl = true;
+        if (this.form.repo_url.trim()) body.repo_url = this.form.repo_url.trim();
         const r = await fetch('/run/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: this.apiHeaders(),
           body: JSON.stringify(body),
         });
         if (!r.ok) {
@@ -204,8 +363,11 @@ function dashboard() {
         this.showModal = false;
         this.form.request = '';
         this.form.max_cost_usd = null;
-        await this.loadRuns();
+        this.form.hitl = false;
+        this.form.repo_url = '';
+        this.form.templateName = '';
         if (d.run_id) window.location = '/run/' + d.run_id;
+        else await this.loadRuns();
       } catch (err) {
         this.formError = err.message;
       } finally {
