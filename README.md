@@ -27,10 +27,13 @@ Backend platform for orchestrating [antcrew](https://github.com/iagop03/antcrew)
 ## Quick start
 
 ```bash
-# Install dependencies
+# 1. Install antcrew (not yet on PyPI — install from source)
+pip install "git+https://github.com/iagop03/antcrew.git"
+
+# 2. Install platform dependencies
 pip install -e ".[dev]"
 
-# Run locally (SQLite, no auth)
+# 3. Run locally (SQLite, no auth)
 make run
 # → http://localhost:8000
 
