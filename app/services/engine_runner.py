@@ -357,7 +357,7 @@ def _run_engine_sync(
 
     hitl_after = hitl_after or []
 
-    llm = build_llm(model)
+    llm = build_llm(model, prompt_caching=True)
     event_log = EventLog()
     EventBusBridge(event_log, run_id=run_id)
 
