@@ -119,69 +119,138 @@
       </div>
     </div>
 
-    <!-- Sidebar: tickets + state -->
+    <!-- Sidebar: engine or team view -->
     <div class="space-y-5">
-      <!-- Tickets -->
-      <div>
-        <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
-          Tickets <span class="text-gray-600 normal-case" x-text="'(' + tickets.length + ')'"></span>
-        </h2>
-        <template x-if="loadingTickets">
-          <div class="space-y-2">
-            <div class="h-16 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
-            <div class="h-16 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+
+      <!-- ── ENGINE SIDEBAR ── -->
+      <template x-if="run && run.team === 'engine'">
+        <div class="space-y-5">
+          <!-- Engine info card -->
+          <div class="bg-gray-900 border border-indigo-900/60 rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Engine run</span>
+            </div>
+            <p class="text-sm text-white mb-3 leading-snug" x-text="engineGoal || run.request"></p>
+            <template x-if="engineOutputDir">
+              <div class="text-xs text-gray-500 font-mono truncate" x-text="engineOutputDir"></div>
+            </template>
           </div>
-        </template>
-        <div class="space-y-2" x-show="!loadingTickets">
-          <template x-if="tickets.length === 0">
-            <p class="text-gray-500 text-sm">None produced yet.</p>
-          </template>
-          <template x-for="t in tickets" :key="t.ticket_id">
-            <a :href="'/tickets'" class="block bg-gray-900 border border-gray-800 rounded-lg p-3 hover:border-gray-600 transition">
-              <div class="flex items-start justify-between gap-2">
-                <div>
-                  <div class="font-mono text-xs text-gray-500 mb-0.5" x-text="t.ticket_id"></div>
-                  <div class="text-sm text-white" x-text="t.title"></div>
+
+          <!-- Capabilities timeline -->
+          <div>
+            <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
+              Capabilities <span class="text-gray-600 normal-case" x-text="'(' + capabilityRuns.length + ')'"></span>
+            </h2>
+            <template x-if="capabilityRuns.length === 0">
+              <p class="text-gray-500 text-sm">Waiting for first capability…</p>
+            </template>
+            <div class="space-y-1.5">
+              <template x-for="cap in capabilityRuns" :key="cap.name + cap.startedAt">
+                <div class="bg-gray-900 border rounded-lg px-3 py-2 text-sm"
+                     :class="cap.done ? 'border-gray-800' : 'border-indigo-900/60'">
+                  <div class="flex items-center justify-between">
+                    <span class="font-medium text-white" x-text="cap.name"></span>
+                    <template x-if="!cap.done">
+                      <span class="text-xs text-yellow-400 animate-pulse">running</span>
+                    </template>
+                    <template x-if="cap.done">
+                      <span class="text-xs text-gray-500" x-text="cap.duration + 's'"></span>
+                    </template>
+                  </div>
+                  <template x-if="cap.produced && cap.produced.length > 0">
+                    <div class="text-xs text-indigo-400 mt-1 truncate" x-text="cap.produced.join(', ')"></div>
+                  </template>
+                  <template x-if="!cap.done && liveTokens[cap.name]">
+                    <pre class="mt-2 text-xs font-mono text-green-400/80 bg-black/30 rounded p-1.5
+                                leading-tight max-h-24 overflow-hidden whitespace-pre-wrap break-all"
+                         x-text="liveTokens[cap.name]"></pre>
+                  </template>
                 </div>
-                <span class="text-xs px-1.5 py-0.5 rounded shrink-0"
-                  :class="{
-                    'bg-red-900/50 text-red-300': t.priority === 'high' || t.priority === 'critical',
-                    'bg-yellow-900/50 text-yellow-300': t.priority === 'medium',
-                    'bg-gray-800 text-gray-400': t.priority === 'low',
-                  }"
-                  x-text="t.priority"></span>
-              </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Download engine artifacts -->
+          <template x-if="run.status === 'success' && engineOutputDir">
+            <a :href="'/runs/' + runId + '/artifacts.zip'"
+               class="flex items-center justify-center gap-2 w-full bg-gray-900 border border-gray-700 hover:border-indigo-500 rounded-lg px-3 py-2 text-sm text-gray-300 hover:text-indigo-300 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+              </svg>
+              Download artifacts (.zip)
             </a>
           </template>
         </div>
-      </div>
+      </template>
 
-      <!-- Download artifacts -->
-      <div x-show="run && run.status === 'success' && stateJson">
-        <a :href="'/runs/' + runId + '/artifacts.zip'"
-           class="flex items-center justify-center gap-2 w-full bg-gray-900 border border-gray-700 hover:border-indigo-500 rounded-lg px-3 py-2 text-sm text-gray-300 hover:text-indigo-300 transition">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
-          </svg>
-          Download artifacts (.zip)
-        </a>
-      </div>
+      <!-- ── TEAM SIDEBAR ── -->
+      <template x-if="run && run.team !== 'engine'">
+        <div class="space-y-5">
+          <!-- Tickets -->
+          <div>
+            <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
+              Tickets <span class="text-gray-600 normal-case" x-text="'(' + tickets.length + ')'"></span>
+            </h2>
+            <template x-if="loadingTickets">
+              <div class="space-y-2">
+                <div class="h-16 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+                <div class="h-16 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+              </div>
+            </template>
+            <div class="space-y-2" x-show="!loadingTickets">
+              <template x-if="tickets.length === 0">
+                <p class="text-gray-500 text-sm">None produced yet.</p>
+              </template>
+              <template x-for="t in tickets" :key="t.ticket_id">
+                <a href="/tickets" class="block bg-gray-900 border border-gray-800 rounded-lg p-3 hover:border-gray-600 transition">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <div class="font-mono text-xs text-gray-500 mb-0.5" x-text="t.ticket_id"></div>
+                      <div class="text-sm text-white" x-text="t.title"></div>
+                    </div>
+                    <span class="text-xs px-1.5 py-0.5 rounded shrink-0"
+                      :class="{
+                        'bg-red-900/50 text-red-300': t.priority === 'high' || t.priority === 'critical',
+                        'bg-yellow-900/50 text-yellow-300': t.priority === 'medium',
+                        'bg-gray-800 text-gray-400': t.priority === 'low',
+                      }"
+                      x-text="t.priority"></span>
+                  </div>
+                </a>
+              </template>
+            </div>
+          </div>
 
-      <!-- State JSON -->
-      <div x-show="stateJson">
-        <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">State</h2>
-        <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-          <button @click="stateExpanded = !stateExpanded"
-            class="w-full px-3 py-2 text-xs text-gray-400 hover:text-white text-left transition flex justify-between">
-            <span>RunResult.to_dict()</span>
-            <span x-text="stateExpanded ? '▲ collapse' : '▼ expand'"></span>
-          </button>
-          <pre x-show="stateExpanded"
-               class="px-3 py-2 text-xs text-green-300 font-mono overflow-auto max-h-80 border-t border-gray-800"
-               x-text="stateJson"></pre>
+          <!-- Download artifacts (team run) -->
+          <div x-show="run.status === 'success' && stateJson">
+            <a :href="'/runs/' + runId + '/artifacts.zip'"
+               class="flex items-center justify-center gap-2 w-full bg-gray-900 border border-gray-700 hover:border-indigo-500 rounded-lg px-3 py-2 text-sm text-gray-300 hover:text-indigo-300 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+              </svg>
+              Download artifacts (.zip)
+            </a>
+          </div>
+
+          <!-- State JSON -->
+          <div x-show="stateJson">
+            <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">State</h2>
+            <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+              <button @click="stateExpanded = !stateExpanded"
+                class="w-full px-3 py-2 text-xs text-gray-400 hover:text-white text-left transition flex justify-between">
+                <span>RunResult.to_dict()</span>
+                <span x-text="stateExpanded ? '▲ collapse' : '▼ expand'"></span>
+              </button>
+              <pre x-show="stateExpanded"
+                   class="px-3 py-2 text-xs text-green-300 font-mono overflow-auto max-h-80 border-t border-gray-800"
+                   x-text="stateJson"></pre>
+            </div>
+          </div>
         </div>
-      </div>
+      </template>
+
     </div>
   </div>
 </div>
@@ -195,6 +264,10 @@ function runDetail() {
     tickets: [],
     stateJson: '',
     stateExpanded: false,
+    engineGoal: '',
+    engineOutputDir: '',
+    capabilityRuns: [],   // [{name, done, duration, produced}]
+    liveTokens: {},       // {capName: accumulated_text_tail}
     ws: null,
     wsConnected: false,
     _wsBackoff: 1000,
@@ -209,14 +282,32 @@ function runDetail() {
     hitlSubmitting: false,
 
     async init() {
-      // Extract run_id safely from /run/<id> path
       const match = location.pathname.match(/^\/run\/(.+?)\/?$/);
       this.runId = match ? match[1] : null;
       if (!this.runId) { this.runError = 'Invalid URL — no run ID found.'; this.loadingRun = false; return; }
 
-      await Promise.all([this.loadRun(), this.loadEvents(), this.loadTickets(), this.loadState()]);
+      await Promise.all([this.loadRun(), this.loadEvents(), this.loadState()]);
+      if (this.run && this.run.team !== 'engine') await this.loadTickets();
+      this._deriveCapabilities();
       await this.loadPendingReview();
       this.connectWs();
+    },
+
+    _deriveCapabilities() {
+      // Build capability run list from agent.start / agent.end events.
+      const caps = {};
+      for (const ev of this.events) {
+        const name = ev.payload && ev.payload.agent_name;
+        if (!name) continue;
+        if (ev.event_type === 'agent.start') {
+          caps[name] = { name, done: false, startedAt: ev.timestamp, duration: null, produced: [] };
+        } else if (ev.event_type === 'agent.end' && caps[name]) {
+          caps[name].done = true;
+          caps[name].duration = (ev.payload.duration_s || 0).toFixed(1);
+          caps[name].produced = ev.payload.produced_keys || [];
+        }
+      }
+      this.capabilityRuns = Object.values(caps);
     },
 
     async loadRun() {
@@ -256,7 +347,14 @@ function runDetail() {
     async loadState() {
       try {
         const r = await fetch(`/runs/${this.runId}/state`, { headers: this.apiHeaders() });
-        if (r.ok) this.stateJson = JSON.stringify(await r.json(), null, 2);
+        if (!r.ok) return;
+        const state = await r.json();
+        if (state && state.engine) {
+          this.engineGoal = state.goal || '';
+          this.engineOutputDir = state.output_dir || '';
+        } else {
+          this.stateJson = JSON.stringify(state, null, 2);
+        }
       } catch {}
     },
 
@@ -294,6 +392,22 @@ function runDetail() {
       this.ws.onmessage = (e) => {
         const ev = JSON.parse(e.data);
         if (ev.type === 'ping') return;
+        // Live token streaming — accumulate per capability, skip the timeline
+        if (ev.type === 'agent.token') {
+          const name = ev.payload && ev.payload.agent_name;
+          if (name) {
+            const chunk = (ev.payload.chunk || '');
+            const prev  = this.liveTokens[name] || '';
+            const next  = prev + chunk;
+            this.liveTokens[name] = next.length > 600 ? next.slice(-600) : next;
+          }
+          return;
+        }
+        // Clear live buffer when capability finishes
+        if (ev.type === 'agent.end') {
+          const name = ev.payload && ev.payload.agent_name;
+          if (name) delete this.liveTokens[name];
+        }
         // Append event to timeline (avoid full reload on every event)
         this.events.push({
           _key: ++this._nextEventKey,
@@ -302,8 +416,13 @@ function runDetail() {
           payload: ev.payload || {},
           timestamp: ev.timestamp,
         });
+        if (ev.type === 'agent.start' || ev.type === 'agent.end') {
+          this._deriveCapabilities();
+        }
         if (ev.type === 'pipeline.end') {
-          Promise.all([this.loadRun(), this.loadTickets(), this.loadState()]);
+          const tasks = [this.loadRun(), this.loadState()];
+          if (!this.run || this.run.team !== 'engine') tasks.push(this.loadTickets());
+          Promise.all(tasks);
         }
         if (ev.type === 'hitl.review_required' && ev.run_id === this.runId) {
           this.hitlReview = ev.payload;
