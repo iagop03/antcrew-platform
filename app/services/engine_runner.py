@@ -80,7 +80,7 @@ def resolve_engine_review(
 def _make_review_callback(run_id: str, cap_name: str, event_log, timeout: int = 3600):
     """Return a blocking callable for HitlReviewer that integrates with the platform bus."""
     def request_review(content) -> dict:
-        from antcrew.engine.events import HitlRequested, HitlResolved
+        from antcrew_engine.engine.events import HitlRequested, HitlResolved
 
         review_id = str(_uuid.uuid4())
         event = _threading.Event()
@@ -122,7 +122,7 @@ def _patch_downstream_needs(registry, reviewed_cap: str, old_cond_str: str | Non
     produced by the upstream capability (e.g. 'architecture_exists' for 'architect').
     """
     import dataclasses
-    from antcrew.engine import ConditionId
+    from antcrew_engine.engine import ConditionId
 
     old_cond  = ConditionId(old_cond_str or f"{reviewed_cap}_exists")
     new_cond  = ConditionId(f"{reviewed_cap}_approved")
@@ -140,7 +140,7 @@ def _patch_downstream_needs(registry, reviewed_cap: str, old_cond_str: str | Non
 
 def _load_existing_codebase(store, source_dir: Path, goal_description: str) -> None:
     """Seed the store with an existing project's .py files + stub planning artifacts."""
-    from antcrew.engine import Artifact, ArtifactId, ArtifactKind
+    from antcrew_engine.engine import Artifact, ArtifactId, ArtifactKind
 
     _SKIP = frozenset([".antcrew", "__pycache__", "venv", ".venv", ".git", "node_modules"])
 
@@ -251,12 +251,12 @@ def _build_engine_registry(
     max_tasks: int = 12,
     parallel_workers: int = 5,
 ):
-    from antcrew.capabilities import (
+    from antcrew_engine.capabilities import (
         Architect, BugFixer, CodeGenerator, CodeRegenerator, CodeReviewer,
         DependencyInstaller, DocGenerator, ReviewFixer, TaskPlanner, TestGenerator, TestRunner,
     )
-    from antcrew.config import build_llm as _build_llm
-    from antcrew.engine import CapabilityRegistry
+    from antcrew_engine.config import build_llm as _build_llm
+    from antcrew_engine.engine import CapabilityRegistry
 
     _overrides = {
         name: _build_llm(model_str)
@@ -282,7 +282,7 @@ def _build_engine_registry(
 
 
 def _build_engine_validators():
-    from antcrew.capabilities.validators import (
+    from antcrew_engine.capabilities.validators import (
         AllTasksCompletedValidator, CodeReviewedValidator, DependenciesInstalledValidator,
         DocumentationExistsValidator, TestsExistValidator, TestsPassValidator, artifact_validators,
     )
@@ -302,7 +302,7 @@ def _build_engine_validators():
 
 
 def _build_engine_goal(description: str, tech: list[str], conditions: list[str], full: bool):
-    from antcrew.engine import (
+    from antcrew_engine.engine import (
         Condition, ConditionId, Constraints, DesiredProjectState, Goal,
     )
 
@@ -358,11 +358,11 @@ def _run_engine_sync(
     max_tasks: int = 12,
     parallel_workers: int = 5,
 ) -> tuple[bool, float]:
-    from antcrew.capabilities.hitl_reviewer import HitlReviewer
-    from antcrew.capabilities.validators import artifact_validators
-    from antcrew.config import build_llm
-    from antcrew.engine import ConditionId, EventLog, FilesystemStore, MemoryStore, Operator
-    from antcrew.engine.bus_bridge import EventBusBridge
+    from antcrew_engine.capabilities.hitl_reviewer import HitlReviewer
+    from antcrew_engine.capabilities.validators import artifact_validators
+    from antcrew_engine.config import build_llm
+    from antcrew_engine.engine import ConditionId, EventLog, FilesystemStore, MemoryStore, Operator
+    from antcrew_engine.engine.bus_bridge import EventBusBridge
 
     hitl_after = hitl_after or []
 
