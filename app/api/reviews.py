@@ -297,8 +297,22 @@ async def submit_review(
         "feedback": body.feedback,
     }
 
-    # Resolve the Future — unblocks the executor thread
+    # Resolve the Future — unblocks the executor thread (LangGraph path)
     resolve_review(review_id, decision_payload)
+
+    # Resolve the threading.Event — unblocks a HitlReviewer in the engine thread pool
+    try:
+        from app.services.engine_runner import resolve_engine_review
+        # Parse edited JSON for "edit" verdict so HitlReviewer receives new_content as a dict
+        new_content = None
+        if body.decision == "edit" and body.edited:
+            try:
+                new_content = json.loads(body.edited)
+            except Exception:
+                new_content = body.edited
+        resolve_engine_review(review_id, body.decision, body.feedback, new_content)
+    except Exception:
+        pass  # not an engine review — fine to ignore
 
     review.status = _DECISION_TO_STATUS.get(body.decision, body.decision)
     review.decision = body.decision

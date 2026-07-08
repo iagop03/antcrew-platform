@@ -58,12 +58,21 @@ _engine_reviews: dict[str, _threading.Event] = {}
 _engine_verdicts: dict[str, dict] = {}
 
 
-def resolve_engine_review(review_id: str, verdict: str, feedback: str | None) -> bool:
-    """Unblock a HitlReviewer waiting on *review_id*. Called from the review API."""
+def resolve_engine_review(
+    review_id: str,
+    verdict: str,
+    feedback: str | None,
+    new_content=None,
+) -> bool:
+    """Unblock a HitlReviewer waiting on *review_id*. Called from the review API.
+
+    *new_content* carries the edited artifact body for verdict="edit"; passed
+    through to HitlReviewer so it can write the modified artifact without an LLM call.
+    """
     event = _engine_reviews.pop(review_id, None)
     if event is None:
         return False
-    _engine_verdicts[review_id] = {"verdict": verdict, "feedback": feedback}
+    _engine_verdicts[review_id] = {"verdict": verdict, "feedback": feedback, "new_content": new_content}
     event.set()
     return True
 
