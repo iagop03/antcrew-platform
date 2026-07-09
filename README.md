@@ -27,15 +27,25 @@ Backend platform for orchestrating [antcrew](https://github.com/iagop03/antcrew)
 ## Quick start
 
 ```bash
-# 1. Install antcrew (not yet on PyPI — install from source)
+# 1. Install antcrew + engine
+pip install antcrew antcrew-engine
+
+# Or from source (development)
 pip install "git+https://github.com/iagop03/antcrew.git"
+pip install "git+https://github.com/iagop03/antcrew-engine.git"
 
 # 2. Install platform dependencies
 pip install -e ".[dev]"
 
-# 3. Run locally (SQLite, no auth)
-make run
+# 3. Configure your LLM key
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# 4. Run locally (SQLite, no auth)
+uvicorn app.main:app --reload
 # → http://localhost:8000
+
+# Or via Makefile:
+make run
 
 # Apply migrations (PostgreSQL)
 DATABASE_URL=postgresql+asyncpg://... make migrate
@@ -46,29 +56,61 @@ DATABASE_URL=postgresql+asyncpg://... make migrate
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | `sqlite+aiosqlite:///platform.db` | DB connection string |
-| `PLATFORM_API_KEY` | — | Master API key (bypasses DB key check) |
-| `SLACK_WEBHOOK_URL` | — | Optional Slack webhook for HITL notifications |
-| `OPENAI_API_KEY` | — | Required for eval judge scoring |
+| `PLATFORM_API_KEY` | — | Master API key (bypasses DB key check when set) |
+| `ANTHROPIC_API_KEY` | — | Required for engine runs with the default Claude model |
+| `OPENAI_API_KEY` | — | Required for OpenAI models and eval judge scoring |
+| `SLACK_WEBHOOK_URL` | — | Slack incoming webhook for HITL review notifications |
+| `SLACK_BOT_TOKEN` | — | Slack bot token for interactive HITL (Socket Mode) |
+| `SLACK_APP_TOKEN` | — | Slack app-level token (`xapp-…`) for Socket Mode |
+| `SLACK_CHANNEL_ID` | — | Slack channel to post HITL review requests |
+| `HITL_TIMEOUT_S` | `3600` | Seconds before a HITL review auto-times-out |
+| `WEBHOOK_URL` | — | Global fallback webhook fired on every `pipeline.end` |
+| `PLATFORM_BASE_URL` | — | Public base URL used to build review links in webhooks |
+| `ANTCREW_WORKERS` | `4` | Number of background engine worker threads |
 
 ## API overview
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/run/` | Start a pipeline run |
+### Team runner (antcrew Layer 1)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/run/` | Start a pipeline run (DevTeam, ResearchTeam, etc.) |
 | `GET` | `/runs/` | List runs |
-| `GET` | `/runs/{id}` | Run detail |
+| `GET` | `/runs/{id}` | Run detail + artifact listing |
 | `POST` | `/runs/{id}/cancel` | Cancel a running pipeline |
 | `GET` | `/runs/{id}/events` | SSE event stream |
 | `WS` | `/ws/events` | WebSocket live events |
+
+### Engine runner (antcrew-engine Layer 2)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/engine/run` | Start a capability-driven engine run |
+| `GET` | `/engine/runs/{id}` | Engine run status + artifact list |
+| `GET` | `/engine/runs/{id}/artifacts/{path}` | Serve individual artifact file |
+| `GET` | `/engine/runs/{id}/zip` | Download all artifacts as ZIP |
+
+### HITL, reviews, evals, tickets
+
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/reviews/` | List HITL reviews |
-| `POST` | `/reviews/{id}` | Submit a review decision |
+| `POST` | `/reviews/{id}` | Submit approve / reject / edit decision |
 | `GET` | `/evals/` | List eval runs |
 | `POST` | `/evals/` | Trigger an eval |
 | `GET` | `/evals/compare` | Compare two evals |
 | `GET` | `/tickets/` | List tickets |
+
+### Configuration
+
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/templates/` | List run templates |
 | `GET` | `/workspaces/` | List workspaces |
 | `POST` | `/workspaces/{id}/members` | Add API key to workspace |
+| `GET` | `/api-keys/` | List API keys |
 
 Full interactive docs at `/docs` (Swagger UI).
 
