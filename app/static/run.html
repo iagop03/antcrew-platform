@@ -71,6 +71,10 @@
         <div class="text-right text-sm text-gray-400 space-y-1">
           <div x-text="run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '—'"></div>
           <div class="text-xs" x-text="run.duration_s ? run.duration_s.toFixed(0) + 's' : ''"></div>
+          <template x-if="totalCacheRead + totalCacheWrite > 0">
+            <div class="text-xs text-blue-400"
+                 x-text="'↓' + totalCacheRead.toLocaleString() + 'r ↑' + totalCacheWrite.toLocaleString() + 'w cache'"></div>
+          </template>
           <div class="text-xs" x-text="formatDate(run.created_at)"></div>
         </div>
       </div>
@@ -268,6 +272,8 @@ function runDetail() {
     engineOutputDir: '',
     capabilityRuns: [],   // [{name, done, duration, produced}]
     liveTokens: {},       // {capName: accumulated_text_tail}
+    totalCacheRead: 0,
+    totalCacheWrite: 0,
     ws: null,
     wsConnected: false,
     _wsBackoff: 1000,
@@ -403,10 +409,12 @@ function runDetail() {
           }
           return;
         }
-        // Clear live buffer when capability finishes
+        // Clear live buffer when capability finishes; accumulate cache stats
         if (ev.type === 'agent.end') {
           const name = ev.payload && ev.payload.agent_name;
           if (name) delete this.liveTokens[name];
+          this.totalCacheRead  += (ev.payload && ev.payload.cache_read_tokens)  || 0;
+          this.totalCacheWrite += (ev.payload && ev.payload.cache_write_tokens) || 0;
         }
         // Append event to timeline (avoid full reload on every event)
         this.events.push({
