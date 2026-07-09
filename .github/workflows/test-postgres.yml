@@ -33,11 +33,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install antcrew from source
-        run: pip install "git+https://github.com/iagop03/antcrew.git"
-
       - name: Install dependencies
         run: pip install -e ".[dev]"
+
+      - name: Install antcrew from source (overrides PyPI version)
+        run: pip install --force-reinstall "git+https://github.com/iagop03/antcrew.git"
 
       - name: Run tests against PostgreSQL
         env:
