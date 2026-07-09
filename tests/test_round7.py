@@ -283,7 +283,7 @@ async def test_mark_review_timed_out(session):
 
     # Simulate what _mark_review_timed_out does
     row.status = "timeout"
-    row.resolved_at = datetime.now(timezone.utc)
+    row.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
     session.add(row)
     await session.commit()
 
