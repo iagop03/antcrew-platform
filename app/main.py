@@ -130,7 +130,7 @@ async def _hitl_cleanup_loop() -> None:
         await asyncio.sleep(300)
         try:
             from datetime import datetime, timezone
-            cutoff = datetime.now(timezone.utc) - timedelta(seconds=timeout_s)
+            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(seconds=timeout_s)
             async with AsyncSession(_engine, expire_on_commit=False) as session:
                 result = await session.exec(
                     select(HitlReview).where(
@@ -141,7 +141,7 @@ async def _hitl_cleanup_loop() -> None:
                 stale = result.all()
                 for r in stale:
                     r.status = "timeout"
-                    r.resolved_at = datetime.now(timezone.utc)
+                    r.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     session.add(r)
                 if stale:
                     await session.commit()
@@ -196,7 +196,7 @@ async def _data_retention_loop() -> None:
         await asyncio.sleep(3600)
         try:
             from datetime import datetime, timezone
-            cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=retention_days)
             deleted_d, deleted_e = await _do_retention(_engine, cutoff)
             if deleted_d or deleted_e:
                 log.info(

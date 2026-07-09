@@ -206,8 +206,9 @@ def test_push_run_to_platform_sends_duration_s(monkeypatch):
         def raise_for_status(self): pass
         def json(self): return {"run_id": "abc"}
 
-    def fake_post(url, *, json, headers, timeout):
-        captured["payload"] = json
+    def fake_post(url, *, content, headers, timeout):
+        import json as _json
+        captured["payload"] = _json.loads(content)
         return FakeResponse()
 
     fake_httpx = type(sys)("httpx")

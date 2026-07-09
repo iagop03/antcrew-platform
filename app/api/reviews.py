@@ -318,7 +318,7 @@ async def submit_review(
     review.decision = body.decision
     review.edited_json = body.edited
     review.feedback = body.feedback
-    review.resolved_at = datetime.now(timezone.utc)
+    review.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
     session.add(review)
     await session.commit()
     await session.refresh(review)

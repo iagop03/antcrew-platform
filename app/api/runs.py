@@ -74,7 +74,7 @@ async def upload_run(
         state=body.state,
         workspace_id=ctx.workspace_id,
         created_by=ctx.created_by,
-        finished_at=datetime.now(timezone.utc),
+        finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     session.add(run)
     await session.commit()

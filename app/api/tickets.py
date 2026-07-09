@@ -67,7 +67,7 @@ async def update_status(
         if run and not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This ticket is not accessible with the current API key")
     ticket.status = body.status
-    ticket.updated_at = datetime.now(timezone.utc)
+    ticket.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     session.add(ticket)
     await session.commit()
     await session.refresh(ticket)

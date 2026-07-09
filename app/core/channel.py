@@ -165,7 +165,7 @@ async def _mark_review_timed_out(review_id: str) -> None:
             row = (await _s.exec(_sel(_HitlReview).where(_HitlReview.review_id == review_id))).first()
             if row and row.status == "pending":
                 row.status = "timeout"
-                row.resolved_at = datetime.now(timezone.utc)
+                row.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 _s.add(row)
                 await _s.commit()
     except Exception as exc:

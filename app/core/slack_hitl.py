@@ -243,7 +243,7 @@ def _resolve_review_sync(
                         row.feedback = feedback
                     if edited:
                         row.edited_json = edited
-                    row.resolved_at = datetime.now(timezone.utc)
+                    row.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     session.add(row)
                     await session.commit()
                     log.info("slack_hitl: resolved review %s → %s", review_id, decision)
@@ -283,7 +283,7 @@ def _resolve_review_sync(
                         row.feedback = feedback
                     if edited:
                         row.edited_json = edited
-                    row.resolved_at = datetime.now(timezone.utc)
+                    row.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     session.add(row)
                     await session.commit()
                     log.info("slack_hitl: resolved review %s → %s (isolated loop)", review_id, decision)

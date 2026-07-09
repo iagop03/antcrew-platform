@@ -81,9 +81,9 @@ def run_eval_sync(eval_id: str, cfg: EvalRunConfig, loop: asyncio.AbstractEventL
                             run.cost_usd = updates.get("cost_usd", 0.0)
                             run.finished_at = updates.get("finished_at")
                             if run.created_at and run.finished_at:
-                                created = (run.created_at if run.created_at.tzinfo
-                                           else run.created_at.replace(tzinfo=timezone.utc))
-                                run.duration_s = (run.finished_at - created).total_seconds()
+                                fa = run.finished_at.replace(tzinfo=None) if run.finished_at.tzinfo else run.finished_at
+                                ca = run.created_at.replace(tzinfo=None) if run.created_at.tzinfo else run.created_at
+                                run.duration_s = (fa - ca).total_seconds()
                             sess.add(run)
 
                     await sess.commit()
@@ -136,7 +136,7 @@ def run_eval_sync(eval_id: str, cfg: EvalRunConfig, loop: asyncio.AbstractEventL
             "report": report.to_dict(),
             "cost_usd": report.cost_usd,
             "elapsed_ms": round(elapsed, 1),
-            "finished_at": datetime.now(timezone.utc),
+            "finished_at": datetime.now(timezone.utc).replace(tzinfo=None),
         }))
         _emit("eval.done", {
             "team": cfg.team,
@@ -153,6 +153,6 @@ def run_eval_sync(eval_id: str, cfg: EvalRunConfig, loop: asyncio.AbstractEventL
             "status": "error",
             "error": str(exc),
             "elapsed_ms": round(elapsed, 1),
-            "finished_at": datetime.now(_tz.utc),
+            "finished_at": datetime.now(_tz.utc).replace(tzinfo=None),
         }))
         _emit("eval.done", {"team": cfg.team, "status": "error", "error": str(exc)})

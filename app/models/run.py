@@ -9,7 +9,7 @@ from sqlmodel import Field, SQLModel, JSON, Column
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Workspace(SQLModel, table=True):

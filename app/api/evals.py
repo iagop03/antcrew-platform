@@ -140,7 +140,7 @@ async def upload_eval_report(
 
     from datetime import datetime, timezone
     run_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     run_stub = Run(
         run_id=run_id,

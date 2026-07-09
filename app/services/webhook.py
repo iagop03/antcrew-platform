@@ -45,7 +45,7 @@ def notify_new_delivery() -> None:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 async def _process_pending() -> None:

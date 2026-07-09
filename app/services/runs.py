@@ -13,7 +13,7 @@ from app.models.run import Run, Event as DBEvent, Ticket, HitlReview
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 async def list_runs(
@@ -105,9 +105,8 @@ async def cancel_run(session: AsyncSession, run_id: str) -> Optional[Run]:
     run.status = "cancelled"
     run.finished_at = _utcnow()
     if run.created_at:
-        created = (run.created_at if run.created_at.tzinfo
-                   else run.created_at.replace(tzinfo=timezone.utc))
-        run.duration_s = (run.finished_at - created).total_seconds()
+        ca = run.created_at.replace(tzinfo=None) if run.created_at.tzinfo else run.created_at
+        run.duration_s = (run.finished_at - ca).total_seconds()
     session.add(run)
 
     # Resolve pending HITL reviews so the executor thread can unblock and exit

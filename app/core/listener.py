@@ -30,7 +30,7 @@ _REQUEST_MAX_LEN = 2000
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _sync_handler(event: "Event") -> None:
@@ -75,9 +75,8 @@ async def _persist_event(event: "Event") -> None:
                     run.cost_usd = event.payload.get("cost_usd", 0.0)
                     run.finished_at = _utcnow()
                     if run.created_at:
-                        created = (run.created_at if run.created_at.tzinfo
-                                   else run.created_at.replace(tzinfo=timezone.utc))
-                        run.duration_s = (run.finished_at - created).total_seconds()
+                        ca = run.created_at.replace(tzinfo=None) if run.created_at.tzinfo else run.created_at
+                        run.duration_s = (run.finished_at - ca).total_seconds()
                     session.add(run)
 
                     pipeline_payload = json.dumps({

@@ -56,7 +56,7 @@ async def create_schedule(
         expect_min_code_files=body.expect_min_code_files,
         expect_review_verdict=body.expect_review_verdict,
         workspace_id=ctx.workspace_id,
-        next_run_at=datetime.now(timezone.utc) + timedelta(hours=body.interval_hours),
+        next_run_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=body.interval_hours),
     )
     session.add(sched)
     await session.commit()
@@ -121,7 +121,7 @@ async def dispatch_due_schedules(engine) -> int:
     from sqlmodel.ext.asyncio.session import AsyncSession as _Sess
 
     log = logging.getLogger("eval_scheduler")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     async with _Sess(engine, expire_on_commit=False) as session:
         result = await session.exec(
