@@ -58,6 +58,63 @@ _retention_task: Optional[asyncio.Task] = None
 log = logging.getLogger(__name__)
 
 
+async def _check_auth_mode() -> None:
+    """Warn loudly if the platform starts in open (unauthenticated) mode.
+
+    Open mode is intentional for local dev but dangerous if exposed on a
+    non-loopback interface.  We check both conditions and emit a WARNING
+    that is hard to miss in logs and stdout.
+    """
+    env_key = os.environ.get("PLATFORM_API_KEY")
+    if env_key:
+        log.info("auth: single-key mode (PLATFORM_API_KEY set)")
+        return
+
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from app.core.database import engine as _engine
+    from app.models.run import ApiKey
+
+    try:
+        async with AsyncSession(_engine, expire_on_commit=False) as session:
+            any_key = (await session.exec(
+                select(ApiKey).where(ApiKey.revoked_at == None).limit(1)  # noqa: E711
+            )).first()
+        if any_key is not None:
+            log.info("auth: multi-key mode (%d+ API keys in DB)", 1)
+            return
+    except Exception as exc:
+        log.warning("auth: could not query ApiKey table (%s) — defaulting to open mode", exc)
+
+    # Detect if we're exposed beyond localhost
+    host = os.environ.get("HOST", "127.0.0.1")
+    is_public = host not in ("127.0.0.1", "localhost", "::1")
+
+    border = "=" * 72
+    msg = (
+        f"\n{border}\n"
+        "  ⚠  ANTCREW-PLATFORM STARTING IN OPEN (UNAUTHENTICATED) MODE\n"
+        "     All API endpoints are accessible without any credentials.\n"
+        "\n"
+        "  To enable authentication:\n"
+        "    Option A — set PLATFORM_API_KEY env var (single key)\n"
+        "    Option B — POST /api-keys to create scoped keys in the DB\n"
+    )
+    if is_public:
+        msg += (
+            f"\n  🚨  HOST={host!r} — this server is reachable beyond localhost.\n"
+            "     Running without auth on a public interface is a security risk.\n"
+        )
+    msg += f"{border}\n"
+
+    if is_public:
+        log.error("auth: OPEN MODE on public host %r — no credentials required", host)
+    else:
+        log.warning("auth: open mode (no PLATFORM_API_KEY, no DB keys) — local dev only")
+
+    # Also print directly so it shows even when log output is JSON-structured
+    print(msg, flush=True)
+
+
 async def _hitl_cleanup_loop() -> None:
     """Mark stale pending reviews as 'timeout' every 5 minutes."""
     import os as _os
@@ -175,6 +232,7 @@ async def lifespan(app: FastAPI):
             "CORS policy is open (*) — set CORS_ORIGINS env var to restrict origins in production"
         )
     await init_db()
+    await _check_auth_mode()
     start_listening()
     from app.core.slack_hitl import maybe_start_from_env as _slack_start
     _slack_start()
