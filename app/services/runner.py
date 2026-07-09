@@ -65,7 +65,7 @@ def _build_team_registry() -> dict[str, tuple[str, str]]:
 _TEAM_REGISTRY = _build_team_registry()
 AVAILABLE_TEAMS = list(_TEAM_REGISTRY)
 # Includes "custom" (POST /run/pipeline) for discoverability in GET /run/teams
-ALL_PIPELINE_TYPES = AVAILABLE_TEAMS + ["custom"]
+ALL_PIPELINE_TYPES = AVAILABLE_TEAMS + ["custom", "engine"]
 
 
 def _make_team(team_name: str, max_cost_usd: Optional[float] = None, model: str = ""):

@@ -5,6 +5,7 @@ import io
 import uuid
 import zipfile
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -176,26 +177,53 @@ async def tickets(
     return await get_run_tickets(session, run_id)
 
 
+_ENGINE_SKIP_DIRS = {".antcrew"}
+
+
+def _engine_output_dir(run: "Run") -> Path | None:
+    """Return the engine output_dir path if the run has one stored."""
+    if run.team != "engine" or not run.state:
+        return None
+    d = run.state.get("output_dir")
+    return Path(d) if d else None
+
+
 @router.get("/{run_id}/artifacts")
 async def artifacts(
     run_id: str,
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ) -> dict:
-    """Return generated code, devops, doc, and test artifacts for a completed run.
+    """Return generated artifacts for a completed run.
 
-    Each artifact list is empty (not null) when the run hasn't produced that type.
-    The run must be in 'success' status; 404 is returned for missing state.
+    For engine runs: lists files produced in output_dir (if persisted to disk).
+    For team runs: returns code/devops/doc/test artifact lists from run state.
     """
     run = await get_run(session, run_id)
     if not run:
         raise HTTPException(404, f"Run {run_id!r} not found")
     _assert_run_access(run, ctx)
+
+    # Engine run path
+    output_dir = _engine_output_dir(run)
+    if run.team == "engine":
+        if output_dir is None:
+            return {"run_id": run_id, "status": run.status, "engine": True,
+                    "artifacts": [], "note": "Run used in-memory store — files not persisted"}
+        if not output_dir.exists():
+            return {"run_id": run_id, "status": run.status, "engine": True,
+                    "artifacts": [], "note": f"output_dir not found on server: {output_dir}"}
+        file_list = [
+            {"file_path": str(p.relative_to(output_dir)), "size_bytes": p.stat().st_size}
+            for p in sorted(output_dir.rglob("*"))
+            if p.is_file() and not any(part in _ENGINE_SKIP_DIRS for part in p.parts)
+        ]
+        return {"run_id": run_id, "status": run.status, "engine": True,
+                "output_dir": str(output_dir), "artifacts": file_list}
+
+    # Team run path (original behaviour)
     if run.state is None:
-        raise HTTPException(
-            404,
-            f"State not available — run {run_id!r} is still {run.status!r}",
-        )
+        raise HTTPException(404, f"State not available — run {run_id!r} is still {run.status!r}")
     s = run.state
     return {
         "run_id": run_id,
@@ -213,14 +241,41 @@ async def artifacts_zip(
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ) -> StreamingResponse:
-    """Download all code, test, and devops artifacts as a ZIP archive."""
+    """Download all artifacts as a ZIP archive.
+
+    For engine runs: zips every file under output_dir (excluding .antcrew/ metadata).
+    For team runs: zips code/test/devops/doc artifacts from run state.
+    """
     run = await get_run(session, run_id)
     if not run:
         raise HTTPException(404, f"Run {run_id!r} not found")
     _assert_run_access(run, ctx)
+
+    buf = io.BytesIO()
+
+    # Engine run path
+    output_dir = _engine_output_dir(run)
+    if run.team == "engine":
+        if output_dir is None:
+            raise HTTPException(
+                404, "Engine run used in-memory store — artifacts were not persisted to disk"
+            )
+        if not output_dir.exists():
+            raise HTTPException(404, f"output_dir not found on server: {output_dir}")
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for p in sorted(output_dir.rglob("*")):
+                if p.is_file() and not any(part in _ENGINE_SKIP_DIRS for part in p.parts):
+                    zf.write(p, str(p.relative_to(output_dir)))
+        buf.seek(0)
+        filename = f"antcrew-engine-{run_id[:12]}.zip"
+        return StreamingResponse(
+            buf, media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # Team run path (original behaviour)
     if run.state is None:
         raise HTTPException(404, f"State not available — run {run_id!r} is still {run.status!r}")
-
     s = run.state
     all_artifacts = (
         (s.get("code_artifacts") or [])
@@ -228,8 +283,6 @@ async def artifacts_zip(
         + (s.get("devops_artifacts") or [])
         + (s.get("doc_artifacts") or [])
     )
-
-    buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for art in all_artifacts:
             if isinstance(art, dict):
@@ -241,11 +294,9 @@ async def artifacts_zip(
             if path:
                 zf.writestr(path.lstrip("/"), content)
     buf.seek(0)
-
     filename = f"antcrew-{run_id[:12]}.zip"
     return StreamingResponse(
-        buf,
-        media_type="application/zip",
+        buf, media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

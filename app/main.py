@@ -18,7 +18,7 @@ from sqlmodel import select
 from app.core.database import init_db, get_session
 from app.core.listener import start_listening, stop_listening
 from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, evals
-from app.api import eval_schedules
+from app.api import eval_schedules, engine
 
 _STATIC = Path(__file__).parent / "static"
 _VERSION = "0.4.0"
@@ -196,6 +196,8 @@ async def lifespan(app: FastAPI):
                 pass
     from app.services.runner import shutdown as _runner_shutdown
     _runner_shutdown()
+    from app.services.engine_runner import shutdown as _engine_shutdown
+    _engine_shutdown()
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +228,7 @@ app.include_router(templates.router)
 app.include_router(workspaces.router)
 app.include_router(evals.router)
 app.include_router(eval_schedules.router)
+app.include_router(engine.router)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 

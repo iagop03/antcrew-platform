@@ -134,67 +134,142 @@
 <div x-show="showModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
   <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
     <h2 class="text-lg font-semibold mb-4">New Run</h2>
+
+    <!-- Mode tabs -->
+    <div class="flex gap-1 mb-5 bg-gray-800 rounded-lg p-1">
+      <button type="button" @click="form.mode = 'team'"
+        class="flex-1 text-sm py-1.5 rounded-md transition font-medium"
+        :class="form.mode === 'team' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'">
+        Team run
+      </button>
+      <button type="button" @click="form.mode = 'engine'"
+        class="flex-1 text-sm py-1.5 rounded-md transition font-medium"
+        :class="form.mode === 'engine' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'">
+        Engine run
+      </button>
+    </div>
+
     <form @submit.prevent="triggerRun()">
-      <template x-if="templates.length > 0">
-        <div class="mb-4">
-          <label class="block text-sm text-gray-400 mb-1">Load from template</label>
-          <div class="flex flex-wrap gap-1.5">
-            <template x-for="t in templates" :key="t.id">
-              <button type="button" @click="loadTemplate(t)"
-                class="text-xs px-2.5 py-1 rounded-lg border border-gray-700 text-gray-300 hover:border-indigo-500 hover:text-indigo-300 transition"
-                x-text="t.name"></button>
-            </template>
+
+      <!-- ── TEAM MODE ── -->
+      <template x-if="form.mode === 'team'">
+        <div>
+          <template x-if="templates.length > 0">
+            <div class="mb-4">
+              <label class="block text-sm text-gray-400 mb-1">Load from template</label>
+              <div class="flex flex-wrap gap-1.5">
+                <template x-for="t in templates" :key="t.id">
+                  <button type="button" @click="loadTemplate(t)"
+                    class="text-xs px-2.5 py-1 rounded-lg border border-gray-700 text-gray-300 hover:border-indigo-500 hover:text-indigo-300 transition"
+                    x-text="t.name"></button>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-1">Team</label>
+            <select x-model="form.team" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+              <template x-for="t in teamOptions" :key="t">
+                <option :value="t" x-text="t"></option>
+              </template>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-1">Request</label>
+            <textarea x-model="form.request" rows="3"
+              placeholder="Build an auth module with JWT and refresh tokens…"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-1">Max cost (USD, optional)</label>
+            <input type="number" step="0.01" min="0.01" x-model.number="form.max_cost_usd"
+              placeholder="e.g. 2.00"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="mb-4 flex items-center gap-2.5">
+            <input type="checkbox" id="hitl-toggle" x-model="form.hitl"
+              class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0">
+            <label for="hitl-toggle" class="text-sm text-gray-300 select-none cursor-pointer">
+              Enable HITL — pause for human review at each checkpoint
+            </label>
+          </div>
+          <div class="mb-5">
+            <label class="block text-sm text-gray-400 mb-1">Repo URL (optional)</label>
+            <input type="url" x-model="form.repo_url"
+              placeholder="https://github.com/org/repo"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+            <p class="text-xs text-gray-500 mt-1">Clone this repo and inject its contents as context.</p>
+          </div>
+          <div class="mt-3 flex items-center gap-2">
+            <input type="text" x-model="form.templateName" placeholder="Template name (optional)"
+              class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
+            <button type="button" @click="saveTemplate()" :disabled="!form.templateName.trim()"
+              class="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-indigo-500 hover:text-indigo-300 transition disabled:opacity-40">
+              Save template
+            </button>
           </div>
         </div>
       </template>
-      <div class="mb-4">
-        <label class="block text-sm text-gray-400 mb-1">Team</label>
-        <select x-model="form.team" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-          <template x-for="t in availableTeams" :key="t">
-            <option :value="t" x-text="t"></option>
-          </template>
-        </select>
-      </div>
-      <div class="mb-4">
-        <label class="block text-sm text-gray-400 mb-1">Request</label>
-        <textarea x-model="form.request" rows="3"
-          placeholder="Build an auth module with JWT and refresh tokens…"
-          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
-      </div>
-      <div class="mb-4">
-        <label class="block text-sm text-gray-400 mb-1">Max cost (USD, optional)</label>
-        <input type="number" step="0.01" min="0.01" x-model.number="form.max_cost_usd"
-          placeholder="e.g. 2.00"
-          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-      </div>
-      <div class="mb-4 flex items-center gap-2.5">
-        <input type="checkbox" id="hitl-toggle" x-model="form.hitl"
-          class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0">
-        <label for="hitl-toggle" class="text-sm text-gray-300 select-none cursor-pointer">
-          Enable HITL — pause for human review at each checkpoint
-        </label>
-      </div>
-      <div class="mb-5">
-        <label class="block text-sm text-gray-400 mb-1">Repo URL (optional)</label>
-        <input type="url" x-model="form.repo_url"
-          placeholder="https://github.com/org/repo"
-          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-        <p class="text-xs text-gray-500 mt-1">Clone this repo and inject its contents as context. Leave blank to use the workspace default.</p>
-      </div>
-      <div class="flex gap-3">
+
+      <!-- ── ENGINE MODE ── -->
+      <template x-if="form.mode === 'engine'">
+        <div>
+          <div class="mb-1 flex items-center gap-2">
+            <input type="checkbox" id="resume-toggle" x-model="form.resume"
+              class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0">
+            <label for="resume-toggle" class="text-sm text-gray-300 select-none cursor-pointer">
+              Resume — continue a previous run from output dir
+            </label>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-1">
+              Goal <template x-if="form.resume"><span class="text-gray-500">(optional when resuming)</span></template>
+            </label>
+            <textarea x-model="form.goal" rows="3"
+              :placeholder="form.resume ? 'Leave blank to reuse saved goal…' : 'Build a REST API for a task manager with auth…'"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-1">Tech stack (comma-separated, optional)</label>
+            <input type="text" x-model="form.tech"
+              placeholder="Python, FastAPI, SQLite"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="mb-4 flex items-center gap-2.5">
+            <input type="checkbox" id="full-toggle" x-model="form.full"
+              class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0">
+            <label for="full-toggle" class="text-sm text-gray-300 select-none cursor-pointer">
+              Full pipeline — code + tests + review (uncheck for plan-only)
+            </label>
+          </div>
+          <div class="mb-5">
+            <label class="block text-sm text-gray-400 mb-1">
+              Output dir <template x-if="form.resume"><span class="text-red-400">*</span></template>
+              <span class="text-gray-500">(server path, optional)</span>
+            </label>
+            <input type="text" x-model="form.outputDir"
+              placeholder="/srv/antcrew/my-project"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+            <p class="text-xs text-gray-500 mt-1">Absolute path on the server where artifacts are persisted.</p>
+          </div>
+          <div class="mb-5">
+            <label class="block text-sm text-gray-400 mb-1">
+              Source dir <span class="text-gray-500">(--from-dir, optional)</span>
+            </label>
+            <input type="text" x-model="form.sourceDir"
+              placeholder="/srv/repos/my-project"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+            <p class="text-xs text-gray-500 mt-1">Load existing codebase into the store — skips planning phases.</p>
+          </div>
+        </div>
+      </template>
+
+      <div class="flex gap-3 mt-1">
         <button type="button" @click="showModal = false"
           class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition">Cancel</button>
         <button type="submit" :disabled="submitting"
           class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
-          x-text="submitting ? 'Starting…' : 'Start Run'"></button>
-      </div>
-      <div class="mt-3 flex items-center gap-2">
-        <input type="text" x-model="form.templateName" placeholder="Template name (optional)"
-          class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
-        <button type="button" @click="saveTemplate()" :disabled="!form.templateName.trim()"
-          class="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-indigo-500 hover:text-indigo-300 transition disabled:opacity-40">
-          Save template
-        </button>
+          x-text="submitting ? 'Starting…' : (form.mode === 'engine' && form.resume ? 'Resume' : 'Start Run')"></button>
       </div>
       <p x-show="formError" class="text-red-400 text-xs mt-3" x-text="formError"></p>
     </form>
@@ -213,10 +288,15 @@ function dashboard() {
     submitting: false,
     formError: '',
     availableTeams: [],
+    teamOptions: [],
     templates: [],
     pendingReviews: 0,
     runningEvals: 0,
-    form: { team: 'DevTeam', request: '', max_cost_usd: null, hitl: false, repo_url: '', templateName: '' },
+    form: {
+      mode: 'team',
+      team: 'DevTeam', request: '', max_cost_usd: null, hitl: false, repo_url: '', templateName: '',
+      goal: '', tech: '', full: true, outputDir: '', sourceDir: '', resume: false,
+    },
     ws: null,
     wsConnected: false,
     _wsBackoff: 1000,
@@ -261,7 +341,9 @@ function dashboard() {
         if (!r.ok) return;
         const d = await r.json();
         this.availableTeams = d.teams;
-        this.form.team = d.teams[0] || 'DevTeam';
+        // teamOptions excludes special types handled by their own modes
+        this.teamOptions = d.teams.filter(t => t !== 'engine' && t !== 'custom');
+        this.form.team = this.teamOptions[0] || 'DevTeam';
       } catch {}
     },
 
@@ -345,11 +427,23 @@ function dashboard() {
       this.submitting = true;
       this.formError = '';
       try {
-        const body = { team: this.form.team, request: this.form.request };
-        if (this.form.max_cost_usd) body.max_cost_usd = this.form.max_cost_usd;
-        if (this.form.hitl) body.hitl = true;
-        if (this.form.repo_url.trim()) body.repo_url = this.form.repo_url.trim();
-        const r = await fetch('/run/', {
+        let url, body;
+
+        if (this.form.mode === 'engine') {
+          url = '/engine/run';
+          body = { goal: this.form.goal.trim(), full: this.form.full, resume: this.form.resume };
+          if (this.form.tech.trim()) body.tech = this.form.tech.split(',').map(s => s.trim()).filter(Boolean);
+          if (this.form.outputDir.trim()) body.output_dir = this.form.outputDir.trim();
+          if (this.form.sourceDir.trim()) body.source_dir = this.form.sourceDir.trim();
+        } else {
+          url = '/run/';
+          body = { team: this.form.team, request: this.form.request };
+          if (this.form.max_cost_usd) body.max_cost_usd = this.form.max_cost_usd;
+          if (this.form.hitl) body.hitl = true;
+          if (this.form.repo_url.trim()) body.repo_url = this.form.repo_url.trim();
+        }
+
+        const r = await fetch(url, {
           method: 'POST',
           headers: this.apiHeaders(),
           body: JSON.stringify(body),
@@ -361,11 +455,20 @@ function dashboard() {
         }
         const d = await r.json();
         this.showModal = false;
-        this.form.request = '';
-        this.form.max_cost_usd = null;
-        this.form.hitl = false;
-        this.form.repo_url = '';
-        this.form.templateName = '';
+        // Reset only the relevant fields
+        if (this.form.mode === 'engine') {
+          this.form.goal = '';
+          this.form.tech = '';
+          this.form.outputDir = '';
+          this.form.sourceDir = '';
+          this.form.resume = false;
+        } else {
+          this.form.request = '';
+          this.form.max_cost_usd = null;
+          this.form.hitl = false;
+          this.form.repo_url = '';
+          this.form.templateName = '';
+        }
         if (d.run_id) window.location = '/run/' + d.run_id;
         else await this.loadRuns();
       } catch (err) {
