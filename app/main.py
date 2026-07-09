@@ -18,7 +18,7 @@ from sqlmodel import select
 from app.core.database import init_db, get_session
 from app.core.listener import start_listening, stop_listening
 from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, evals
-from app.api import eval_schedules, engine
+from app.api import eval_schedules, engine, billing
 
 _STATIC = Path(__file__).parent / "static"
 _VERSION = "0.4.0"
@@ -287,6 +287,7 @@ app.include_router(workspaces.router)
 app.include_router(evals.router)
 app.include_router(eval_schedules.router)
 app.include_router(engine.router)
+app.include_router(billing.router)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 

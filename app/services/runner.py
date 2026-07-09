@@ -313,17 +313,25 @@ async def _store_result(result) -> None:
 
 
 async def _check_workspace_budget(workspace_id: int) -> None:
-    """Raise ValueError if the workspace has exhausted its budget.
+    """Raise ValueError if the workspace has exhausted its budget or subscription is suspended.
 
     Reads the cached total_cost_usd (O(1) single-row read) updated by
     _mark_workspace_budget_status after each run completes.
     """
     from sqlmodel import select
     from app.models.run import Workspace
+    from app.services.billing import BLOCKED_STATUSES
 
     async with AsyncSession(engine, expire_on_commit=False) as session:
         ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
-        if ws is None or ws.max_cost_usd is None:
+        if ws is None:
+            return
+        if ws.stripe_subscription_status in BLOCKED_STATUSES:
+            raise ValueError(
+                f"Workspace subscription is '{ws.stripe_subscription_status}'. "
+                "Please update your billing details to continue running pipelines."
+            )
+        if ws.max_cost_usd is None:
             return
         if ws.total_cost_usd >= ws.max_cost_usd:
             raise ValueError(

@@ -143,6 +143,8 @@ class WorkspacePublic(BaseModel):
     slack_app_configured: bool = False
     hitl_default: bool
     hitl_timeout_s: Optional[float] = None
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_status: Optional[str] = None
     created_at: datetime
 
     @model_validator(mode="before")
@@ -166,6 +168,8 @@ class WorkspacePublic(BaseModel):
                 "slack_app_configured": bool(data.slack_app_token_enc),
                 "hitl_default": data.hitl_default,
                 "hitl_timeout_s": data.hitl_timeout_s,
+                "stripe_customer_id": getattr(data, "stripe_customer_id", None),
+                "stripe_subscription_status": getattr(data, "stripe_subscription_status", None),
                 "created_at": data.created_at,
             }
         return data

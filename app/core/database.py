@@ -112,6 +112,30 @@ async def _migrate_workspace_membership(eng) -> None:
         pass  # PostgreSQL handled by Alembic or create_all
 
 
+async def _migrate_stripe_fields(eng) -> None:
+    """Idempotent migration: add Stripe billing columns to workspace if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(workspace)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            for col_def, col_name in [
+                ("stripe_customer_id TEXT", "stripe_customer_id"),
+                ("stripe_subscription_id TEXT", "stripe_subscription_id"),
+                ("stripe_subscription_status TEXT", "stripe_subscription_status"),
+            ]:
+                if col_name not in col_names:
+                    await conn.execute(
+                        text(f"ALTER TABLE workspace ADD COLUMN {col_def}")
+                    )
+            if "stripe_customer_id" not in col_names:
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_workspace_stripe_customer_id "
+                    "ON workspace(stripe_customer_id)"
+                ))
+    except Exception:
+        pass  # PostgreSQL or table absent — skip
+
+
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
@@ -119,6 +143,7 @@ async def init_db() -> None:
     await _migrate_drop_budget_exceeded(engine)
     await _migrate_eval_run_id(engine)
     await _migrate_workspace_membership(engine)
+    await _migrate_stripe_fields(engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

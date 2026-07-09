@@ -27,6 +27,9 @@ class Workspace(SQLModel, table=True):
     slack_app_token_enc: Optional[str] = Field(default=None) # encrypted xapp-… for Socket Mode
     hitl_default: bool = Field(default=False)
     hitl_timeout_s: Optional[float] = Field(default=None)  # per-workspace HITL timeout (overrides env HITL_TIMEOUT_S)
+    stripe_customer_id: Optional[str] = Field(default=None, index=True)  # cus_...
+    stripe_subscription_id: Optional[str] = Field(default=None)           # sub_...
+    stripe_subscription_status: Optional[str] = Field(default=None)       # active | trialing | past_due | canceled | unpaid
     created_at: datetime = Field(default_factory=_utcnow)
 
 
