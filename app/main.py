@@ -58,6 +58,26 @@ _retention_task: Optional[asyncio.Task] = None
 log = logging.getLogger(__name__)
 
 
+async def _check_database_url() -> None:
+    """Block startup if SQLite is used on a public-facing host.
+
+    SQLite is single-writer and locks the whole file on writes — under any real
+    concurrent load it will cause 500s.  On a public host this is always wrong.
+    """
+    db_url = os.environ.get("DATABASE_URL", "")
+    if not db_url or "sqlite" not in db_url.lower():
+        return
+    host = os.environ.get("HOST", "127.0.0.1")
+    is_public = host not in ("127.0.0.1", "localhost", "::1")
+    if is_public:
+        raise RuntimeError(
+            f"DATABASE_URL={db_url!r} uses SQLite on public host {host!r}. "
+            "SQLite is single-writer and will lock under concurrent traffic. "
+            "Set DATABASE_URL to a PostgreSQL connection string for production deployments."
+        )
+    log.debug("database: SQLite OK on localhost")
+
+
 async def _check_sandbox_mode() -> None:
     """Block or loudly warn when engine runs would execute code outside Docker on a public host.
 
@@ -312,6 +332,7 @@ async def lifespan(app: FastAPI):
     global _webhook_task, _scheduler_task
     _setup_logging()
     await init_db()
+    await _check_database_url()
     await _check_auth_mode()
     await _check_cors_config()
     await _check_sandbox_mode()

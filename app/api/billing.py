@@ -268,3 +268,70 @@ async def detach_stripe(
     ws.stripe_subscription_status = None
     session.add(ws)
     await session.commit()
+
+
+class CheckoutOut(BaseModel):
+    checkout_url: str
+
+
+@router.post(
+    "/workspaces/{workspace_id}/checkout",
+    response_model=CheckoutOut,
+    dependencies=[Depends(require_api_key), Depends(require_role("admin"))],
+)
+async def create_checkout_session(
+    workspace_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> CheckoutOut:
+    """Create a Stripe Checkout Session and return the hosted payment URL.
+
+    Required env vars: STRIPE_SECRET_KEY, STRIPE_PRICE_ID, STRIPE_SUCCESS_URL, STRIPE_CANCEL_URL.
+    """
+    s = _billing._stripe()
+    if not s:
+        raise HTTPException(
+            503,
+            "Stripe is not configured. Set STRIPE_SECRET_KEY and install the stripe package.",
+        )
+
+    price_id = os.environ.get("STRIPE_PRICE_ID")
+    success_url = os.environ.get("STRIPE_SUCCESS_URL")
+    cancel_url = os.environ.get("STRIPE_CANCEL_URL")
+    if not price_id or not success_url or not cancel_url:
+        raise HTTPException(
+            503,
+            "Checkout requires STRIPE_PRICE_ID, STRIPE_SUCCESS_URL, and STRIPE_CANCEL_URL env vars.",
+        )
+
+    ws = (await session.exec(
+        select(Workspace).where(Workspace.id == workspace_id)
+    )).first()
+    if not ws:
+        raise HTTPException(404, f"Workspace {workspace_id} not found")
+
+    # Ensure there's a Stripe Customer to attach the subscription to
+    if not ws.stripe_customer_id:
+        customer_id = _billing.get_or_create_customer(ws.name, ws.slug)
+        if customer_id:
+            ws.stripe_customer_id = customer_id
+            session.add(ws)
+            await session.commit()
+
+    try:
+        loop = __import__("asyncio").get_running_loop()
+        checkout = await loop.run_in_executor(
+            None,
+            lambda: s.checkout.Session.create(
+                mode="subscription",
+                customer=ws.stripe_customer_id or None,
+                line_items=[{"price": price_id, "quantity": 1}],
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata={"workspace_id": str(workspace_id), "slug": ws.slug},
+            ),
+        )
+    except Exception as exc:
+        log.error("billing: checkout session creation failed for ws %d: %s", workspace_id, exc)
+        raise HTTPException(502, f"Stripe error: {exc}")
+
+    return CheckoutOut(checkout_url=checkout.url)

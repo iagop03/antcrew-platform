@@ -89,9 +89,10 @@ class ApiKey(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     label: str = Field(index=True, unique=True)
-    key_hash: str  # sha256(raw_key).hexdigest()
+    key_hash: str  # bcrypt hash (or legacy sha256 until next login)
     workspace_id: Optional[int] = Field(default=None)
     role: str = Field(default="write")  # admin | write | read | reviewer
+    email: Optional[str] = Field(default=None)  # for HITL assignment notifications
     created_at: datetime = Field(default_factory=_utcnow)
     revoked_at: Optional[datetime] = Field(default=None)
 
@@ -245,4 +246,21 @@ class HitlReviewAssignee(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     review_id: str = Field(index=True)    # FK → hitl_review.review_id
     assignee_label: str = Field(index=True)  # FK → api_key.label
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class HitlAuditEntry(SQLModel, table=True):
+    """Immutable audit log for HITL review lifecycle events.
+
+    Tracks who did what and when: creation, assignment, approval, rejection, timeout.
+    Never updated — only appended to.
+    """
+
+    __tablename__ = "hitl_audit_entry"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    review_id: str = Field(index=True)     # FK → hitl_review.review_id
+    actor_label: Optional[str] = Field(default=None)  # API key label who triggered this event
+    action: str  # created | assigned | approved | rejected | timed_out
+    note: Optional[str] = Field(default=None)  # free-text from verdict note or error
     created_at: datetime = Field(default_factory=_utcnow)

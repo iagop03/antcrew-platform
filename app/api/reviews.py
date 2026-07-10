@@ -1,6 +1,7 @@
 """HITL review resolution and listing."""
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
@@ -14,7 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible, ws_filter
 from app.core.channel import resolve_review
 from app.core.database import get_session
-from app.models.run import HitlReview, HitlReviewAssignee, Run
+from app.models.run import HitlReview, HitlReviewAssignee, HitlAuditEntry, Run
 from app.services.runs import list_reviews as list_reviews_svc
 
 
@@ -184,6 +185,13 @@ async def create_review(
             assignee_label=label,
         ))
 
+    session.add(HitlAuditEntry(
+        review_id=review_id,
+        actor_label=ctx.created_by,
+        action="created",
+        note=f"assignees={body.assignees}" if body.assignees else None,
+    ))
+
     await session.commit()
     await session.refresh(review)
 
@@ -208,6 +216,31 @@ async def create_review(
         )
     except Exception:
         pass
+
+    # Email assignees who have an email address on their ApiKey
+    if body.assignees:
+        try:
+            from app.models.run import ApiKey as _ApiKey
+            from app.services.email import send_review_assigned as _send_email
+            key_rows = (await session.exec(
+                select(_ApiKey).where(
+                    col(_ApiKey.label).in_(body.assignees),
+                    _ApiKey.email != None,  # noqa: E711
+                )
+            )).all()
+            for k in key_rows:
+                if k.email:
+                    asyncio.create_task(
+                        _send_email(
+                            to_email=k.email,
+                            assignee_label=k.label,
+                            review_id=review_id,
+                            agent_name=body.agent_name,
+                            run_id=body.run_id,
+                        )
+                    )
+        except Exception:
+            pass
 
     return (await _to_public(session, [review]))[0]
 
@@ -309,6 +342,13 @@ async def assign_review(
         if not existing_row:
             session.add(HitlReviewAssignee(review_id=review_id, assignee_label=label))
 
+    session.add(HitlAuditEntry(
+        review_id=review_id,
+        actor_label=ctx.created_by,
+        action="assigned",
+        note=label,
+    ))
+
     await session.commit()
     await session.refresh(review)
     return (await _to_public(session, [review]))[0]
@@ -374,6 +414,15 @@ async def submit_review(
     if not review.assigned_to and ctx.created_by:
         review.assigned_to = ctx.created_by
     session.add(review)
+
+    audit_action = {"approve": "approved", "reject": "rejected"}.get(body.decision, body.decision)
+    session.add(HitlAuditEntry(
+        review_id=review_id,
+        actor_label=ctx.created_by,
+        action=audit_action,
+        note=body.feedback,
+    ))
+
     await session.commit()
     await session.refresh(review)
     return (await _to_public(session, [review]))[0]

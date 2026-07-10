@@ -18,6 +18,8 @@ Alerts:
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -30,6 +32,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.database import engine
 from app.models.run import WebhookDelivery
+
+_SIGNING_SECRET: Optional[str] = os.environ.get("WEBHOOK_SIGNING_SECRET") or None
+
+
+def _sign_payload(body: str) -> Optional[str]:
+    """Return ``sha256=<hex>`` HMAC of *body* using WEBHOOK_SIGNING_SECRET, or None."""
+    if not _SIGNING_SECRET:
+        return None
+    sig = hmac.new(_SIGNING_SECRET.encode(), body.encode(), hashlib.sha256).hexdigest()
+    return f"sha256={sig}"
 
 log = logging.getLogger(__name__)
 
@@ -94,10 +106,15 @@ async def _process_pending() -> None:
 
             for delivery in deliveries:
                 try:
+                    headers = {"Content-Type": "application/json"}
+                    sig = _sign_payload(delivery.payload_json)
+                    if sig:
+                        headers["X-Antcrew-Signature"] = sig
                     async with httpx.AsyncClient(timeout=10.0) as client:
                         r = await client.post(
                             delivery.url,
-                            json=json.loads(delivery.payload_json),
+                            content=delivery.payload_json,
+                            headers=headers,
                         )
                         r.raise_for_status()
                     delivery.status = "delivered"
