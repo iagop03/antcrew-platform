@@ -443,6 +443,34 @@ def _run_engine_sync(
 # Async dispatch
 # ---------------------------------------------------------------------------
 
+async def _check_engine_workspace(workspace_id: int) -> None:
+    """Block engine runs when the workspace subscription is cancelled/unpaid or over budget.
+
+    Mirrors runner._check_workspace_budget but kept local so engine_runner has
+    no coupling to runner internals — both modules import BLOCKED_STATUSES directly.
+    """
+    from sqlmodel import select
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from app.core.database import engine as _db_engine
+    from app.models.run import Workspace
+    from app.services.billing import BLOCKED_STATUSES
+
+    async with AsyncSession(_db_engine, expire_on_commit=False) as session:
+        ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+        if ws is None:
+            return
+        if ws.stripe_subscription_status in BLOCKED_STATUSES:
+            raise ValueError(
+                f"Workspace subscription is '{ws.stripe_subscription_status}'. "
+                "Please update your billing details to continue using the engine."
+            )
+        if ws.max_cost_usd is not None and ws.total_cost_usd >= ws.max_cost_usd:
+            raise ValueError(
+                f"Workspace budget exhausted: ${ws.total_cost_usd:.4f} spent of "
+                f"${ws.max_cost_usd:.2f} limit. Update the workspace budget to continue."
+            )
+
+
 async def dispatch_engine(
     goal: str,
     *,
@@ -480,10 +508,8 @@ async def dispatch_engine(
     conditions = conditions or []
     hitl_after = hitl_after or []
 
-    # Budget check — raises ValueError if workspace is over limit.
     if workspace_id is not None:
-        from app.services.runner import _check_workspace_budget
-        await _check_workspace_budget(workspace_id)
+        await _check_engine_workspace(workspace_id)
 
     # Resume: load goal from persisted metadata, let goal arg override description.
     if resume and output_dir is not None:

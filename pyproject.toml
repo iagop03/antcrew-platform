@@ -15,8 +15,8 @@ dependencies = [
     "httpx>=0.27",
     "asyncpg>=0.29",
     "alembic>=1.13",
-    "antcrew>=0.32.0",
-    "antcrew-engine>=0.1.0",
+    "antcrew>=0.33.0,<0.34",
+    "antcrew-engine>=0.3.0,<0.4",
 ]
 
 [project.optional-dependencies]

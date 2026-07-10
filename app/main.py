@@ -58,6 +58,74 @@ _retention_task: Optional[asyncio.Task] = None
 log = logging.getLogger(__name__)
 
 
+async def _check_sandbox_mode() -> None:
+    """Block or loudly warn when engine runs would execute code outside Docker on a public host.
+
+    The safe production value is ANTCREW_SANDBOX=required.  'auto' is acceptable
+    on localhost (Docker may be absent) but on any public interface it means generated
+    code and pip install post-install hooks execute unsandboxed on the host.
+    """
+    sandbox_mode = os.environ.get("ANTCREW_SANDBOX", "auto").lower()
+    host = os.environ.get("HOST", "127.0.0.1")
+    is_public = host not in ("127.0.0.1", "localhost", "::1")
+
+    if sandbox_mode == "required":
+        log.info("sandbox: ANTCREW_SANDBOX=required — Docker isolation enforced")
+        return
+
+    if is_public and sandbox_mode != "required":
+        border = "=" * 72
+        msg = (
+            f"\n{border}\n"
+            "  🚨  ANTCREW-PLATFORM: SANDBOX NOT ENFORCED ON PUBLIC HOST\n"
+            f"      ANTCREW_SANDBOX={sandbox_mode!r}  HOST={host!r}\n"
+            "\n"
+            "  Engine runs will execute generated code and pip install on the HOST.\n"
+            "  Set ANTCREW_SANDBOX=required to enforce Docker isolation.\n"
+            f"{border}\n"
+        )
+        log.error(
+            "sandbox: ANTCREW_SANDBOX=%r on public host %r — "
+            "generated code runs unsandboxed; set ANTCREW_SANDBOX=required",
+            sandbox_mode, host,
+        )
+        print(msg, flush=True)
+    else:
+        log.debug("sandbox: ANTCREW_SANDBOX=%r (localhost — Docker optional)", sandbox_mode)
+
+
+async def _check_stripe_config() -> None:
+    """Block startup when Stripe is configured without a webhook secret in production.
+
+    Accepting Stripe webhooks without signature verification lets anyone forge
+    subscription events (cancel a rival's subscription, falsely mark invoices paid).
+    In production this is a hard error; locally it's a warning.
+    """
+    stripe_key     = os.environ.get("STRIPE_SECRET_KEY")
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
+    if not stripe_key:
+        return  # Stripe not configured — billing is a no-op, nothing to enforce
+    if webhook_secret:
+        log.info("billing: Stripe configured with webhook secret — signature verification active")
+        return
+
+    host      = os.environ.get("HOST", "127.0.0.1")
+    is_public = host not in ("127.0.0.1", "localhost", "::1")
+
+    if is_public:
+        raise RuntimeError(
+            "STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is missing. "
+            "Starting in production without webhook signature verification would allow "
+            "anyone to forge subscription events. "
+            "Set STRIPE_WEBHOOK_SECRET (from your Stripe webhook dashboard) or "
+            "unset STRIPE_SECRET_KEY if billing is not yet active."
+        )
+    log.warning(
+        "billing: STRIPE_SECRET_KEY set but STRIPE_WEBHOOK_SECRET missing — "
+        "webhook events will be rejected (403). Set STRIPE_WEBHOOK_SECRET for local testing."
+    )
+
+
 async def _check_auth_mode() -> None:
     """Warn loudly if the platform starts in open (unauthenticated) mode.
 
@@ -233,6 +301,8 @@ async def lifespan(app: FastAPI):
         )
     await init_db()
     await _check_auth_mode()
+    await _check_sandbox_mode()
+    await _check_stripe_config()
     start_listening()
     from app.core.slack_hitl import maybe_start_from_env as _slack_start
     _slack_start()

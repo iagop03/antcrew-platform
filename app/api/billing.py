@@ -49,11 +49,21 @@ async def stripe_webhook(
             raise HTTPException(400, "Invalid webhook signature")
         event_type: str = event["type"]
         event_data: dict = event["data"]
+    elif s and not webhook_secret:
+        # Stripe is configured but no webhook secret — reject rather than accept unverified events.
+        # An attacker who knows this endpoint can forge any subscription event without a secret.
+        log.error(
+            "billing: STRIPE_WEBHOOK_SECRET not set — rejecting webhook to prevent "
+            "unverified event processing. Set STRIPE_WEBHOOK_SECRET to enable webhooks."
+        )
+        raise HTTPException(
+            403,
+            "Webhook signature verification is not configured. "
+            "Set STRIPE_WEBHOOK_SECRET on the server to enable Stripe webhook processing.",
+        )
     else:
-        if not webhook_secret:
-            log.warning(
-                "billing: STRIPE_WEBHOOK_SECRET not set — skipping signature verification"
-            )
+        # Stripe not configured at all (no STRIPE_SECRET_KEY): dev/test mode.
+        # Accept raw JSON so local integration tests can drive the billing state machine.
         try:
             body = json.loads(payload)
         except Exception:
