@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, model_validator
 from sqlmodel import select, col, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -15,7 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible, ws_filter
 from app.core.channel import resolve_review
 from app.core.database import get_session
-from app.models.run import HitlReview, HitlReviewAssignee, HitlAuditEntry, Run
+from app.models.run import HitlReview, HitlReviewAssignee, HitlAuditEntry, ApiKey, Run
 from app.services.runs import list_reviews as list_reviews_svc
 
 
@@ -91,6 +91,16 @@ async def _to_public(
     return result
 
 
+class AuditEntryPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: Optional[int] = None
+    review_id: str
+    actor_label: Optional[str] = None
+    action: str
+    note: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
 router = APIRouter(
     prefix="/reviews",
     tags=["hitl"],
@@ -132,6 +142,7 @@ class CreateReview(BaseModel):
              dependencies=[Depends(require_role("admin", "write"))])
 async def create_review(
     body: CreateReview,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
@@ -217,27 +228,25 @@ async def create_review(
     except Exception:
         pass
 
-    # Email assignees who have an email address on their ApiKey
+    # Email assignees who have an email address — via BackgroundTasks (safe, tracked by FastAPI)
     if body.assignees:
         try:
-            from app.models.run import ApiKey as _ApiKey
             from app.services.email import send_review_assigned as _send_email
             key_rows = (await session.exec(
-                select(_ApiKey).where(
-                    col(_ApiKey.label).in_(body.assignees),
-                    _ApiKey.email != None,  # noqa: E711
+                select(ApiKey).where(
+                    col(ApiKey.label).in_(body.assignees),
+                    ApiKey.email != None,  # noqa: E711
                 )
             )).all()
             for k in key_rows:
                 if k.email:
-                    asyncio.create_task(
-                        _send_email(
-                            to_email=k.email,
-                            assignee_label=k.label,
-                            review_id=review_id,
-                            agent_name=body.agent_name,
-                            run_id=body.run_id,
-                        )
+                    background_tasks.add_task(
+                        _send_email,
+                        to_email=k.email,
+                        assignee_label=k.label,
+                        review_id=review_id,
+                        agent_name=body.agent_name,
+                        run_id=body.run_id,
                     )
         except Exception:
             pass
@@ -302,6 +311,30 @@ async def list_reviews(
         reviews = [r for r in reviews if r.assigned_to == assigned_to]
 
     return await _to_public(session, reviews)
+
+
+@router.get("/{review_id}/audit", response_model=list[AuditEntryPublic])
+async def get_review_audit(
+    review_id: str,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+):
+    """Return the immutable audit trail for a HITL review (created, assigned, approved, etc.)."""
+    review = (await session.exec(
+        select(HitlReview).where(HitlReview.review_id == review_id)
+    )).first()
+    if not review:
+        raise HTTPException(404, f"Review {review_id!r} not found")
+    if ctx.workspace_ids is not None:
+        run = (await session.exec(select(Run).where(Run.run_id == review.run_id))).first()
+        if run and not ws_accessible(run.workspace_id, ctx):
+            raise HTTPException(403, "This review is not accessible with the current API key")
+    entries = (await session.exec(
+        select(HitlAuditEntry)
+        .where(HitlAuditEntry.review_id == review_id)
+        .order_by(HitlAuditEntry.created_at)
+    )).all()
+    return [AuditEntryPublic.model_validate(e) for e in entries]
 
 
 @router.patch("/{review_id}/assign", response_model=HitlReviewPublic,

@@ -90,6 +90,7 @@ class ApiKey(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     label: str = Field(index=True, unique=True)
     key_hash: str  # bcrypt hash (or legacy sha256 until next login)
+    key_prefix: Optional[str] = Field(default=None, index=True)  # sha256(raw)[:16] for O(1) lookup
     workspace_id: Optional[int] = Field(default=None)
     role: str = Field(default="write")  # admin | write | read | reviewer
     email: Optional[str] = Field(default=None)  # for HITL assignment notifications

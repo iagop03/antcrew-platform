@@ -1,6 +1,7 @@
 """Stripe billing webhook receiver and workspace billing admin endpoints."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -318,7 +319,7 @@ async def create_checkout_session(
             await session.commit()
 
     try:
-        loop = __import__("asyncio").get_running_loop()
+        loop = asyncio.get_running_loop()
         checkout = await loop.run_in_executor(
             None,
             lambda: s.checkout.Session.create(
