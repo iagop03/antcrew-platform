@@ -230,3 +230,19 @@ class WorkspaceMembership(SQLModel, table=True):
     api_key_id: int = Field(index=True)
     workspace_id: int = Field(index=True)
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+class HitlReviewAssignee(SQLModel, table=True):
+    """One row per reviewer assigned to a HitlReview (many-to-many).
+
+    Assignees are identified by their API key label.  Any assignee can resolve
+    the review (first-to-respond model).  Use the 'mine' query param on
+    GET /reviews/ to filter to reviews where the calling key is an assignee.
+    """
+
+    __tablename__ = "hitl_review_assignee"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    review_id: str = Field(index=True)    # FK → hitl_review.review_id
+    assignee_label: str = Field(index=True)  # FK → api_key.label
+    created_at: datetime = Field(default_factory=_utcnow)

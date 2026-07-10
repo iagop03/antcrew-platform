@@ -428,3 +428,8 @@ async def evals_page():
 @app.get("/webhooks")
 async def webhooks_page():
     return FileResponse(_STATIC / "webhooks.html")
+
+
+@app.get("/onboard")
+async def onboard_page():
+    return FileResponse(_STATIC / "onboard.html")

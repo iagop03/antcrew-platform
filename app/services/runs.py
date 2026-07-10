@@ -221,7 +221,9 @@ async def list_reviews(
     offset: int = 0,
     workspace_id: Optional[int] = None,
     workspace_ids: Optional[list[int]] = None,
+    assignee_label: Optional[str] = None,
 ) -> list[HitlReview]:
+    from app.models.run import HitlReviewAssignee
     stmt = select(HitlReview).order_by(desc(HitlReview.created_at)).limit(limit)
     if offset:
         stmt = stmt.offset(offset)
@@ -238,6 +240,11 @@ async def list_reviews(
                 sa_select(Run.run_id).where(Run.workspace_id == workspace_id)
             )
         )
+    if assignee_label is not None:
+        subq_a = sa_select(HitlReviewAssignee.review_id).where(
+            HitlReviewAssignee.assignee_label == assignee_label
+        )
+        stmt = stmt.where(HitlReview.review_id.in_(subq_a))
     result = await session.exec(stmt)
     return list(result.all())
 

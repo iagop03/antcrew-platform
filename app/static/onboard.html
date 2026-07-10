@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Setup — antcrew</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>[x-cloak]{display:none}</style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center p-6"
+  x-data="onboard()" x-init="init()">
+
+<div class="w-full max-w-lg">
+
+  <!-- Logo -->
+  <div class="text-center mb-8">
+    <span class="font-mono font-bold text-2xl text-indigo-400">antcrew</span>
+    <p class="text-gray-500 text-sm mt-1">Configuración inicial del workspace</p>
+  </div>
+
+  <!-- Progress -->
+  <div class="flex items-center gap-2 mb-8">
+    <template x-for="(label, i) in steps" :key="i">
+      <div class="flex items-center gap-2" :class="i < steps.length - 1 ? 'flex-1' : ''">
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition"
+            :class="{
+              'bg-indigo-600 text-white': step === i + 1,
+              'bg-green-700 text-white': step > i + 1,
+              'bg-gray-800 text-gray-500': step < i + 1
+            }">
+            <span x-show="step <= i + 1" x-text="i + 1"></span>
+            <span x-show="step > i + 1">✓</span>
+          </div>
+          <span class="text-xs hidden sm:block"
+            :class="step === i + 1 ? 'text-gray-200' : 'text-gray-600'"
+            x-text="label"></span>
+        </div>
+        <template x-if="i < steps.length - 1">
+          <div class="flex-1 h-px mx-2" :class="step > i + 1 ? 'bg-green-800' : 'bg-gray-800'"></div>
+        </template>
+      </div>
+    </template>
+  </div>
+
+  <!-- ── STEP 1 ── Workspace + admin key ─────────────────────────────── -->
+  <div x-show="step === 1" x-cloak>
+    <h2 class="text-lg font-semibold mb-1">Crea tu workspace</h2>
+    <p class="text-gray-400 text-sm mb-6">Un workspace agrupa runs, revisores y presupuesto.</p>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs text-gray-400 mb-1.5">Nombre del workspace</label>
+        <input x-model="wsName" placeholder="ej: Equipo Backend"
+          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1.5">Slug (URL-friendly)</label>
+        <input x-model="wsSlug" placeholder="ej: equipo-backend"
+          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+        <p class="text-xs text-gray-600 mt-1">Solo letras minúsculas, números y guiones.</p>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1.5">Tu nombre (será tu label de API key admin)</label>
+        <input x-model="adminLabel" placeholder="ej: alice"
+          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+      </div>
+    </div>
+
+    <p x-show="step1Error" x-cloak class="text-red-400 text-xs mt-3" x-text="step1Error"></p>
+
+    <button @click="createWorkspace()"
+      :disabled="step1Loading || !wsName.trim() || !wsSlug.trim() || !adminLabel.trim()"
+      class="mt-6 w-full py-2.5 rounded-lg font-medium text-sm transition
+        bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+      <span x-show="!step1Loading">Crear workspace →</span>
+      <span x-show="step1Loading">Creando…</span>
+    </button>
+  </div>
+
+  <!-- ── STEP 2 ── Reviewers ─────────────────────────────────────────── -->
+  <div x-show="step === 2" x-cloak>
+    <h2 class="text-lg font-semibold mb-1">Añade tus técnicos revisores</h2>
+    <p class="text-gray-400 text-sm mb-6">
+      Cada revisor recibe su propia API key. Cualquiera puede aprobar o rechazar revisiones HITL.
+    </p>
+
+    <!-- Add reviewer form -->
+    <div class="flex gap-2 mb-4">
+      <input x-model="reviewerName" placeholder="Nombre del revisor (ej: bob)"
+        @keydown.enter="addReviewer()"
+        class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+      <button @click="addReviewer()"
+        :disabled="reviewerLoading || !reviewerName.trim()"
+        class="px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 transition disabled:opacity-50">
+        <span x-show="!reviewerLoading">+ Añadir</span>
+        <span x-show="reviewerLoading">…</span>
+      </button>
+    </div>
+
+    <p x-show="reviewerError" x-cloak class="text-red-400 text-xs mb-3" x-text="reviewerError"></p>
+
+    <!-- Created reviewers -->
+    <div class="space-y-2 mb-6">
+      <template x-if="reviewers.length === 0">
+        <p class="text-gray-600 text-sm text-center py-4">Todavía no hay revisores — o continúa sin añadir ninguno.</p>
+      </template>
+      <template x-for="(rv, i) in reviewers" :key="i">
+        <div class="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+              <span class="text-sm font-mono text-gray-200" x-text="rv.label"></span>
+              <span class="text-xs px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300">reviewer</span>
+            </div>
+            <button @click="copyText(rv.key, 'key-' + i)"
+              class="text-xs text-gray-500 hover:text-indigo-400 transition flex items-center gap-1">
+              <span x-text="copied === 'key-' + i ? '✓ Copiado' : 'Copiar key'"></span>
+            </button>
+          </div>
+          <code class="text-xs text-gray-500 font-mono break-all" x-text="rv.key"></code>
+        </div>
+      </template>
+    </div>
+
+    <button @click="step = 3"
+      class="w-full py-2.5 rounded-lg font-medium text-sm transition bg-indigo-600 hover:bg-indigo-500 text-white">
+      Continuar →
+    </button>
+  </div>
+
+  <!-- ── STEP 3 ── Done ──────────────────────────────────────────────── -->
+  <div x-show="step === 3" x-cloak>
+    <div class="text-center mb-6">
+      <div class="text-5xl mb-3">✓</div>
+      <h2 class="text-lg font-semibold mb-1">¡Todo listo!</h2>
+      <p class="text-gray-400 text-sm">Tu workspace está configurado.</p>
+    </div>
+
+    <!-- Summary card -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5 space-y-3">
+      <div class="flex justify-between items-center">
+        <span class="text-xs text-gray-500">Workspace</span>
+        <span class="text-sm font-medium" x-text="wsName"></span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-xs text-gray-500">Tu API key (admin)</span>
+        <button @click="copyText(adminKey, 'admin-key')"
+          class="text-xs text-indigo-400 hover:text-indigo-300 transition"
+          x-text="copied === 'admin-key' ? '✓ Copiada' : 'Copiar'"></button>
+      </div>
+      <code class="block text-xs text-gray-400 font-mono break-all bg-gray-950 rounded px-3 py-2"
+        x-text="adminKey"></code>
+      <div class="flex justify-between items-center pt-1">
+        <span class="text-xs text-gray-500">Revisores</span>
+        <span class="text-sm" x-text="reviewers.length + ' añadidos'"></span>
+      </div>
+    </div>
+
+    <!-- How to trigger a run with HITL -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Cómo lanzar un run con revisión</p>
+      <div class="relative">
+        <pre class="text-xs text-gray-300 font-mono overflow-x-auto bg-gray-950 rounded-lg px-4 py-3 leading-relaxed"
+          x-text="curlExample()"></pre>
+        <button @click="copyText(curlExample(), 'curl')"
+          class="absolute top-2 right-2 text-xs text-gray-500 hover:text-indigo-400 transition px-2 py-1 bg-gray-900 rounded"
+          x-text="copied === 'curl' ? '✓' : 'Copiar'"></button>
+      </div>
+    </div>
+
+    <div class="flex gap-3">
+      <a href="/"
+        class="flex-1 py-2.5 rounded-lg font-medium text-sm text-center transition bg-indigo-600 hover:bg-indigo-500 text-white">
+        Ir al dashboard
+      </a>
+      <a href="/reviews"
+        class="flex-1 py-2.5 rounded-lg font-medium text-sm text-center transition bg-gray-800 hover:bg-gray-700 text-gray-200">
+        Ver cola de revisiones
+      </a>
+    </div>
+  </div>
+
+</div><!-- /card -->
+
+<script>
+function onboard() {
+  return {
+    step: 1,
+    steps: ['Workspace', 'Revisores', 'Listo'],
+
+    // Step 1
+    wsName: '',
+    wsSlug: '',
+    adminLabel: '',
+    step1Loading: false,
+    step1Error: '',
+    workspaceId: null,
+    adminKey: '',
+
+    // Step 2
+    reviewerName: '',
+    reviewerLoading: false,
+    reviewerError: '',
+    reviewers: [],
+
+    // UI
+    copied: '',
+
+    init() {
+      // Auto-slug from wsName
+      this.$watch('wsName', v => {
+        if (this.wsSlug === '' || this.wsSlug === this._autoSlug) {
+          this._autoSlug = v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          this.wsSlug = this._autoSlug;
+        }
+      });
+    },
+
+    _autoSlug: '',
+
+    async createWorkspace() {
+      this.step1Error = '';
+      this.step1Loading = true;
+      try {
+        // 1. Create workspace
+        const r1 = await fetch('/workspaces/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: this.wsName.trim(), slug: this.wsSlug.trim() }),
+        });
+        if (!r1.ok) {
+          const d = await r1.json().catch(() => ({}));
+          this.step1Error = d.detail || `Error ${r1.status} al crear workspace`;
+          return;
+        }
+        const ws = await r1.json();
+        this.workspaceId = ws.id;
+
+        // 2. Create admin key scoped to this workspace
+        const r2 = await fetch('/api-keys/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: this.adminLabel.trim(), workspace_id: ws.id, role: 'admin' }),
+        });
+        if (!r2.ok) {
+          const d = await r2.json().catch(() => ({}));
+          this.step1Error = d.detail || `Error ${r2.status} al crear API key`;
+          return;
+        }
+        const key = await r2.json();
+        this.adminKey = key.key;
+
+        // Save to localStorage for subsequent requests and dashboard use
+        localStorage.setItem('antcrew_api_key', key.key);
+        localStorage.setItem('antcrew_api_key_label', key.label);
+
+        this.step = 2;
+      } catch (e) {
+        this.step1Error = e.message;
+      } finally {
+        this.step1Loading = false;
+      }
+    },
+
+    async addReviewer() {
+      if (!this.reviewerName.trim()) return;
+      this.reviewerError = '';
+      this.reviewerLoading = true;
+      try {
+        const r = await fetch('/api-keys/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey },
+          body: JSON.stringify({
+            label: this.reviewerName.trim(),
+            workspace_id: this.workspaceId,
+            role: 'reviewer',
+          }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.reviewerError = d.detail || `Error ${r.status}`;
+          return;
+        }
+        const k = await r.json();
+        this.reviewers.push({ label: k.label, key: k.key });
+        this.reviewerName = '';
+      } catch (e) {
+        this.reviewerError = e.message;
+      } finally {
+        this.reviewerLoading = false;
+      }
+    },
+
+    curlExample() {
+      return `curl -X POST http://localhost:8000/run/ \\
+  -H "X-Api-Key: ${this.adminKey || '<tu-admin-key>'}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "team": "my_team",
+    "request": "Analiza el módulo de pagos",
+    "hitl": true,
+    "workspace_id": ${this.workspaceId || 1}
+  }'`;
+    },
+
+    async copyText(text, id) {
+      try {
+        await navigator.clipboard.writeText(text);
+        this.copied = id;
+        setTimeout(() => { if (this.copied === id) this.copied = ''; }, 2000);
+      } catch {}
+    },
+  };
+}
+</script>
+</body>
+</html>

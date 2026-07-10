@@ -18,9 +18,9 @@
   <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
   <a href="/reviews" class="text-sm text-white font-medium flex items-center gap-1.5">
     Reviews
-    <span x-show="reviews.length > 0"
+    <span x-show="allCount > 0"
       class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-black text-xs font-bold"
-      x-text="reviews.length"></span>
+      x-text="allCount"></span>
   </a>
   <div class="ml-auto flex items-center gap-2">
     <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500" title="Live"></span>
@@ -28,15 +28,41 @@
   </div>
 </nav>
 
-<!-- Header -->
-<div class="px-6 py-5 flex items-center justify-between">
-  <div>
-    <h1 class="text-xl font-semibold">HITL Review Queue</h1>
-    <p class="text-gray-400 text-sm mt-0.5">Approve or reject agent output — the pipeline resumes immediately after.</p>
+<!-- Header + tabs -->
+<div class="px-6 py-5">
+  <div class="flex items-start justify-between mb-4">
+    <div>
+      <h1 class="text-xl font-semibold">HITL Review Queue</h1>
+      <p class="text-gray-400 text-sm mt-0.5">Approve or reject agent output — the pipeline resumes immediately.</p>
+    </div>
+    <div class="text-sm text-gray-500" x-show="myLabel">
+      <span class="text-gray-600">Signed in as </span>
+      <span class="text-indigo-300 font-mono" x-text="myLabel"></span>
+    </div>
   </div>
-  <div class="flex items-center gap-2 text-sm text-gray-400">
-    <span x-show="reviews.length === 0 && !loading">All clear</span>
-    <span x-show="reviews.length > 0" class="text-amber-400 font-medium" x-text="reviews.length + ' pending'"></span>
+
+  <!-- Tab bar -->
+  <div class="flex gap-1 bg-gray-900 rounded-lg p-1 w-fit">
+    <button @click="setTab('mine')"
+      :class="activeTab === 'mine'
+        ? 'bg-gray-800 text-white'
+        : 'text-gray-400 hover:text-gray-200'"
+      class="px-4 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-2">
+      Mi cola
+      <span x-show="mineCount > 0"
+        class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"
+        x-text="mineCount"></span>
+    </button>
+    <button @click="setTab('all')"
+      :class="activeTab === 'all'
+        ? 'bg-gray-800 text-white'
+        : 'text-gray-400 hover:text-gray-200'"
+      class="px-4 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-2">
+      Todas
+      <span x-show="allCount > 0"
+        class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-600 text-gray-200 text-xs font-bold"
+        x-text="allCount"></span>
+    </button>
   </div>
 </div>
 
@@ -61,9 +87,12 @@
   <div class="px-6">
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
       <div class="text-4xl mb-3">✓</div>
-      <p class="text-gray-300 font-medium mb-1">No pending reviews</p>
+      <p class="text-gray-300 font-medium mb-1">
+        <span x-show="activeTab === 'mine'">No tienes reviews pendientes</span>
+        <span x-show="activeTab === 'all'">No hay reviews pendientes</span>
+      </p>
       <p class="text-gray-500 text-sm">
-        Runs with <code class="bg-gray-800 px-1 rounded text-xs">hitl: true</code> will appear here when an agent needs approval.
+        Runs with <code class="bg-gray-800 px-1 rounded text-xs">hitl: true</code> will appear here.
       </p>
     </div>
   </div>
@@ -76,7 +105,7 @@
 
       <!-- Card header -->
       <div class="px-5 py-3 border-b border-gray-800 flex items-center justify-between bg-amber-900/10">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
           <span class="inline-flex items-center gap-1.5 bg-amber-900/40 text-amber-300 text-xs font-medium px-2.5 py-1 rounded-full">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
             <span x-text="review.agent_name"></span>
@@ -84,27 +113,32 @@
           <a :href="'/run/' + review.run_id"
             class="text-xs text-gray-500 hover:text-indigo-400 font-mono transition"
             x-text="'run:' + review.run_id.slice(0,12) + '…'"></a>
-          <!-- Reviewer assignment -->
-          <template x-if="review.assigned_to">
-            <span class="text-xs text-gray-500 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-              <span x-text="review.assigned_to"></span>
-            </span>
+
+          <!-- Assignee chips -->
+          <template x-if="review.assignees && review.assignees.length > 0">
+            <div class="flex items-center gap-1.5">
+              <template x-for="(a, i) in review.assignees" :key="i">
+                <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+                  :class="a === myLabel
+                    ? 'bg-indigo-900/60 text-indigo-300 ring-1 ring-indigo-500'
+                    : 'bg-gray-800 text-gray-400'">
+                  <span class="w-1.5 h-1.5 rounded-full"
+                    :class="a === myLabel ? 'bg-indigo-400' : 'bg-gray-500'"></span>
+                  <span x-text="a"></span>
+                </span>
+              </template>
+            </div>
           </template>
-          <template x-if="!review.assigned_to">
+
+          <!-- Unassigned: claim button -->
+          <template x-if="!review.assignees || review.assignees.length === 0">
             <button @click="claimReview(review)"
               class="text-xs text-gray-600 hover:text-blue-400 transition">
               Claim
             </button>
           </template>
-          <template x-if="review.assigned_to && review.assigned_to !== myName">
-            <button @click="claimReview(review)"
-              class="text-xs text-gray-600 hover:text-yellow-400 transition">
-              Reassign to me
-            </button>
-          </template>
         </div>
-        <span class="text-xs text-gray-500" x-text="timeAgo(review.created_at)"></span>
+        <span class="text-xs text-gray-500 shrink-0 ml-3" x-text="timeAgo(review.created_at)"></span>
       </div>
 
       <!-- Artifact -->
@@ -222,7 +256,7 @@
 
       </div><!-- /artifact -->
 
-      <!-- Edit mode: inline JSON editor -->
+      <!-- Edit mode -->
       <template x-if="editingId === review.review_id">
         <div class="px-5 pb-4 space-y-2 border-t border-gray-800 pt-4">
           <p class="text-xs text-gray-500 uppercase tracking-wide">Edit artifact — modify JSON then submit</p>
@@ -244,14 +278,12 @@
 
       <!-- Actions -->
       <div class="px-5 pb-5 space-y-3" x-show="editingId !== review.review_id">
-        <!-- Feedback note (included with any decision) -->
         <input
           :id="'fb-' + review.review_id"
           x-model="feedbacks[review.review_id]"
-          placeholder="Optional note sent alongside any decision (approve, reject, etc.)…"
+          placeholder="Optional note sent alongside any decision…"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
 
-        <!-- Resolve buttons -->
         <div class="flex gap-2 flex-wrap">
           <template x-for="opt in parseOptions(review)" :key="opt">
             <button
@@ -273,13 +305,13 @@
 
         <p x-show="resolveErrors[review.review_id]" class="text-red-400 text-xs"
           x-text="resolveErrors[review.review_id]"></p>
-      </div><!-- /actions -->
+      </div>
 
     </div><!-- /card -->
   </template>
 </div>
 
-<!-- Toast: new review arrived -->
+<!-- Toast -->
 <div x-show="toast" x-cloak x-transition
   class="fixed bottom-6 right-6 bg-amber-700 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 z-50">
   <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
@@ -292,6 +324,9 @@ function reviewQueue() {
   return {
     reviews: [],
     loading: true,
+    activeTab: 'all',
+    allCount: 0,
+    mineCount: 0,
     feedbacks: {},
     resolving: {},
     resolveErrors: {},
@@ -301,18 +336,16 @@ function reviewQueue() {
     wsConnected: false,
     _wsBackoff: 1000,
     toast: '',
-    myName: localStorage.getItem('antcrew_reviewer') || '',
+    myLabel: localStorage.getItem('antcrew_api_key_label') || '',
 
     async init() {
-      if (!this.myName) {
-        const name = prompt('Your reviewer name (saved locally):');
-        if (name?.trim()) {
-          this.myName = name.trim();
-          localStorage.setItem('antcrew_reviewer', this.myName);
-        }
-      }
       await this.loadReviews();
       this.connectWs();
+    },
+
+    setTab(tab) {
+      this.activeTab = tab;
+      this.loadReviews();
     },
 
     apiHeaders(extra = {}) {
@@ -325,15 +358,33 @@ function reviewQueue() {
     async loadReviews() {
       this.loading = true;
       try {
-        const r = await fetch('/reviews/?status=pending&limit=50', { headers: this.apiHeaders() });
+        // Load the active tab
+        const isMine = this.activeTab === 'mine';
+        const url = isMine
+          ? '/reviews/?status=pending&mine=true&limit=50'
+          : '/reviews/?status=pending&limit=50';
+        const r = await fetch(url, { headers: this.apiHeaders() });
         if (r.ok) this.reviews = await r.json();
+
+        // Update counts
+        this.allCount = isMine
+          ? (await (await fetch('/reviews/?status=pending&limit=1', { headers: this.apiHeaders() })).json()).length
+          : this.reviews.length;
+        if (!isMine && this.myLabel) {
+          const mr = await fetch(`/reviews/?status=pending&mine=true&limit=50`, { headers: this.apiHeaders() });
+          if (mr.ok) this.mineCount = (await mr.json()).length;
+        } else if (isMine) {
+          this.mineCount = this.reviews.length;
+          const ar = await fetch('/reviews/?status=pending&limit=200', { headers: this.apiHeaders() });
+          if (ar.ok) this.allCount = (await ar.json()).length;
+        }
       } catch {}
       this.loading = false;
     },
 
     artifactType(review) {
       try {
-        const a = review.artifact;          // HitlReviewPublic already parses this
+        const a = review.artifact;
         if (!a) return 'empty';
         if (Array.isArray(a)) {
           if (a[0]?.file_path && a[0]?.content !== undefined) return 'code';
@@ -356,15 +407,15 @@ function reviewQueue() {
     },
 
     async claimReview(review) {
-      const name = this.myName || prompt('Your reviewer name:');
-      if (!name?.trim()) return;
-      this.myName = name.trim();
-      localStorage.setItem('antcrew_reviewer', this.myName);
+      const label = this.myLabel || prompt('Your API key label (saved locally):');
+      if (!label?.trim()) return;
+      this.myLabel = label.trim();
+      localStorage.setItem('antcrew_api_key_label', this.myLabel);
       try {
         const r = await fetch(`/reviews/${review.review_id}/assign`, {
           method: 'PATCH',
           headers: this.apiHeaders(),
-          body: JSON.stringify({ assigned_to: this.myName }),
+          body: JSON.stringify({ assigned_to: this.myLabel }),
         });
         if (r.ok) {
           const updated = await r.json();
@@ -380,7 +431,6 @@ function reviewQueue() {
     },
 
     async submitEdit(review) {
-      // Validate JSON before submitting
       try { JSON.parse(this.editedJson); }
       catch (e) {
         this.resolveErrors[review.review_id] = 'Invalid JSON: ' + e.message;
@@ -399,7 +449,6 @@ function reviewQueue() {
       this.resolveErrors[review.review_id] = '';
       try {
         const body = { decision };
-        // Include feedback note with any decision if the user typed one
         const fb = this.feedbacks[review.review_id]?.trim();
         if (fb) body.feedback = fb;
         if (editedJson) body.edited = editedJson;
@@ -411,6 +460,9 @@ function reviewQueue() {
         if (r.ok) {
           this.reviews = this.reviews.filter(rv => rv.review_id !== review.review_id);
           delete this.feedbacks[review.review_id];
+          // Update counts
+          if (this.activeTab === 'mine') this.mineCount = Math.max(0, this.mineCount - 1);
+          this.allCount = Math.max(0, this.allCount - 1);
         } else {
           const d = await r.json().catch(() => ({}));
           this.resolveErrors[review.review_id] = d.detail || `HTTP ${r.status}`;
@@ -432,7 +484,7 @@ function reviewQueue() {
         if (ev.type === 'ping') return;
         if (ev.type === 'hitl.review_required') {
           this.loadReviews();
-          this.toast = 'New review request — ' + (ev.payload?.agent_name || 'agent');
+          this.toast = 'New review — ' + (ev.payload?.agent_name || 'agent');
           setTimeout(() => { this.toast = ''; }, 5000);
         }
       };

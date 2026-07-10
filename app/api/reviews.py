@@ -8,22 +8,22 @@ from typing import Optional, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, model_validator
-from sqlmodel import select, desc
+from sqlmodel import select, col, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible, ws_filter
 from app.core.channel import resolve_review
 from app.core.database import get_session
-from app.models.run import HitlReview, Run
+from app.models.run import HitlReview, HitlReviewAssignee, Run
 from app.services.runs import list_reviews as list_reviews_svc
 
 
 # ---------------------------------------------------------------------------
-# P3.1 — Normalized response model: exposes artifact/options as parsed types
+# Response model
 # ---------------------------------------------------------------------------
 
 class HitlReviewPublic(BaseModel):
-    """HitlReview with artifact_json parsed to dict and options_json to list."""
+    """HitlReview with artifact/options parsed and assignees enriched."""
     model_config = ConfigDict(from_attributes=True)
 
     id: Optional[int] = None
@@ -37,6 +37,7 @@ class HitlReviewPublic(BaseModel):
     edited_json: Optional[str] = None
     feedback: Optional[str] = None
     assigned_to: Optional[str] = None
+    assignees: list[str] = []
     created_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
 
@@ -59,7 +60,35 @@ class HitlReviewPublic(BaseModel):
         except Exception:
             d.pop("options_json", None)
             d["options"] = ["approve", "reject"]
+        if "assignees" not in d:
+            d["assignees"] = []
         return d
+
+
+async def _to_public(
+    session: AsyncSession,
+    reviews: list[HitlReview],
+) -> list[HitlReviewPublic]:
+    """Convert HitlReview list to public models, batch-loading assignees in one query."""
+    if not reviews:
+        return []
+    review_ids = [r.review_id for r in reviews]
+    assignee_rows = (await session.exec(
+        select(HitlReviewAssignee).where(
+            col(HitlReviewAssignee.review_id).in_(review_ids)
+        )
+    )).all()
+    assignees_map: dict[str, list[str]] = {}
+    for row in assignee_rows:
+        assignees_map.setdefault(row.review_id, []).append(row.assignee_label)
+
+    result: list[HitlReviewPublic] = []
+    for r in reviews:
+        d = {k: v for k, v in r.__dict__.items() if not k.startswith("_")}
+        d["assignees"] = assignees_map.get(r.review_id, [])
+        result.append(HitlReviewPublic.model_validate(d))
+    return result
+
 
 router = APIRouter(
     prefix="/reviews",
@@ -70,7 +99,6 @@ router = APIRouter(
 _VALID_DECISIONS = ("approve", "reject", "edit", "feedback")
 _VALID_STATUSES = ("pending", "approved", "rejected", "edited", "feedback", "cancelled", "timeout")
 
-# Map decision verb → stored status noun
 _DECISION_TO_STATUS = {
     "approve": "approved",
     "reject": "rejected",
@@ -86,16 +114,17 @@ class ReviewDecision(BaseModel):
 
 
 class ReviewAssign(BaseModel):
-    assigned_to: str  # reviewer name / email / identifier
+    assigned_to: str
 
 
 class CreateReview(BaseModel):
     run_id: str
-    review_id: Optional[str] = None     # generated if omitted
+    review_id: Optional[str] = None
     agent_name: str
     artifact_json: str = "null"
     options: list[str] = ["approve", "edit", "reject"]
-    workspace_id: Optional[int] = None  # used when creating a stub Run for local runs
+    workspace_id: Optional[int] = None
+    assignees: list[str] = []   # API key labels to assign; any one can resolve
 
 
 @router.post("/", status_code=201, response_model=HitlReviewPublic,
@@ -107,16 +136,8 @@ async def create_review(
 ):
     """Register a HITL review created by an external (local) run.
 
-    Called by antcrew.integrations.PlatformChannel when a local pipeline run
-    reaches a HITL checkpoint. Creates the HitlReview row and fires the same
-    notification path (Slack, webhook) as platform-dispatched runs.
-
-    If the run_id does not correspond to a known Run row, a stub Run with
-    status='external' is created so the workspace listener can resolve Slack
-    tokens and the run appears in the dashboard.
-
-    The review_id is generated if not supplied. The caller should then poll
-    GET /reviews/{review_id} until status != 'pending' to receive the decision.
+    Pass ``assignees`` as a list of API key labels to notify specific reviewers.
+    Any one of the assignees can resolve the review.
     """
     review_id = body.review_id or str(uuid.uuid4())
 
@@ -124,9 +145,8 @@ async def create_review(
         select(HitlReview).where(HitlReview.review_id == review_id)
     )).first()
     if existing:
-        return existing
+        return (await _to_public(session, [existing]))[0]
 
-    # Ensure the run_id has a corresponding Run row so workspace listeners work.
     run_exists = (await session.exec(
         select(Run).where(Run.run_id == body.run_id)
     )).first()
@@ -142,8 +162,10 @@ async def create_review(
             created_by=ctx.created_by,
         )
         session.add(stub)
-        await session.flush()  # write stub before the review FK
+        await session.flush()
 
+    # First assignee becomes the legacy assigned_to field for backward compat
+    primary = body.assignees[0] if body.assignees else None
     review = HitlReview(
         review_id=review_id,
         run_id=body.run_id,
@@ -151,13 +173,20 @@ async def create_review(
         artifact_json=body.artifact_json,
         options_json=json.dumps(body.options),
         status="pending",
+        assigned_to=primary,
     )
     session.add(review)
+    await session.flush()
+
+    for label in body.assignees:
+        session.add(HitlReviewAssignee(
+            review_id=review_id,
+            assignee_label=label,
+        ))
+
     await session.commit()
     await session.refresh(review)
 
-    # Fire the bus event so the existing listener handles Slack/webhook notifications.
-    # The listener is idempotent — it skips HitlReview creation when the row exists.
     try:
         from antcrew.core.events import bus as _bus
         artifact_data: object = {}
@@ -172,14 +201,15 @@ async def create_review(
                 "agent_name": body.agent_name,
                 "options": body.options,
                 "artifact": artifact_data,
+                "assignees": body.assignees,
             },
             run_id=body.run_id,
             thread_id="external",
         )
     except Exception:
-        pass  # notification failure must not fail the endpoint
+        pass
 
-    return review
+    return (await _to_public(session, [review]))[0]
 
 
 @router.get("/{review_id}", response_model=HitlReviewPublic)
@@ -188,11 +218,7 @@ async def get_review(
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
-    """Get a specific HITL review by ID.
-
-    Reviewers can use this to inspect the full artifact before resolving.
-    Returns 403 when the review belongs to a different workspace than the API key.
-    """
+    """Get a specific HITL review by ID, including its full assignee list."""
     result = await session.exec(select(HitlReview).where(HitlReview.review_id == review_id))
     review = result.first()
     if not review:
@@ -202,29 +228,47 @@ async def get_review(
         run = run_result.first()
         if run and not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This review is not accessible with the current API key")
-    return review
+    return (await _to_public(session, [review]))[0]
 
 
 @router.get("/", response_model=list[HitlReviewPublic])
 async def list_reviews(
     status: str = Query("pending", description=f"Filter by status. One of: {_VALID_STATUSES}"),
     run_id: Optional[str] = None,
-    assigned_to: Optional[str] = Query(None, description="Filter by assignee name"),
+    assigned_to: Optional[str] = Query(None, description="Filter by legacy single-assignee field"),
+    mine: bool = Query(False, description="Return only reviews assigned to the calling key"),
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
-    """List HITL reviews. Default: pending reviews. Scoped to key's workspace when set."""
+    """List HITL reviews.
+
+    Use ``mine=true`` to see only reviews where the authenticated API key is an assignee.
+    Reviewers see their own queue; admins/writers see all.
+    """
     if status not in _VALID_STATUSES:
         raise HTTPException(422, f"status must be one of {_VALID_STATUSES}")
+
+    # Resolve assignee_label for 'mine' filter
+    assignee_label: Optional[str] = None
+    if mine and ctx.created_by:
+        assignee_label = ctx.created_by
+
     reviews = await list_reviews_svc(
-        session, status=status, run_id=run_id, limit=limit, offset=offset,
+        session,
+        status=status,
+        run_id=run_id,
+        limit=limit,
+        offset=offset,
         workspace_ids=ctx.workspace_ids,
+        assignee_label=assignee_label,
     )
+    # Legacy single-field filter (backward compat)
     if assigned_to is not None:
         reviews = [r for r in reviews if r.assigned_to == assigned_to]
-    return reviews
+
+    return await _to_public(session, reviews)
 
 
 @router.patch("/{review_id}/assign", response_model=HitlReviewPublic,
@@ -235,10 +279,9 @@ async def assign_review(
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
-    """Assign a pending review to a named reviewer.
+    """Assign (or reassign) a pending review to a named reviewer.
 
-    Use this to claim ownership before resolving, so other reviewers know
-    someone is already handling it. The pipeline is not unblocked by this call.
+    Also adds the assignee to the multi-reviewer table if not already present.
     """
     result = await session.exec(select(HitlReview).where(HitlReview.review_id == review_id))
     review = result.first()
@@ -252,11 +295,23 @@ async def assign_review(
         if run and not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This review is not accessible with the current API key")
 
-    review.assigned_to = body.assigned_to.strip() or None
+    label = body.assigned_to.strip() or None
+    review.assigned_to = label
     session.add(review)
+
+    # Ensure the assignee has a row in hitl_review_assignee
+    if label:
+        existing_row = (await session.exec(
+            select(HitlReviewAssignee)
+            .where(HitlReviewAssignee.review_id == review_id)
+            .where(HitlReviewAssignee.assignee_label == label)
+        )).first()
+        if not existing_row:
+            session.add(HitlReviewAssignee(review_id=review_id, assignee_label=label))
+
     await session.commit()
     await session.refresh(review)
-    return review
+    return (await _to_public(session, [review]))[0]
 
 
 @router.post("/{review_id}", response_model=HitlReviewPublic,
@@ -269,8 +324,8 @@ async def submit_review(
 ):
     """Submit a HITL review decision.
 
-    The run's executor thread is unblocked immediately; LangGraph continues from
-    the checkpoint using the provided decision.
+    The run's executor thread is unblocked immediately.  Any assignee (or any key
+    with write/admin role) can resolve a review.
     """
     if body.decision not in _VALID_DECISIONS:
         raise HTTPException(422, f"decision must be one of {_VALID_DECISIONS}")
@@ -284,7 +339,6 @@ async def submit_review(
     if review.status != "pending":
         raise HTTPException(409, f"Review {review_id!r} already resolved (status: {review.status!r})")
 
-    # Verify the requesting key has access to the run this review belongs to
     if ctx.workspace_ids is not None:
         run_result = await session.exec(select(Run).where(Run.run_id == review.run_id))
         run = run_result.first()
@@ -297,13 +351,10 @@ async def submit_review(
         "feedback": body.feedback,
     }
 
-    # Resolve the Future — unblocks the executor thread (LangGraph path)
     resolve_review(review_id, decision_payload)
 
-    # Resolve the threading.Event — unblocks a HitlReviewer in the engine thread pool
     try:
         from app.services.engine_runner import resolve_engine_review
-        # Parse edited JSON for "edit" verdict so HitlReviewer receives new_content as a dict
         new_content = None
         if body.decision == "edit" and body.edited:
             try:
@@ -312,14 +363,17 @@ async def submit_review(
                 new_content = body.edited
         resolve_engine_review(review_id, body.decision, body.feedback, new_content)
     except Exception:
-        pass  # not an engine review — fine to ignore
+        pass
 
     review.status = _DECISION_TO_STATUS.get(body.decision, body.decision)
     review.decision = body.decision
     review.edited_json = body.edited
     review.feedback = body.feedback
     review.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    # Record who resolved it in assigned_to if not already set
+    if not review.assigned_to and ctx.created_by:
+        review.assigned_to = ctx.created_by
     session.add(review)
     await session.commit()
     await session.refresh(review)
-    return review
+    return (await _to_public(session, [review]))[0]
