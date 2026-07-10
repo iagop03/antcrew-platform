@@ -74,24 +74,13 @@ async def _check_sandbox_mode() -> None:
         return
 
     if is_public and sandbox_mode != "required":
-        border = "=" * 72
-        msg = (
-            f"\n{border}\n"
-            "  🚨  ANTCREW-PLATFORM: SANDBOX NOT ENFORCED ON PUBLIC HOST\n"
-            f"      ANTCREW_SANDBOX={sandbox_mode!r}  HOST={host!r}\n"
-            "\n"
-            "  Engine runs will execute generated code and pip install on the HOST.\n"
-            "  Set ANTCREW_SANDBOX=required to enforce Docker isolation.\n"
-            f"{border}\n"
+        raise RuntimeError(
+            f"ANTCREW_SANDBOX={sandbox_mode!r} on public host {host!r}. "
+            "Engine runs will execute generated code and pip install post-install hooks "
+            "directly on the host. Set ANTCREW_SANDBOX=required to enforce Docker isolation, "
+            "or set HOST to a loopback address for local-only deployments."
         )
-        log.error(
-            "sandbox: ANTCREW_SANDBOX=%r on public host %r — "
-            "generated code runs unsandboxed; set ANTCREW_SANDBOX=required",
-            sandbox_mode, host,
-        )
-        print(msg, flush=True)
-    else:
-        log.debug("sandbox: ANTCREW_SANDBOX=%r (localhost — Docker optional)", sandbox_mode)
+    log.debug("sandbox: ANTCREW_SANDBOX=%r (localhost — Docker optional)", sandbox_mode)
 
 
 async def _check_stripe_config() -> None:

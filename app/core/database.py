@@ -1,8 +1,18 @@
-"""SQLite database setup using SQLModel + aiosqlite."""
+"""Database setup using SQLModel + aiosqlite (SQLite) or asyncpg (PostgreSQL).
+
+Migration strategy:
+  SQLite  (dev / test) — create_all on fresh DB + inline _migrate_* helpers
+  PostgreSQL (production) — alembic upgrade head via subprocess in executor
+"""
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import os
+import subprocess
+import sys
+from pathlib import Path
 from typing import AsyncGenerator
 
 from sqlalchemy import text
@@ -10,9 +20,40 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+log = logging.getLogger(__name__)
+
 DB_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./platform.db")
 
 engine = create_async_engine(DB_URL, echo=False)
+
+_PROJECT_ROOT = Path(__file__).parent.parent.parent  # app/core/database.py → project root
+
+
+async def _run_alembic_upgrade() -> None:
+    """Run `alembic upgrade head` for the current DATABASE_URL.
+
+    Runs in a thread-pool executor so the async event loop is not blocked and
+    there is no nested-asyncio issue (alembic's env.py calls asyncio.run()
+    internally, which requires a fresh event loop in a separate thread).
+    """
+    env = {**os.environ, "DATABASE_URL": DB_URL}
+    loop = asyncio.get_running_loop()
+    result: subprocess.CompletedProcess = await loop.run_in_executor(
+        None,
+        lambda: subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            cwd=str(_PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            env=env,
+        ),
+    )
+    if result.stdout.strip():
+        log.info("alembic: %s", result.stdout.strip())
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"alembic upgrade head failed (exit {result.returncode}):\n{result.stderr}"
+        )
 
 
 async def _migrate_webhook_events(eng) -> None:
@@ -137,6 +178,10 @@ async def _migrate_stripe_fields(eng) -> None:
 
 
 async def init_db() -> None:
+    if "postgresql" in DB_URL:
+        await _run_alembic_upgrade()
+        return
+    # SQLite: create_all for fresh DBs + inline helpers for existing ones
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     await _migrate_webhook_events(engine)
