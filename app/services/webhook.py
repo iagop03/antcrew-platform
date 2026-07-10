@@ -9,12 +9,18 @@ Usage:
 
     # Started at app startup in lifespan:
     asyncio.create_task(start_webhook_retry_loop())
+
+Alerts:
+    Set ALERT_WEBHOOK_URL to receive a POST notification whenever a delivery
+    permanently fails (all 5 attempts exhausted).  Works with Slack incoming
+    webhooks, Discord webhooks, or any HTTP endpoint that accepts JSON.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -26,6 +32,32 @@ from app.core.database import engine
 from app.models.run import WebhookDelivery
 
 log = logging.getLogger(__name__)
+
+_ALERT_URL: Optional[str] = os.environ.get("ALERT_WEBHOOK_URL") or None
+
+
+async def _send_alert(delivery: WebhookDelivery) -> None:
+    """POST a failure summary to ALERT_WEBHOOK_URL (fire-and-forget, never raises)."""
+    if not _ALERT_URL:
+        return
+    payload = {
+        "text": (
+            f":x: Webhook delivery #{delivery.id} permanently failed after "
+            f"{delivery.attempts} attempts.\n"
+            f"URL: {delivery.url}\n"
+            f"Last error: {delivery.last_error or 'unknown'}"
+        ),
+        "delivery_id": delivery.id,
+        "url": delivery.url,
+        "attempts": delivery.attempts,
+        "last_error": delivery.last_error,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(_ALERT_URL, json=payload)
+        log.debug("webhook: sent failure alert for delivery %d", delivery.id)
+    except Exception as exc:
+        log.warning("webhook: failed to send alert for delivery %d: %s", delivery.id, exc)
 
 _POLL_INTERVAL = 30   # fallback poll for retries even when no new deliveries arrive
 _MAX_ATTEMPTS = 5
@@ -77,6 +109,7 @@ async def _process_pending() -> None:
                     if delivery.attempts >= _MAX_ATTEMPTS:
                         delivery.status = "failed"
                         log.warning("webhook: permanently failed delivery %d: %s", delivery.id, exc)
+                        await _send_alert(delivery)
                     else:
                         delivery.status = "retrying"
                         delay = 2 ** delivery.attempts  # 2, 4, 8, 16 seconds

@@ -12,6 +12,19 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.main import app
 from app.core.database import get_session
 
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """Clear rate-limit sliding windows between tests.
+
+    Without this, the in-memory counter accumulates across the entire test suite
+    and starts returning 429 after ~60 requests (the default RATE_LIMIT_RPM).
+    """
+    from app.core import rate_limit
+    rate_limit.reset()
+    yield
+    rate_limit.reset()
+
 # Override with TEST_DB_URL env var to run against PostgreSQL in CI
 TEST_DB_URL = os.environ.get("TEST_DB_URL", "sqlite+aiosqlite:///:memory:")
 

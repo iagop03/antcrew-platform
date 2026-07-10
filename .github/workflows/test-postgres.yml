@@ -34,10 +34,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
+        # Installs antcrew + antcrew-engine from PyPI at the pinned versions in
+        # pyproject.toml — intentionally NOT from git, so this CI catches any
+        # version-skew between what's published and what the platform expects.
         run: pip install -e ".[dev]"
-
-      - name: Install antcrew from source (overrides PyPI version)
-        run: pip install --force-reinstall "git+https://github.com/iagop03/antcrew.git"
 
       - name: Run tests against PostgreSQL
         env:

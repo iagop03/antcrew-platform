@@ -12,7 +12,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional, Any
 
-from fastapi import Depends, HTTPException, Security
+from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyHeader
 
 from app.core.database import get_session
@@ -92,26 +92,33 @@ async def _authenticate(raw_key: Optional[str], session) -> WorkspaceContext:
 
 
 async def get_workspace_context(
+    request: Request,
     x_api_key: str | None = Security(_KEY_HEADER),
     session=Depends(get_session),
 ) -> WorkspaceContext:
-    """FastAPI dependency: authenticate and return workspace context.
+    """FastAPI dependency: authenticate, rate-limit, and return workspace context.
 
     Returns WorkspaceContext with workspace_id (from the API key's scope) and
     created_by (key label). In open mode both are None.
     Uses the injected session so tests can override it via get_session.
     """
+    from app.core import rate_limit
+
     env_key = os.environ.get("PLATFORM_API_KEY")
     if env_key:
         if x_api_key != env_key:
             raise HTTPException(401, "Invalid or missing X-Api-Key header")
-        return WorkspaceContext(workspace_id=None, created_by="env_key", role="admin")
+        ctx = WorkspaceContext(workspace_id=None, created_by="env_key", role="admin")
+        await rate_limit.check(request, ctx.workspace_id, ctx.created_by)
+        return ctx
     try:
-        return await _authenticate(x_api_key, session)
+        ctx = await _authenticate(x_api_key, session)
     except HTTPException:
         raise
     except Exception:
         return WorkspaceContext(workspace_id=None, created_by=None)  # DB unavailable → fail open
+    await rate_limit.check(request, ctx.workspace_id, ctx.created_by)
+    return ctx
 
 
 # Alias so routers can keep `dependencies=[Depends(require_api_key)]`.

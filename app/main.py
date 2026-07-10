@@ -290,17 +290,41 @@ async def _eval_scheduler_loop() -> None:
             log.warning("eval scheduler error: %s", exc)
 
 
+async def _check_cors_config() -> None:
+    """Block startup when CORS_ORIGINS=* is used on a public-facing host.
+
+    The safe default (no CORS_ORIGINS set) restricts cross-origin access to
+    localhost only.  Explicitly setting CORS_ORIGINS=* in production is a
+    hard error — it lets any website make credentialed requests to the API.
+    """
+    cors = os.environ.get("CORS_ORIGINS", "").strip()
+    if cors != "*":
+        if not cors:
+            log.debug("CORS: no CORS_ORIGINS set — defaulting to localhost only")
+        else:
+            log.info("CORS: origins=%r", cors)
+        return
+
+    host = os.environ.get("HOST", "127.0.0.1")
+    is_public = host not in ("127.0.0.1", "localhost", "::1")
+    if is_public:
+        raise RuntimeError(
+            "CORS_ORIGINS=* is not allowed on a public host. "
+            "Set CORS_ORIGINS to a comma-separated list of allowed origins "
+            "(e.g. https://app.yourdomain.com) or unset it to allow localhost only."
+        )
+    log.warning(
+        "CORS: allow_origins=* — localhost only, set CORS_ORIGINS for production"
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _webhook_task, _scheduler_task
     _setup_logging()
-    cors = os.environ.get("CORS_ORIGINS", "*")
-    if cors.strip() == "*":
-        log.warning(
-            "CORS policy is open (*) — set CORS_ORIGINS env var to restrict origins in production"
-        )
     await init_db()
     await _check_auth_mode()
+    await _check_cors_config()
     await _check_sandbox_mode()
     await _check_stripe_config()
     start_listening()
@@ -339,9 +363,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins_raw = os.environ.get("CORS_ORIGINS", "").strip()
+_cors_origins = (
+    _cors_origins_raw.split(",")
+    if _cors_origins_raw
+    else ["http://localhost:3000", "http://localhost:8000",
+          "http://127.0.0.1:3000", "http://127.0.0.1:8000"]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
