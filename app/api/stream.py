@@ -64,12 +64,30 @@ async def events_stream(
 ):
     """Stream all bus events (or events for a specific run_id) over WebSocket.
 
-    Pass api_key as a query param when PLATFORM_API_KEY or DB keys are configured:
-    ws://host/ws/events?api_key=<key>&run_id=<optional>
+    Auth options (in priority order):
+    1. Query param: ws://host/ws/events?api_key=<key>  — simple but key appears in
+       access logs. Avoid on production proxies that log full request URLs.
+    2. First-message auth: connect without api_key, then send JSON
+       {"auth": "<key>"} as the first message. The server waits up to 10 s for it
+       before closing the connection. Preferred for programmatic clients that want
+       to keep the key out of server access logs.
     """
     await ws.accept()
 
-    if not await check_ws_api_key(api_key):
+    # Resolve key: query param takes priority; fall back to first-message auth.
+    resolved_key = api_key
+    if resolved_key is None:
+        # Wait briefly for the client to send {"auth": "<key>"} as first message.
+        try:
+            raw = await asyncio.wait_for(ws.receive_text(), timeout=10.0)
+            msg = json.loads(raw)
+            if isinstance(msg, dict) and "auth" in msg:
+                resolved_key = msg["auth"]
+                run_id = run_id or msg.get("run_id")
+        except (asyncio.TimeoutError, json.JSONDecodeError, Exception):
+            pass  # no first-message auth — proceed to key check (will reject if required)
+
+    if not await check_ws_api_key(resolved_key):
         await ws.close(code=4001, reason="Unauthorized")
         return
 

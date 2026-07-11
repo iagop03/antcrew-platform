@@ -135,6 +135,39 @@ async def _check_stripe_config() -> None:
     )
 
 
+async def _check_slack_config() -> None:
+    """Block startup when Slack is configured without token encryption on a public host.
+
+    A Slack bot token (xoxb-…) stored in plaintext in the DB is a high-value
+    credential — it allows posting to channels and reading message history.
+    On a public-facing host, require SLACK_TOKEN_ENCRYPTION_KEY to be set so
+    tokens are Fernet-encrypted at rest. Locally, warn only.
+    """
+    bot_token = os.environ.get("SLACK_BOT_TOKEN")
+    if not bot_token:
+        return  # Slack not configured — nothing to enforce
+    enc_key = os.environ.get("SLACK_TOKEN_ENCRYPTION_KEY")
+    if enc_key:
+        log.info("slack: token encryption active (SLACK_TOKEN_ENCRYPTION_KEY set)")
+        return
+
+    host = os.environ.get("HOST", "127.0.0.1")
+    is_public = host not in ("127.0.0.1", "localhost", "::1")
+
+    if is_public:
+        raise RuntimeError(
+            "SLACK_BOT_TOKEN is set but SLACK_TOKEN_ENCRYPTION_KEY is missing. "
+            "The Slack bot token would be stored in plaintext in the database, "
+            "exposing a credential that allows posting to and reading from your Slack workspace. "
+            "Generate a key with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" "
+            "and set it as SLACK_TOKEN_ENCRYPTION_KEY, or unset SLACK_BOT_TOKEN if Slack is not yet active."
+        )
+    log.warning(
+        "slack: SLACK_BOT_TOKEN set but SLACK_TOKEN_ENCRYPTION_KEY missing — "
+        "bot token stored in plaintext (dev mode only, not suitable for production)"
+    )
+
+
 async def _check_auth_mode() -> None:
     """Warn or block when the platform starts in open (unauthenticated) mode.
 
@@ -352,6 +385,7 @@ async def lifespan(app: FastAPI):
     await _check_cors_config()
     await _check_sandbox_mode()
     await _check_stripe_config()
+    await _check_slack_config()
     start_listening()
     from app.core.slack_hitl import maybe_start_from_env as _slack_start
     _slack_start()

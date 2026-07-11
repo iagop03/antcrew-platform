@@ -164,6 +164,9 @@ async def create_review(
     )).first()
     if not run_exists:
         workspace_id = body.workspace_id or ctx.workspace_id
+        # Reject attempts to pin a review to a workspace the caller can't access.
+        if body.workspace_id is not None and not ws_accessible(body.workspace_id, ctx):
+            raise HTTPException(403, "Access denied to the requested workspace")
         stub = Run(
             run_id=body.run_id,
             thread_id="external",
