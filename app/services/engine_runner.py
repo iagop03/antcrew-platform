@@ -357,6 +357,7 @@ def _run_engine_sync(
     capability_models: "dict[str, str] | None" = None,
     max_tasks: int = 12,
     parallel_workers: int = 5,
+    byok_api_key: Optional[str] = None,
 ) -> tuple[bool, float]:
     from antcrew_engine.capabilities.hitl_reviewer import HitlReviewer
     from antcrew_engine.capabilities.validators import artifact_validators
@@ -366,7 +367,7 @@ def _run_engine_sync(
 
     hitl_after = hitl_after or []
 
-    llm = build_llm(model, prompt_caching=True)
+    llm = build_llm(model, prompt_caching=True, api_key=byok_api_key or None)
     event_log = EventLog()
     EventBusBridge(event_log, run_id=run_id)
 
@@ -525,6 +526,23 @@ async def dispatch_engine(
     if not goal:
         raise ValueError("goal is required (or use resume=True with a prior output_dir)")
 
+    # Fetch BYOK key if this workspace uses customer-supplied LLM keys
+    _byok_api_key: Optional[str] = None
+    if workspace_id is not None:
+        from sqlmodel import select as _sel
+        from sqlmodel.ext.asyncio.session import AsyncSession
+        from app.core.database import engine as _db_engine
+        from app.models.run import Workspace as _WS
+        async with AsyncSession(_db_engine, expire_on_commit=False) as _sess:
+            _ws = (await _sess.exec(_sel(_WS).where(_WS.id == workspace_id))).first()
+            if _ws and getattr(_ws, "llm_key_mode", "managed") == "byok":
+                _provider = "openai" if (
+                    model.startswith("gpt") or model.startswith("o1") or model.startswith("o3")
+                    or model.startswith("openai:")
+                ) else "anthropic"
+                from app.core.byok import get_workspace_llm_key
+                _byok_api_key = await get_workspace_llm_key(_sess, workspace_id, _provider)
+
     run_id = new_run_id()
     stop_event = _threading.Event()
     _cancel_events[run_id] = stop_event
@@ -552,6 +570,7 @@ async def dispatch_engine(
                 run_id, goal, model, tech, conditions, full, max_iter, output_dir,
                 fix_attempts, hitl_after, source_dir, stop_event, hitl_max_rejections,
                 max_cost_usd, capability_models, max_tasks, parallel_workers,
+                _byok_api_key,
             )
             success, cost_usd = await loop.run_in_executor(_executor, fn)
         except Exception as exc:

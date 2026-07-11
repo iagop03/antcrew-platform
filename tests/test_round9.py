@@ -79,7 +79,7 @@ def test_make_team_falls_back_when_team_rejects_llm(monkeypatch):
             import importlib
             import antcrew.config as _cfg
             orig_build = _cfg.build_llm
-            _cfg.build_llm = lambda m: _FakeLLM()
+            _cfg.build_llm = lambda m, **_kw: _FakeLLM()
             try:
                 return original_make_team(team_name, max_cost_usd=max_cost_usd, model=model)
             finally:

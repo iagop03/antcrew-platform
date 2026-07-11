@@ -16,8 +16,8 @@ dependencies = [
     "asyncpg>=0.29",
     "alembic>=1.13",
     "bcrypt>=4.0",
-    "antcrew>=0.33.0,<0.34",
-    "antcrew-engine>=0.3.0,<0.4",
+    "antcrew>=0.33.5,<0.34",
+    "antcrew-engine>=0.3.5,<0.4",
 ]
 
 [project.optional-dependencies]

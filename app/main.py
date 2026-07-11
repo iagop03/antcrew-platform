@@ -347,6 +347,45 @@ async def _eval_scheduler_loop() -> None:
             log.warning("eval scheduler error: %s", exc)
 
 
+async def _check_byok_config() -> None:
+    """Warn or block when customer LLM keys are stored without encryption.
+
+    If any LLMProviderKey rows exist but BYOK_ENCRYPTION_KEY is not set on a
+    public host, those keys are in plaintext — block startup.
+    """
+    enc_key = os.environ.get("BYOK_ENCRYPTION_KEY")
+    if enc_key:
+        log.info("byok: key encryption active (BYOK_ENCRYPTION_KEY set)")
+        return
+
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from app.core.database import engine as _engine
+    from app.models.run import LLMProviderKey
+
+    try:
+        async with AsyncSession(_engine, expire_on_commit=False) as session:
+            any_key = (await session.exec(select(LLMProviderKey).limit(1))).first()
+    except Exception:
+        return  # Table not yet created (pre-migration) — safe to proceed
+
+    if not any_key:
+        return  # No BYOK keys stored yet
+
+    host = os.environ.get("HOST", "127.0.0.1")
+    is_public = host not in ("127.0.0.1", "localhost", "::1")
+
+    if is_public:
+        raise RuntimeError(
+            "Customer LLM keys are stored in plaintext but BYOK_ENCRYPTION_KEY is not set. "
+            "API keys are high-value credentials. "
+            "Generate an encryption key: python -c \"from cryptography.fernet import Fernet; "
+            "print(Fernet.generate_key().decode())\" and set it as BYOK_ENCRYPTION_KEY."
+        )
+    log.warning(
+        "byok: customer LLM keys stored in plaintext — set BYOK_ENCRYPTION_KEY before production"
+    )
+
+
 async def _check_cors_config() -> None:
     """Block startup when CORS_ORIGINS=* is used on a public-facing host.
 
@@ -386,6 +425,7 @@ async def lifespan(app: FastAPI):
     await _check_sandbox_mode()
     await _check_stripe_config()
     await _check_slack_config()
+    await _check_byok_config()
     start_listening()
     from app.core.slack_hitl import maybe_start_from_env as _slack_start
     _slack_start()

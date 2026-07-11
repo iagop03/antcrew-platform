@@ -80,7 +80,12 @@ AVAILABLE_TEAMS = list(_TEAM_REGISTRY)
 ALL_PIPELINE_TYPES = AVAILABLE_TEAMS + ["custom", "engine"]
 
 
-def _make_team(team_name: str, max_cost_usd: Optional[float] = None, model: str = ""):
+def _make_team(
+    team_name: str,
+    max_cost_usd: Optional[float] = None,
+    model: str = "",
+    byok_api_key: Optional[str] = None,
+):
     if team_name == "custom":
         raise ValueError(
             "Use POST /run/pipeline (dispatch_custom) for custom pipelines — "
@@ -93,9 +98,9 @@ def _make_team(team_name: str, max_cost_usd: Optional[float] = None, model: str 
     module = importlib.import_module(module_path)
     cls = getattr(module, class_name)
     kwargs: dict = {}
-    if model:
+    if model or byok_api_key:
         from antcrew.config import build_llm as _build_llm
-        llm = _build_llm(model)
+        llm = _build_llm(model or "claude", api_key=byok_api_key)
         if max_cost_usd is not None:
             llm.max_cost_usd = max_cost_usd
         kwargs["llm"] = llm
@@ -242,13 +247,14 @@ def _run_sync(
     max_cost_usd: Optional[float],
     platform_channel: PlatformChannel,
     force_hitl: bool,
+    byok_api_key: Optional[str] = None,
 ):
     """Run a team synchronously in the executor thread.
 
     When force_hitl=True all agents get the platform channel and run_interactive is used.
     Otherwise only agents already marked approval_required=True get the channel.
     """
-    team = _make_team(team_name, max_cost_usd=max_cost_usd)
+    team = _make_team(team_name, max_cost_usd=max_cost_usd, byok_api_key=byok_api_key)
     all_agents = list(getattr(team, "_agents", {}).values())
 
     if force_hitl:
@@ -432,15 +438,20 @@ async def dispatch(
         async with _get_budget_lock(workspace_id):
             await _check_workspace_budget(workspace_id)
 
-    # Look up per-workspace HITL timeout
+    # Look up per-workspace HITL timeout and BYOK key in a single DB call
     _hitl_timeout: Optional[float] = None
+    _byok_api_key: Optional[str] = None
     if workspace_id is not None:
         from sqlmodel import select as _sel
         from app.models.run import Workspace as _WS
         async with AsyncSession(engine, expire_on_commit=False) as _sess:
             _ws = (await _sess.exec(_sel(_WS).where(_WS.id == workspace_id))).first()
-            if _ws and _ws.hitl_timeout_s is not None:
-                _hitl_timeout = _ws.hitl_timeout_s
+            if _ws:
+                if _ws.hitl_timeout_s is not None:
+                    _hitl_timeout = _ws.hitl_timeout_s
+                if getattr(_ws, "llm_key_mode", "managed") == "byok":
+                    from app.core.byok import get_workspace_llm_key
+                    _byok_api_key = await get_workspace_llm_key(_sess, workspace_id, "anthropic")
 
     # Clone repo and inject context before dispatching to the thread pool.
     _tmp_repo_dir: Optional[Path] = None
@@ -469,7 +480,7 @@ async def dispatch(
         try:
             fn = functools.partial(
                 _run_sync, team_name, effective_request, thread_id,
-                max_cost_usd, platform_channel, force_hitl,
+                max_cost_usd, platform_channel, force_hitl, _byok_api_key,
             )
             result = await loop.run_in_executor(_executor, fn)
             await _store_result(result)
@@ -528,13 +539,14 @@ def _run_custom_sync(
     platform_channel: PlatformChannel,
     force_hitl: bool,
     model: str = "claude",
+    byok_api_key: Optional[str] = None,
 ):
     """Build a CustomTeam from inline TemplateAgent configs and run it."""
     from antcrew.agents.template_agent import TemplateAgent
     from antcrew.teams.custom_team import CustomTeam
     from antcrew.config import build_llm
 
-    llm = build_llm(model or "claude")
+    llm = build_llm(model or "claude", api_key=byok_api_key)
     if max_cost_usd is not None:
         llm.max_cost_usd = max_cost_usd
 
@@ -590,15 +602,24 @@ async def dispatch_custom(
         async with _get_budget_lock(workspace_id):
             await _check_workspace_budget(workspace_id)
 
-    # Look up per-workspace HITL timeout if workspace is known
+    # Look up per-workspace HITL timeout and BYOK key in a single DB call
     _hitl_timeout: Optional[float] = None
+    _byok_api_key: Optional[str] = None
     if workspace_id is not None:
         from sqlmodel import select as _sel
         from app.models.run import Workspace as _WS
         async with AsyncSession(engine, expire_on_commit=False) as _sess:
             _ws = (await _sess.exec(_sel(_WS).where(_WS.id == workspace_id))).first()
-            if _ws and _ws.hitl_timeout_s is not None:
-                _hitl_timeout = _ws.hitl_timeout_s
+            if _ws:
+                if _ws.hitl_timeout_s is not None:
+                    _hitl_timeout = _ws.hitl_timeout_s
+                if getattr(_ws, "llm_key_mode", "managed") == "byok":
+                    _provider = "openai" if (
+                        model.startswith("gpt") or model.startswith("o1")
+                        or model.startswith("o3") or model.startswith("openai:")
+                    ) else "anthropic"
+                    from app.core.byok import get_workspace_llm_key
+                    _byok_api_key = await get_workspace_llm_key(_sess, workspace_id, _provider)
 
     loop = asyncio.get_running_loop()
     run_id_future: asyncio.Future[str] = loop.create_future()
@@ -615,7 +636,7 @@ async def dispatch_custom(
         try:
             fn = functools.partial(
                 _run_custom_sync, steps, request, thread_id,
-                max_cost_usd, platform_channel, force_hitl, model,
+                max_cost_usd, platform_channel, force_hitl, model, _byok_api_key,
             )
             result = await loop.run_in_executor(_executor, fn)
             await _store_result(result)

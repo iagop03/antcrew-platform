@@ -17,7 +17,7 @@ from sqlalchemy import func, select as sa_select
 from app.core.auth import require_api_key, require_role, get_workspace_context, WorkspaceContext, ws_accessible
 from app.core.database import get_session
 from app.core.security import validate_external_url
-from app.models.run import Workspace, Run, HitlReview, WebhookConfig, WebhookEvent, ApiKey, WorkspaceMembership
+from app.models.run import Workspace, Run, HitlReview, WebhookConfig, WebhookEvent, ApiKey, WorkspaceMembership, LLMProviderKey
 
 router = APIRouter(
     prefix="/workspaces",
@@ -127,7 +127,7 @@ class CreateWebhookConfig(BaseModel):
 
 
 class WorkspacePublic(BaseModel):
-    """Workspace response that never exposes encrypted Slack token fields."""
+    """Workspace response that never exposes encrypted token fields."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -146,6 +146,8 @@ class WorkspacePublic(BaseModel):
     hitl_timeout_s: Optional[float] = None
     stripe_customer_id: Optional[str] = None
     stripe_subscription_status: Optional[str] = None
+    llm_key_mode: str = "managed"
+    byok_providers: list[str] = []
     created_at: datetime
 
     @model_validator(mode="before")
@@ -171,6 +173,8 @@ class WorkspacePublic(BaseModel):
                 "hitl_timeout_s": data.hitl_timeout_s,
                 "stripe_customer_id": getattr(data, "stripe_customer_id", None),
                 "stripe_subscription_status": getattr(data, "stripe_subscription_status", None),
+                "llm_key_mode": getattr(data, "llm_key_mode", "managed"),
+                "byok_providers": getattr(data, "_byok_providers", []),
                 "created_at": data.created_at,
             }
         return data
@@ -573,6 +577,179 @@ async def delete_workspace(workspace_id: int, session: AsyncSession = Depends(ge
     if not ws:
         raise HTTPException(404, f"Workspace {workspace_id} not found")
     await session.delete(ws)
+    await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# BYOK — per-workspace LLM API key management
+# ---------------------------------------------------------------------------
+
+class SetLLMModeRequest(BaseModel):
+    mode: str  # "managed" | "byok"
+
+    @field_validator("mode")
+    @classmethod
+    def mode_valid(cls, v: str) -> str:
+        if v not in ("managed", "byok"):
+            raise ValueError("mode must be 'managed' or 'byok'")
+        return v
+
+
+class StoreLLMKeyRequest(BaseModel):
+    provider: str  # "anthropic" | "openai"
+    api_key: str
+    confirm_overwrite: bool = False
+
+    @field_validator("provider")
+    @classmethod
+    def provider_valid(cls, v: str) -> str:
+        if v not in ("anthropic", "openai"):
+            raise ValueError("provider must be 'anthropic' or 'openai'")
+        return v
+
+    @field_validator("api_key")
+    @classmethod
+    def key_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("api_key must not be empty")
+        return v
+
+
+class LLMKeyOut(BaseModel):
+    provider: str
+    configured: bool = True
+    created_at: datetime
+
+
+@router.patch("/{workspace_id}/llm-mode", response_model=WorkspacePublic,
+              dependencies=[Depends(require_role("admin"))])
+async def set_llm_mode(
+    workspace_id: int,
+    body: SetLLMModeRequest,
+    session: AsyncSession = Depends(get_session),
+) -> WorkspacePublic:
+    """Switch a workspace between managed (platform key) and byok (customer key) modes.
+
+    Cannot switch to 'byok' unless at least one LLM key is already stored.
+    Switching back to 'managed' is always allowed (stored keys are preserved).
+    """
+    ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+    if not ws:
+        raise HTTPException(404, f"Workspace {workspace_id} not found")
+
+    if body.mode == "byok":
+        existing = (await session.exec(
+            select(LLMProviderKey).where(LLMProviderKey.workspace_id == workspace_id).limit(1)
+        )).first()
+        if not existing:
+            raise HTTPException(
+                422,
+                "Cannot switch to BYOK mode: no LLM keys configured. "
+                "Store at least one key via POST /workspaces/{id}/llm-keys first."
+            )
+
+    ws.llm_key_mode = body.mode
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+    return WorkspacePublic.model_validate(ws)
+
+
+@router.get("/{workspace_id}/llm-keys", response_model=list[LLMKeyOut],
+            dependencies=[Depends(require_role("admin"))])
+async def list_llm_keys(
+    workspace_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> list[LLMKeyOut]:
+    """List configured LLM providers for a workspace. Never returns plaintext keys."""
+    if not (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first():
+        raise HTTPException(404, f"Workspace {workspace_id} not found")
+    rows = (await session.exec(
+        select(LLMProviderKey).where(LLMProviderKey.workspace_id == workspace_id)
+    )).all()
+    return [LLMKeyOut(provider=r.provider, created_at=r.created_at) for r in rows]
+
+
+@router.post("/{workspace_id}/llm-keys", status_code=201,
+             dependencies=[Depends(require_role("admin"))])
+async def store_llm_key(
+    workspace_id: int,
+    body: StoreLLMKeyRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Store or rotate a BYOK LLM API key for a workspace.
+
+    The key is encrypted at rest using Fernet (BYOK_ENCRYPTION_KEY env var).
+    Overwriting an existing key for the same provider requires confirm_overwrite=true.
+    """
+    if not (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first():
+        raise HTTPException(404, f"Workspace {workspace_id} not found")
+
+    existing = (await session.exec(
+        select(LLMProviderKey)
+        .where(LLMProviderKey.workspace_id == workspace_id)
+        .where(LLMProviderKey.provider == body.provider)
+    )).first()
+
+    if existing and not body.confirm_overwrite:
+        raise HTTPException(
+            409,
+            f"A key for provider '{body.provider}' already exists. "
+            "Set confirm_overwrite=true to replace it."
+        )
+
+    from app.core.byok import _encrypt
+    encrypted = _encrypt(body.api_key)
+
+    if existing:
+        existing.key_enc = encrypted
+        from app.models.run import _utcnow
+        existing.created_at = _utcnow()
+        session.add(existing)
+    else:
+        session.add(LLMProviderKey(
+            workspace_id=workspace_id,
+            provider=body.provider,
+            key_enc=encrypted,
+        ))
+
+    await session.commit()
+    return {"workspace_id": workspace_id, "provider": body.provider, "configured": True}
+
+
+@router.delete("/{workspace_id}/llm-keys/{provider}", status_code=204,
+               dependencies=[Depends(require_role("admin"))])
+async def delete_llm_key(
+    workspace_id: int,
+    provider: str,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Remove a BYOK key. If it was the last key, resets llm_key_mode to 'managed'."""
+    if provider not in ("anthropic", "openai"):
+        raise HTTPException(422, "provider must be 'anthropic' or 'openai'")
+
+    row = (await session.exec(
+        select(LLMProviderKey)
+        .where(LLMProviderKey.workspace_id == workspace_id)
+        .where(LLMProviderKey.provider == provider)
+    )).first()
+    if not row:
+        raise HTTPException(404, f"No key for provider '{provider}' in workspace {workspace_id}")
+
+    await session.delete(row)
+
+    # If no keys remain, revert the workspace to managed mode
+    remaining = (await session.exec(
+        select(LLMProviderKey)
+        .where(LLMProviderKey.workspace_id == workspace_id)
+    )).first()
+    if not remaining:
+        ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+        if ws and ws.llm_key_mode == "byok":
+            ws.llm_key_mode = "managed"
+            session.add(ws)
+
     await session.commit()
 
 

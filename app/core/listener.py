@@ -72,11 +72,27 @@ async def _persist_event(event: "Event") -> None:
                 if run and run.status != "cancelled":
                     # Don't overwrite a cancelled run — cancel_run already set the final status
                     run.status = "success" if event.payload.get("success") else "error"
-                    run.cost_usd = event.payload.get("cost_usd", 0.0)
+                    raw_cost_usd = event.payload.get("cost_usd", 0.0)
                     run.finished_at = _utcnow()
                     if run.created_at:
                         ca = run.created_at.replace(tzinfo=None) if run.created_at.tzinfo else run.created_at
                         run.duration_s = (run.finished_at - ca).total_seconds()
+
+                    # Fetch workspace once — used for both billing multiplier and Stripe reporting
+                    ws_row = None
+                    if run.workspace_id is not None:
+                        ws_row = (await session.exec(
+                            select(Workspace).where(Workspace.id == run.workspace_id)
+                        )).first()
+
+                    # Apply billing multiplier: managed ×3.0, byok ×0.4
+                    if ws_row and raw_cost_usd > 0:
+                        from app.core.byok import get_cost_multiplier
+                        multiplier = get_cost_multiplier(getattr(ws_row, "llm_key_mode", "managed"))
+                        run.cost_usd = round(raw_cost_usd * multiplier, 6)
+                    else:
+                        run.cost_usd = raw_cost_usd
+
                     session.add(run)
 
                     pipeline_payload = json.dumps({
@@ -97,19 +113,15 @@ async def _persist_event(event: "Event") -> None:
                         notify_new_delivery()
 
                     # Report metered usage to Stripe (fire-and-forget)
-                    if run.workspace_id is not None and run.cost_usd > 0:
-                        ws_row = (await session.exec(
-                            select(Workspace).where(Workspace.id == run.workspace_id)
-                        )).first()
-                        if ws_row and ws_row.stripe_customer_id:
-                            from app.services import billing as _billing
-                            asyncio.ensure_future(
-                                _billing.report_run_cost(
-                                    run.workspace_id,
-                                    ws_row.stripe_customer_id,
-                                    run.cost_usd,
-                                )
+                    if ws_row and ws_row.stripe_customer_id and run.cost_usd > 0:
+                        from app.services import billing as _billing
+                        asyncio.ensure_future(
+                            _billing.report_run_cost(
+                                run.workspace_id,
+                                ws_row.stripe_customer_id,
+                                run.cost_usd,
                             )
+                        )
 
                     # Per-workspace registered webhooks — filtered in SQL via webhook_event join
                     if run.workspace_id is not None:

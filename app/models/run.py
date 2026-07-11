@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Index
+from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import Field, SQLModel, JSON, Column
 
 
@@ -30,6 +30,7 @@ class Workspace(SQLModel, table=True):
     stripe_customer_id: Optional[str] = Field(default=None, index=True)  # cus_...
     stripe_subscription_id: Optional[str] = Field(default=None)           # sub_...
     stripe_subscription_status: Optional[str] = Field(default=None)       # active | trialing | past_due | canceled | unpaid
+    llm_key_mode: str = Field(default="managed")  # managed | byok
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -264,4 +265,21 @@ class HitlAuditEntry(SQLModel, table=True):
     actor_label: Optional[str] = Field(default=None)  # API key label who triggered this event
     action: str  # created | assigned | approved | rejected | timed_out
     note: Optional[str] = Field(default=None)  # free-text from verdict note or error
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class LLMProviderKey(SQLModel, table=True):
+    """Per-workspace, per-provider LLM API key for BYOK mode.
+
+    key_enc is Fernet-encrypted with BYOK_ENCRYPTION_KEY, or plaintext in dev mode.
+    Unique per (workspace_id, provider) — upsert by deleting and re-inserting.
+    """
+
+    __tablename__ = "llm_provider_key"
+    __table_args__ = (UniqueConstraint("workspace_id", "provider", name="uq_llm_key_ws_provider"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(index=True)
+    provider: str  # anthropic | openai
+    key_enc: str   # Fernet-encrypted or plaintext (dev mode without BYOK_ENCRYPTION_KEY)
     created_at: datetime = Field(default_factory=_utcnow)
