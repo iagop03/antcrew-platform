@@ -12,6 +12,7 @@ Lookup strategy:
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import os
 from dataclasses import dataclass, field
@@ -46,7 +47,7 @@ def _verify(raw_key: str, stored_hash: str) -> bool:
             return _bcrypt.checkpw(raw_key.encode(), stored_hash.encode())
         except Exception:
             return False
-    return stored_hash == hashlib.sha256(raw_key.encode()).hexdigest()
+    return hmac.compare_digest(stored_hash, hashlib.sha256(raw_key.encode()).hexdigest())
 
 
 def _is_legacy_hash(stored_hash: str) -> bool:
@@ -165,7 +166,7 @@ async def get_workspace_context(
 
     env_key = os.environ.get("PLATFORM_API_KEY")
     if env_key:
-        if x_api_key != env_key:
+        if not hmac.compare_digest(x_api_key or "", env_key):
             raise HTTPException(401, "Invalid or missing X-Api-Key header")
         ctx = WorkspaceContext(workspace_id=None, created_by="env_key", role="admin")
         await rate_limit.check(request, ctx.workspace_id, ctx.created_by)
