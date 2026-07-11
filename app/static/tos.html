@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Términos de uso — antcrew</title>
+<style>
+/* FILL IN: replace [EMPRESA] con el nombre legal de tu empresa a lo largo de este documento */
+:root {
+  --bg:        #030712;
+  --surface:   #0f172a;
+  --border:    #1e293b;
+  --text:      #f1f5f9;
+  --muted:     #94a3b8;
+  --subtle:    #64748b;
+  --accent:    #6366f1;
+  --accent-h:  #818cf8;
+  --mono: ui-monospace,'SFMono-Regular',Consolas,monospace;
+  --sans: -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.75;min-height:100vh}
+a{color:var(--accent-h);text-decoration:none}
+a:hover{text-decoration:underline}
+
+nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.25rem 2rem;border-bottom:1px solid var(--border);
+}
+.logo{font-family:var(--mono);font-weight:700;font-size:1.1rem;color:var(--accent-h)}
+.nav-back{font-size:.875rem;color:var(--muted);transition:color .15s}
+.nav-back:hover{color:var(--text);text-decoration:none}
+
+.doc{max-width:46rem;margin:0 auto;padding:4rem 1.5rem 6rem}
+.doc-meta{margin-bottom:3.5rem}
+.doc-label{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:.75rem}
+h1{font-size:1.875rem;font-weight:700;letter-spacing:-.025em;margin-bottom:.75rem;text-wrap:balance}
+.doc-date{font-size:.875rem;color:var(--subtle)}
+
+.doc-notice{
+  background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);
+  border-radius:.75rem;padding:1rem 1.25rem;margin-bottom:2.5rem;
+  font-size:.875rem;color:var(--muted);line-height:1.6;
+}
+.doc-notice strong{color:var(--text)}
+
+h2{
+  font-size:1.125rem;font-weight:600;letter-spacing:-.015em;
+  margin-top:3rem;margin-bottom:.875rem;color:var(--text);
+}
+h2:first-of-type{margin-top:0}
+p{color:var(--muted);margin-bottom:1rem;font-size:.9375rem}
+ul,ol{color:var(--muted);padding-left:1.5rem;margin-bottom:1rem;font-size:.9375rem}
+li{margin-bottom:.375rem;line-height:1.65}
+li+li{margin-top:.25rem}
+strong{color:var(--text);font-weight:500}
+code{font-family:var(--mono);font-size:.825rem;background:rgba(30,41,59,.8);padding:.1rem .35rem;border-radius:.25rem;color:var(--accent-h)}
+
+.section-divider{border:none;border-top:1px solid var(--border);margin:2.5rem 0 0}
+
+footer{border-top:1px solid var(--border);padding:1.75rem 1.5rem}
+.footer-inner{max-width:46rem;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem}
+.footer-brand{font-family:var(--mono);font-size:.85rem;color:var(--subtle)}
+.footer-links{display:flex;gap:1.25rem}
+.footer-link{font-size:.8125rem;color:var(--subtle)}
+.footer-link:hover{color:var(--muted);text-decoration:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">antcrew</a>
+  <a href="/static/pricing.html" class="nav-back">← Volver</a>
+</nav>
+
+<div class="doc">
+  <div class="doc-meta">
+    <div class="doc-label">Legal</div>
+    <h1>Términos de uso</h1>
+    <!-- FILL IN: update with the actual effective date -->
+    <p class="doc-date">Vigentes desde: [FECHA DE ENTRADA EN VIGOR]</p>
+  </div>
+
+  <div class="doc-notice">
+    <strong>Nota:</strong> Este documento es una plantilla de partida. Antes de publicarlo,
+    revísalo con un profesional legal, especialmente las cláusulas relativas al tratamiento
+    de código fuente mediante IA y la limitación de responsabilidad.
+  </div>
+
+  <h2>1. Objeto y aceptación</h2>
+  <p>
+    <!-- FILL IN: replace [EMPRESA] with your legal company name -->
+    Los presentes Términos de Uso (en adelante, «Términos») regulan el acceso y uso del
+    servicio <strong>antcrew</strong>, titularidad de <strong>[EMPRESA]</strong>
+    (en adelante, «antcrew», «nosotros» o «el Proveedor»).
+  </p>
+  <p>
+    Al registrar una cuenta, crear un workspace o utilizar cualquier funcionalidad de antcrew,
+    el usuario (en adelante, «el Cliente») acepta íntegramente estos Términos.
+    Si actúas en nombre de una empresa u organización, declaras tener autorización para vincularla.
+  </p>
+
+  <hr class="section-divider">
+  <h2>2. Descripción del servicio</h2>
+  <p>
+    antcrew es una plataforma de revisión de código automatizada mediante agentes de inteligencia
+    artificial con capacidad de supervisión humana en el bucle (<em>human-in-the-loop</em>, HITL).
+    El servicio permite:
+  </p>
+  <ul>
+    <li>Enviar <em>runs</em> de revisión de código a través de la API REST.</li>
+    <li>Recibir análisis, detección de problemas y propuestas de cambio generadas por modelos de lenguaje.</li>
+    <li>Aprobar, rechazar o escalar decisiones de los agentes mediante Slack, Telegram o API.</li>
+    <li>Gestionar múltiples workspaces con presupuestos y claves de API independientes.</li>
+    <li>Consultar el historial de runs y decisiones durante 30 días desde su ejecución.</li>
+  </ul>
+  <p>antcrew puede añadir, modificar o retirar funcionalidades del servicio con aviso previo razonable.</p>
+
+  <hr class="section-divider">
+  <h2>3. Uso aceptable</h2>
+  <p>El Cliente se compromete a utilizar antcrew únicamente con fines legítimos de desarrollo de software.
+  Queda expresamente prohibido:</p>
+  <ul>
+    <li>Enviar contenido que infrinja derechos de propiedad intelectual de terceros.</li>
+    <li>Utilizar el servicio para procesar datos personales de terceros sin el consentimiento legalmente requerido.</li>
+    <li>Intentar eludir los controles de seguridad, presupuesto o autenticación del servicio.</li>
+    <li>Usar el servicio para generar código malicioso, exploits u otro contenido dañino.</li>
+    <li>Realizar llamadas automatizadas de alta frecuencia con el propósito de degradar el servicio para otros clientes.</li>
+    <li>Revender o sublicenciar el acceso a antcrew sin autorización expresa por escrito del Proveedor.</li>
+  </ul>
+
+  <hr class="section-divider">
+  <h2>4. Cuenta y credenciales</h2>
+  <p>
+    El Cliente es el único responsable de la seguridad de sus claves de API (<code>X-Api-Key</code>)
+    y de las acciones realizadas con ellas. En caso de pérdida o compromiso de una clave,
+    el Cliente debe revocarla de inmediato desde el panel de control.
+  </p>
+  <p>
+    antcrew no puede recuperar el texto en claro de una clave de API una vez generada.
+    Cada workspace puede tener múltiples claves con distintos roles (<code>admin</code>,
+    <code>write</code>, <code>reviewer</code>).
+  </p>
+
+  <hr class="section-divider">
+  <h2>5. Facturación y pago</h2>
+  <p>
+    antcrew funciona bajo un modelo de <strong>pago por uso</strong>. El Cliente paga el coste
+    real de los tokens LLM consumidos por sus runs más una tarifa de servicio aplicada por
+    el Proveedor. No existe cuota mensual fija, mínimo de gasto ni período mínimo de permanencia.
+  </p>
+  <p>
+    El período de prueba (<em>trial</em>) permite el uso completo del servicio durante el número
+    de días indicado en el momento del registro, sin cargo alguno y sin necesidad de introducir
+    un método de pago. Al finalizar el trial, el acceso queda suspendido hasta que el Cliente
+    añada un método de pago válido.
+  </p>
+  <p>
+    El Proveedor utiliza <strong>Stripe</strong> como plataforma de gestión de pagos.
+    Los datos de tarjeta son procesados íntegramente por Stripe y nunca son almacenados
+    por antcrew. El Cliente puede establecer un presupuesto máximo (<code>budget_usd</code>)
+    por workspace; al alcanzarlo, los nuevos runs quedan bloqueados automáticamente.
+  </p>
+  <p>
+    Las facturas se emiten al cierre de cada ciclo de facturación.
+    El Proveedor se reserva el derecho a modificar las tarifas de servicio con un preaviso
+    de al menos 30 días comunicado por email.
+  </p>
+
+  <hr class="section-divider">
+  <h2>6. Tratamiento de código fuente mediante IA</h2>
+  <p>
+    <strong>El Cliente es plenamente consciente y acepta expresamente que</strong> los contenidos
+    enviados como parte de los runs (código fuente, mensajes de commit, contexto de repositorio,
+    instrucciones de revisión, etc.) son transmitidos a proveedores externos de modelos de
+    lenguaje (actualmente <strong>Anthropic, Inc.</strong> y/u <strong>OpenAI, LLC</strong>)
+    para su procesamiento.
+  </p>
+  <p>
+    El Cliente asume la responsabilidad exclusiva de asegurarse de que el contenido enviado
+    no incluya secretos, contraseñas, tokens de acceso, datos personales sensibles ni
+    información cuya transmisión a terceros esté prohibida por contrato o por ley.
+  </p>
+  <p>
+    antcrew no utiliza el contenido de los runs para entrenar sus propios modelos.
+    El uso que los proveedores LLM hacen de los datos se rige por sus respectivos
+    términos de servicio y acuerdos de procesamiento de datos.
+  </p>
+
+  <hr class="section-divider">
+  <h2>7. Retención y eliminación de datos</h2>
+  <p>
+    Los runs y sus resultados se conservan durante <strong>30 días</strong> desde la fecha
+    de ejecución, tras lo cual se eliminan automáticamente de los sistemas de antcrew.
+    El Cliente puede solicitar la eliminación anticipada de sus datos enviando una
+    <!-- FILL IN: your support email -->
+    solicitud a <a href="mailto:hola@antcrew.dev">hola@antcrew.dev</a>.
+  </p>
+  <p>
+    Los datos de facturación (importes, fechas, referencias de transacción Stripe) se conservan
+    durante el período exigido por la normativa fiscal aplicable, con independencia de la baja del servicio.
+  </p>
+
+  <hr class="section-divider">
+  <h2>8. Disponibilidad y nivel de servicio</h2>
+  <p>
+    antcrew se presta en modo «tal cual» (<em>as-is</em>), sin garantía de disponibilidad continua.
+    El Proveedor procurará mantener el servicio operativo, pero no garantiza un SLA específico
+    durante el período de early access. Las interrupciones programadas se comunicarán con
+    antelación razonable.
+  </p>
+
+  <hr class="section-divider">
+  <h2>9. Limitación de responsabilidad</h2>
+  <p>
+    En la máxima medida permitida por la ley aplicable, antcrew no será responsable de:
+  </p>
+  <ul>
+    <li>Errores, omisiones o imprecisiones en los análisis generados por los agentes de IA.</li>
+    <li>Pérdidas económicas derivadas de decisiones tomadas a partir de los resultados de antcrew.</li>
+    <li>Interrupciones del servicio causadas por terceros (proveedores LLM, infraestructura cloud, Stripe).</li>
+    <li>Daños indirectos, pérdida de beneficios o daños consecuentes de ningún tipo.</li>
+  </ul>
+  <p>
+    La responsabilidad total del Proveedor frente al Cliente, por cualquier causa, estará
+    limitada al importe abonado por el Cliente en los tres meses anteriores al hecho causante.
+  </p>
+  <p>
+    <strong>Los análisis generados por antcrew son orientativos.</strong> El Cliente es el
+    único responsable de las decisiones de ingeniería adoptadas en su proyecto.
+  </p>
+
+  <hr class="section-divider">
+  <h2>10. Propiedad intelectual</h2>
+  <p>
+    El código fuente, los modelos, la plataforma y la documentación de antcrew son propiedad
+    del Proveedor o de sus licenciantes. El uso del servicio no otorga al Cliente ninguna
+    licencia sobre ellos más allá del acceso operativo descrito en estos Términos.
+  </p>
+  <p>
+    El Cliente conserva íntegramente la propiedad intelectual del código fuente y demás
+    contenidos que envíe a antcrew.
+  </p>
+
+  <hr class="section-divider">
+  <h2>11. Vigencia y cancelación</h2>
+  <p>
+    Estos Términos entran en vigor en el momento de la creación de la cuenta y permanecen
+    vigentes hasta la cancelación por cualquiera de las partes.
+  </p>
+  <p>
+    El Cliente puede cancelar en cualquier momento desde el panel de control o contactando
+    con el soporte. La cancelación tiene efecto al final del ciclo de facturación en curso.
+    Los datos del Cliente se eliminan conforme al apartado 7.
+  </p>
+  <p>
+    El Proveedor puede cancelar o suspender el acceso del Cliente si detecta un incumplimiento
+    de estos Términos, con o sin aviso previo dependiendo de la gravedad del incumplimiento.
+  </p>
+
+  <hr class="section-divider">
+  <h2>12. Modificaciones</h2>
+  <p>
+    El Proveedor puede actualizar estos Términos. Los cambios materiales se comunicarán
+    al Cliente por email con al menos 15 días de antelación. El uso continuado del servicio
+    tras la fecha de entrada en vigor de los nuevos Términos constituye aceptación de los mismos.
+  </p>
+
+  <hr class="section-divider">
+  <h2>13. Ley aplicable y jurisdicción</h2>
+  <p>
+    <!-- FILL IN: confirm jurisdiction with your legal advisor -->
+    Estos Términos se rigen por la ley española. Las partes se someten, con renuncia expresa
+    a cualquier otro fuero, a los juzgados y tribunales de <strong>[CIUDAD]</strong>.
+  </p>
+  <p>
+    <!-- FILL IN: your contact/legal email -->
+    Para cualquier consulta legal: <a href="mailto:hola@antcrew.dev">hola@antcrew.dev</a>
+  </p>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <span class="footer-brand">antcrew</span>
+    <div class="footer-links">
+      <a href="/static/pricing.html" class="footer-link">Precios</a>
+      <a href="/static/privacy.html" class="footer-link">Privacidad</a>
+      <a href="/docs" class="footer-link">Docs</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

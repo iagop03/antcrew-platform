@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de privacidad — antcrew</title>
+<style>
+:root {
+  --bg:        #030712;
+  --surface:   #0f172a;
+  --border:    #1e293b;
+  --text:      #f1f5f9;
+  --muted:     #94a3b8;
+  --subtle:    #64748b;
+  --accent:    #6366f1;
+  --accent-h:  #818cf8;
+  --mono: ui-monospace,'SFMono-Regular',Consolas,monospace;
+  --sans: -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.75;min-height:100vh}
+a{color:var(--accent-h);text-decoration:none}
+a:hover{text-decoration:underline}
+
+nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.25rem 2rem;border-bottom:1px solid var(--border);
+}
+.logo{font-family:var(--mono);font-weight:700;font-size:1.1rem;color:var(--accent-h)}
+.nav-back{font-size:.875rem;color:var(--muted);transition:color .15s}
+.nav-back:hover{color:var(--text);text-decoration:none}
+
+.doc{max-width:46rem;margin:0 auto;padding:4rem 1.5rem 6rem}
+.doc-meta{margin-bottom:3.5rem}
+.doc-label{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--subtle);margin-bottom:.75rem}
+h1{font-size:1.875rem;font-weight:700;letter-spacing:-.025em;margin-bottom:.75rem;text-wrap:balance}
+.doc-date{font-size:.875rem;color:var(--subtle)}
+
+.doc-notice{
+  background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);
+  border-radius:.75rem;padding:1rem 1.25rem;margin-bottom:2.5rem;
+  font-size:.875rem;color:var(--muted);line-height:1.6;
+}
+.doc-notice strong{color:var(--text)}
+
+h2{
+  font-size:1.125rem;font-weight:600;letter-spacing:-.015em;
+  margin-top:3rem;margin-bottom:.875rem;color:var(--text);
+}
+p{color:var(--muted);margin-bottom:1rem;font-size:.9375rem}
+ul,ol{color:var(--muted);padding-left:1.5rem;margin-bottom:1rem;font-size:.9375rem}
+li{margin-bottom:.375rem;line-height:1.65}
+strong{color:var(--text);font-weight:500}
+code{font-family:var(--mono);font-size:.825rem;background:rgba(30,41,59,.8);padding:.1rem .35rem;border-radius:.25rem;color:var(--accent-h)}
+
+.data-table{width:100%;border-collapse:collapse;margin:1rem 0 1.5rem;font-size:.875rem;overflow-x:auto}
+.data-table th{text-align:left;padding:.625rem 1rem;color:var(--subtle);font-weight:500;border-bottom:1px solid var(--border);font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
+.data-table td{padding:.75rem 1rem;color:var(--muted);border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5}
+.data-table tr:last-child td{border-bottom:none}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:.625rem;margin:1rem 0}
+
+.rights-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.625rem;margin:1rem 0}
+.right-item{background:var(--surface);border:1px solid var(--border);border-radius:.5rem;padding:.875rem 1rem}
+.right-item strong{display:block;font-size:.875rem;margin-bottom:.25rem}
+.right-item span{font-size:.8125rem;color:var(--muted)}
+
+.section-divider{border:none;border-top:1px solid var(--border);margin:2.5rem 0 0}
+
+footer{border-top:1px solid var(--border);padding:1.75rem 1.5rem}
+.footer-inner{max-width:46rem;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem}
+.footer-brand{font-family:var(--mono);font-size:.85rem;color:var(--subtle)}
+.footer-links{display:flex;gap:1.25rem}
+.footer-link{font-size:.8125rem;color:var(--subtle)}
+.footer-link:hover{color:var(--muted);text-decoration:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="logo">antcrew</a>
+  <a href="/static/pricing.html" class="nav-back">← Volver</a>
+</nav>
+
+<div class="doc">
+  <div class="doc-meta">
+    <div class="doc-label">Legal</div>
+    <h1>Política de privacidad</h1>
+    <!-- FILL IN: update with the actual effective date -->
+    <p class="doc-date">Vigente desde: [FECHA DE ENTRADA EN VIGOR]</p>
+  </div>
+
+  <div class="doc-notice">
+    <strong>Nota:</strong> Esta política es una plantilla de partida conforme al RGPD.
+    Antes de publicarla, revísala con un profesional legal. Presta especial atención
+    a los apartados 4 (código fuente) y 5 (proveedores LLM), que son específicos
+    de herramientas de IA y pueden requerir análisis adicional según tu contexto.
+  </div>
+
+  <h2>1. Responsable del tratamiento</h2>
+  <p>
+    <!-- FILL IN: replace with your legal company name, NIF/CIF, address, and contact -->
+    <strong>[EMPRESA]</strong>, con domicilio en <strong>[DIRECCIÓN]</strong>
+    (en adelante, «antcrew» o «el Responsable»), es el responsable del tratamiento
+    de los datos personales recogidos a través del servicio antcrew.
+  </p>
+  <p>
+    <!-- FILL IN: your privacy/legal contact email -->
+    Contacto para cuestiones de privacidad:
+    <a href="mailto:privacidad@antcrew.dev">privacidad@antcrew.dev</a>
+  </p>
+
+  <hr class="section-divider">
+  <h2>2. Datos que recopilamos</h2>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Categoría</th>
+          <th>Datos concretos</th>
+          <th>Origen</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Cuenta</strong></td>
+          <td>Email, nombre, workspace creados, roles asignados</td>
+          <td>Aportado por el usuario al registrarse</td>
+        </tr>
+        <tr>
+          <td><strong>Credenciales</strong></td>
+          <td>Hash de API keys (nunca el texto en claro), etiquetas de clave</td>
+          <td>Generado por el servicio</td>
+        </tr>
+        <tr>
+          <td><strong>Runs</strong></td>
+          <td>Código fuente enviado, contexto, resultados del agente, decisiones HITL, coste en USD</td>
+          <td>Enviado por el usuario vía API</td>
+        </tr>
+        <tr>
+          <td><strong>Facturación</strong></td>
+          <td>Importe cobrado, fecha, ID de transacción Stripe; datos de tarjeta gestionados íntegramente por Stripe</td>
+          <td>Generado por el servicio / Stripe</td>
+        </tr>
+        <tr>
+          <td><strong>Logs técnicos</strong></td>
+          <td>Dirección IP, agente de usuario, timestamp de las llamadas API</td>
+          <td>Registrado automáticamente</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr class="section-divider">
+  <h2>3. Finalidad y base jurídica del tratamiento</h2>
+  <ul>
+    <li>
+      <strong>Ejecución del contrato (Art. 6.1.b RGPD):</strong> prestar el servicio de revisión
+      de código, gestionar runs, procesar pagos, enviar notificaciones HITL.
+    </li>
+    <li>
+      <strong>Interés legítimo (Art. 6.1.f RGPD):</strong> seguridad del servicio, detección
+      de abusos, mejora del rendimiento técnico.
+    </li>
+    <li>
+      <strong>Cumplimiento de obligaciones legales (Art. 6.1.c RGPD):</strong> conservación de
+      registros fiscales y contables durante el período legalmente exigido.
+    </li>
+    <li>
+      <strong>Consentimiento (Art. 6.1.a RGPD):</strong> comunicaciones de marketing, si el
+      usuario las ha solicitado expresamente.
+    </li>
+  </ul>
+
+  <hr class="section-divider">
+  <h2>4. Código fuente y contenidos procesados</h2>
+  <p>
+    <strong>Esta sección es especialmente importante.</strong> Cuando el usuario envía un run,
+    el contenido del run (código fuente, mensajes de commit, instrucciones, contexto de
+    repositorio) es procesado por los agentes de antcrew y, como parte de ese proceso,
+    es transmitido a proveedores externos de modelos de lenguaje (ver apartado 5).
+  </p>
+  <p>
+    antcrew <strong>no utiliza el código fuente de los clientes para entrenar modelos propios</strong>.
+    Los contenidos de los runs se conservan en los sistemas de antcrew durante
+    <strong>30 días</strong> y se eliminan automáticamente tras ese plazo.
+  </p>
+  <p>
+    Recomendamos que los usuarios <strong>no incluyan en los runs</strong>: contraseñas,
+    tokens de acceso, claves de API, datos personales de terceros ni información cubierta
+    por acuerdos de confidencialidad que no contemple su transmisión a servicios de IA en la nube.
+  </p>
+
+  <hr class="section-divider">
+  <h2>5. Proveedores de IA y subencargados de tratamiento</h2>
+  <p>
+    antcrew actúa como encargado del tratamiento respecto al código fuente enviado por el Cliente.
+    Para la ejecución del servicio, antcrew delega el procesamiento de ese contenido en los
+    siguientes subencargados de IA:
+  </p>
+  <ul>
+    <li>
+      <strong>Anthropic, Inc.</strong> (San Francisco, CA, EE.UU.) — modelos Claude.
+      Política de privacidad: <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">anthropic.com/privacy</a>
+    </li>
+    <li>
+      <strong>OpenAI, LLC</strong> (San Francisco, CA, EE.UU.) — modelos GPT (si está configurado).
+      Política de privacidad: <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener">openai.com/policies/privacy-policy</a>
+    </li>
+  </ul>
+  <p>
+    Adicionalmente, antcrew utiliza los siguientes subencargados para la prestación del servicio:
+  </p>
+  <ul>
+    <li><strong>Stripe, Inc.</strong> — procesamiento de pagos. Los datos de tarjeta se transmiten directamente a Stripe y nunca pasan por los servidores de antcrew.</li>
+    <!-- FILL IN: add your cloud hosting provider -->
+    <li><strong>[PROVEEDOR DE HOSTING]</strong> — infraestructura de servidores y almacenamiento.</li>
+  </ul>
+  <p>
+    Los proveedores de IA se encuentran en EE.UU. Las transferencias internacionales de datos
+    se realizan al amparo de las cláusulas contractuales tipo aprobadas por la Comisión Europea
+    u otro mecanismo de transferencia válido.
+  </p>
+
+  <hr class="section-divider">
+  <h2>6. Retención de datos</h2>
+  <ul>
+    <li><strong>Runs y resultados:</strong> 30 días desde la ejecución.</li>
+    <li><strong>Logs técnicos:</strong> 90 días.</li>
+    <li><strong>Datos de cuenta:</strong> mientras la cuenta esté activa, más 30 días tras la baja.</li>
+    <li><strong>Registros de facturación:</strong> el período exigido por la normativa fiscal española (mínimo 5 años).</li>
+  </ul>
+
+  <hr class="section-divider">
+  <h2>7. Derechos del usuario (RGPD)</h2>
+  <p>El usuario puede ejercer en cualquier momento los siguientes derechos:</p>
+  <div class="rights-grid">
+    <div class="right-item">
+      <strong>Acceso</strong>
+      <span>Conocer qué datos tratamos sobre ti</span>
+    </div>
+    <div class="right-item">
+      <strong>Rectificación</strong>
+      <span>Corregir datos inexactos o incompletos</span>
+    </div>
+    <div class="right-item">
+      <strong>Supresión</strong>
+      <span>Solicitar la eliminación de tus datos</span>
+    </div>
+    <div class="right-item">
+      <strong>Oposición</strong>
+      <span>Oponerte a determinados tratamientos</span>
+    </div>
+    <div class="right-item">
+      <strong>Portabilidad</strong>
+      <span>Recibir tus datos en formato estructurado</span>
+    </div>
+    <div class="right-item">
+      <strong>Limitación</strong>
+      <span>Restringir el tratamiento en ciertos casos</span>
+    </div>
+  </div>
+  <p>
+    Para ejercer estos derechos, envía una solicitud a
+    <!-- FILL IN: your privacy contact email -->
+    <a href="mailto:privacidad@antcrew.dev">privacidad@antcrew.dev</a>
+    identificándote. Responderemos en el plazo máximo de un mes.
+  </p>
+  <p>
+    Si consideras que el tratamiento de tus datos no es conforme al RGPD, tienes derecho
+    a presentar una reclamación ante la
+    <a href="https://www.aepd.es" target="_blank" rel="noopener">Agencia Española de Protección de Datos (AEPD)</a>.
+  </p>
+
+  <hr class="section-divider">
+  <h2>8. Seguridad</h2>
+  <p>
+    antcrew aplica medidas técnicas y organizativas adecuadas para proteger los datos frente
+    a accesos no autorizados, pérdida o destrucción. Entre ellas:
+  </p>
+  <ul>
+    <li>Transmisión cifrada mediante TLS en todas las conexiones.</li>
+    <li>Almacenamiento de claves de API solo en forma de hash (bcrypt).</li>
+    <li>Cifrado en reposo de credenciales sensibles (tokens de bots de chat).</li>
+    <li>Análisis de seguridad estático y auditoría de dependencias en el pipeline de CI.</li>
+    <li>Ejecución de código de agentes en entornos Docker aislados.</li>
+  </ul>
+
+  <hr class="section-divider">
+  <h2>9. Cookies y datos de navegación</h2>
+  <p>
+    La interfaz web de antcrew utiliza únicamente cookies técnicas necesarias para el
+    funcionamiento de la sesión. No utilizamos cookies de rastreo, publicidad ni
+    analítica de terceros.
+    <!-- FILL IN: if you add analytics later (e.g. Plausible, PostHog), disclose it here -->
+  </p>
+
+  <hr class="section-divider">
+  <h2>10. Cambios en esta política</h2>
+  <p>
+    antcrew puede actualizar esta política de privacidad. Los cambios materiales se
+    comunicarán al usuario por email con antelación suficiente. La versión vigente
+    siempre estará disponible en <a href="/static/privacy.html">/static/privacy.html</a>.
+  </p>
+
+  <hr class="section-divider">
+  <h2>11. Contacto</h2>
+  <p>
+    Para cualquier consulta relacionada con el tratamiento de tus datos personales:
+  </p>
+  <ul>
+    <!-- FILL IN: your privacy/legal contact details -->
+    <li>Email: <a href="mailto:privacidad@antcrew.dev">privacidad@antcrew.dev</a></li>
+    <li>Empresa: <strong>[EMPRESA]</strong></li>
+    <li>Dirección: <strong>[DIRECCIÓN]</strong></li>
+  </ul>
+</div>
+
+<footer>
+  <div class="footer-inner">
+    <span class="footer-brand">antcrew</span>
+    <div class="footer-links">
+      <a href="/static/pricing.html" class="footer-link">Precios</a>
+      <a href="/static/tos.html" class="footer-link">Términos de uso</a>
+      <a href="/docs" class="footer-link">Docs</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
