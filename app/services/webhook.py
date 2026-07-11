@@ -31,6 +31,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.database import engine
+from app.core.security import validate_external_url
 from app.models.run import WebhookConfig, WebhookDelivery, WebhookEvent
 
 _SIGNING_SECRET: Optional[str] = os.environ.get("WEBHOOK_SIGNING_SECRET") or None
@@ -108,6 +109,17 @@ async def _process_pending() -> None:
             deliveries = list(result.all())
 
             for delivery in deliveries:
+                try:
+                    # Guard against SSRF: validate URL on every attempt (config may have
+                    # been written before this check existed).
+                    validate_external_url(delivery.url, allow_http=True)
+                except ValueError as exc:
+                    delivery.status = "failed"
+                    delivery.last_error = f"Blocked: {exc}"
+                    session.add(delivery)
+                    log.warning("webhook: blocked delivery %d to internal URL %s: %s",
+                                delivery.id, delivery.url, exc)
+                    continue
                 try:
                     headers = {"Content-Type": "application/json"}
                     sig = _sign_payload(delivery.payload_json)

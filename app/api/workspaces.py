@@ -16,6 +16,7 @@ from sqlalchemy import func, select as sa_select
 
 from app.core.auth import require_api_key, require_role, get_workspace_context, WorkspaceContext, ws_accessible
 from app.core.database import get_session
+from app.core.security import validate_external_url
 from app.models.run import Workspace, Run, HitlReview, WebhookConfig, WebhookEvent, ApiKey, WorkspaceMembership
 
 router = APIRouter(
@@ -516,6 +517,10 @@ async def create_webhook_config(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     if not result.first():
         raise HTTPException(404, f"Workspace {workspace_id} not found")
+    try:
+        validate_external_url(body.url, allow_http=True)
+    except ValueError as exc:
+        raise HTTPException(400, f"Invalid webhook URL: {exc}")
     hook = WebhookConfig(workspace_id=workspace_id, url=body.url, label=body.label)
     session.add(hook)
     await session.flush()  # populate hook.id before creating WebhookEvent rows

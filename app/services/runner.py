@@ -162,8 +162,14 @@ async def _inject_repo_context(
     """Clone *repo_url* (depth=1) to a temp dir and prepend its context to *request*.
 
     Returns (tmp_dir, augmented_request). Caller must clean up tmp_dir.
-    Raises RuntimeError on clone failure.
+    Raises RuntimeError on clone failure or if repo_url targets an internal host.
     """
+    from app.core.security import validate_external_url
+    try:
+        validate_external_url(repo_url)
+    except ValueError as exc:
+        raise RuntimeError(f"Blocked repository URL: {exc}") from exc
+
     clone_url = repo_url
     if repo_token and repo_url.startswith("https://"):
         # Inject token into URL for private repos: https://token@github.com/...
