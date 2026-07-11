@@ -97,6 +97,21 @@ code{font-family:var(--mono);font-size:.825rem;background:var(--surface-2);paddi
 .feature-text{font-size:.875rem;color:var(--muted);line-height:1.5}
 .feature-text strong{color:var(--text);font-weight:500}
 
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:2rem}
+@media(max-width:600px){.mode-grid{grid-template-columns:1fr}}
+.mode-card{background:var(--surface-2);border:1px solid var(--border-2);border-radius:.875rem;padding:1.75rem}
+.mode-card.mode-byok{border-color:rgba(99,102,241,.35);background:rgba(99,102,241,.06)}
+.mode-tag{display:inline-block;font-family:var(--mono);font-size:.68rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:.2rem .6rem;border-radius:2rem;margin-bottom:1rem}
+.mode-tag-managed{background:rgba(100,116,139,.15);color:var(--subtle)}
+.mode-tag-byok{background:var(--accent-sub);color:var(--accent-h)}
+.mode-card h3{font-size:1rem;font-weight:600;letter-spacing:-.01em;margin-bottom:.375rem}
+.mode-card .mode-price{font-family:var(--mono);font-size:1.375rem;font-weight:700;color:var(--text);margin-bottom:.25rem}
+.mode-card .mode-desc{font-size:.8125rem;color:var(--muted);line-height:1.6;margin-bottom:1.25rem}
+.mode-list{list-style:none;display:flex;flex-direction:column;gap:.45rem}
+.mode-list li{font-size:.8125rem;color:var(--muted);display:flex;gap:.5rem;align-items:flex-start}
+.mode-list li::before{content:'·';color:var(--subtle);flex-shrink:0;margin-top:.05rem}
+.mode-list li strong{color:var(--text);font-weight:500}
+
 .faq-list{display:flex;flex-direction:column;gap:.75rem;margin-top:3rem}
 .faq-item{background:var(--surface);border:1px solid var(--border);border-radius:.75rem;overflow:hidden}
 details summary{padding:1.125rem 1.5rem;font-size:.9375rem;font-weight:500;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none}
@@ -237,6 +252,44 @@ footer{border-top:1px solid var(--border);padding:2rem 0}
         </div>
       </div>
     </div>
+
+    <!-- BYOK comparison -->
+    <div style="margin-top:3rem">
+      <div class="section-label" style="margin-bottom:.75rem">Dos modos de facturación</div>
+      <p class="section-sub">Elige según tu volumen. Puedes cambiar de modo en cualquier momento.</p>
+      <div class="mode-grid">
+        <div class="mode-card">
+          <span class="mode-tag mode-tag-managed">Managed — predeterminado</span>
+          <h3>Llave gestionada</h3>
+          <div class="mode-price">3× coste LLM</div>
+          <p class="mode-desc">
+            antcrew provee la clave de API del modelo. Cero configuración.
+            Facturas de un único proveedor.
+          </p>
+          <ul class="mode-list">
+            <li>Sin cuentas en Anthropic ni OpenAI</li>
+            <li>PR típico (4k tokens): <strong>~$0.09 – 0.15</strong></li>
+            <li>100 revisiones/mes: <strong>~$9 – 15</strong></li>
+            <li>Listo para usar tras el trial</li>
+          </ul>
+        </div>
+        <div class="mode-card mode-byok">
+          <span class="mode-tag mode-tag-byok">BYOK — Bring Your Own Key</span>
+          <h3>Clave propia</h3>
+          <div class="mode-price">0.4× coste LLM</div>
+          <p class="mode-desc">
+            Conectas tu propia cuenta de Anthropic u OpenAI. Solo pagas la tarifa
+            de servicio de antcrew sobre el coste real de los tokens.
+          </p>
+          <ul class="mode-list">
+            <li>Requiere cuenta en Anthropic y/o OpenAI</li>
+            <li>PR típico (4k tokens): <strong>~$0.01 – 0.02</strong></li>
+            <li>100 revisiones/mes: <strong>~$1 – 2</strong></li>
+            <li>Clave cifrada en reposo (Fernet)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -319,6 +372,20 @@ footer{border-top:1px solid var(--border);padding:2rem 0}
             sin tarjeta de crédito. Al terminar, tu cuenta pasa automáticamente a pago por uso
             si introduces un método de pago, o queda bloqueada hasta entonces.
             La duración exacta del trial puede variar según la campaña o promoción con la que te registres.
+          </div>
+        </details>
+      </div>
+
+      <div class="faq-item">
+        <details>
+          <summary>¿Qué es el modo BYOK y cuándo me conviene?</summary>
+          <div class="faq-body">
+            BYOK (<em>Bring Your Own Key</em>) te permite conectar tu propia clave de API de Anthropic
+            u OpenAI. En ese caso, la tarifa de antcrew baja de 3× a 0.4× el coste LLM real —
+            solo cobras infraestructura y orquestación. Es la opción preferida si ya tienes
+            volumen alto de tokens o un contrato de empresa con el proveedor.
+            Puedes activarlo durante el onboarding o en cualquier momento desde el panel
+            en <em>Workspace → Modo LLM → BYOK</em>. La clave se cifra con Fernet antes de almacenarse.
           </div>
         </details>
       </div>
