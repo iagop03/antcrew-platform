@@ -9,10 +9,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Depends
+import secrets
+
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from sqlmodel import select
 
 from app.core.database import init_db, get_session
@@ -538,6 +541,62 @@ async def health(session=Depends(get_session)):
             status_code=503,
             content={"status": "degraded", "db": False, "version": _VERSION, "error": str(exc)},
         )
+
+
+class _BootstrapRequest(BaseModel):
+    ws_name: str
+    ws_slug: str
+    admin_label: str
+
+
+@app.post("/onboard/bootstrap", status_code=201, tags=["onboard"])
+async def onboard_bootstrap(
+    body: _BootstrapRequest,
+    session=Depends(get_session),
+):
+    """Create the first workspace + admin key when the system is empty.
+
+    No authentication required — but only succeeds when there are zero
+    existing workspaces. Once the system has data, use admin credentials
+    via the standard /workspaces/ and /api-keys/ endpoints.
+    """
+    from sqlalchemy import func
+    from app.models.run import Workspace, ApiKey
+    from app.core.auth import _hash, _key_prefix
+
+    ws_count = (await session.exec(
+        select(func.count()).select_from(Workspace)
+    )).one()
+    if ws_count > 0:
+        raise HTTPException(
+            403,
+            "System already has workspaces. "
+            "Use admin credentials via /workspaces/ and /api-keys/.",
+        )
+
+    ws = Workspace(name=body.ws_name.strip(), slug=body.ws_slug.strip())
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    raw = secrets.token_urlsafe(32)
+    key = ApiKey(
+        label=body.admin_label.strip(),
+        key_hash=_hash(raw),
+        key_prefix=_key_prefix(raw),
+        workspace_id=ws.id,
+        role="admin",
+    )
+    session.add(key)
+    await session.commit()
+
+    return {
+        "workspace_id": ws.id,
+        "workspace_name": ws.name,
+        "workspace_slug": ws.slug,
+        "admin_label": key.label,
+        "key": raw,
+    }
 
 
 @app.get("/")

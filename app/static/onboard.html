@@ -51,14 +51,6 @@
 
     <div class="space-y-4">
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5">
-          PLATFORM_API_KEY
-          <span class="text-gray-600 ml-1">— déjalo vacío si el servidor está en modo abierto</span>
-        </label>
-        <input x-model="platformKey" type="password" placeholder="Solo necesaria si PLATFORM_API_KEY está configurada"
-          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
-      </div>
-      <div>
         <label class="block text-xs text-gray-400 mb-1.5">Nombre del workspace</label>
         <input x-model="wsName" placeholder="ej: Equipo Backend"
           class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
@@ -270,7 +262,6 @@ function onboard() {
     steps: ['Workspace', 'Revisores', 'Modo LLM', 'Listo'],
 
     // Step 1
-    platformKey: '',
     wsName: '',
     wsSlug: '',
     adminLabel: '',
@@ -311,40 +302,30 @@ function onboard() {
       this.step1Error = '';
       this.step1Loading = true;
       try {
-        const bootstrapHeaders = { 'Content-Type': 'application/json' };
-        if (this.platformKey.trim()) bootstrapHeaders['X-Api-Key'] = this.platformKey.trim();
-
-        // 1. Create workspace
-        const r1 = await fetch('/workspaces/', {
+        const r = await fetch('/onboard/bootstrap', {
           method: 'POST',
-          headers: bootstrapHeaders,
-          body: JSON.stringify({ name: this.wsName.trim(), slug: this.wsSlug.trim() }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ws_name: this.wsName.trim(),
+            ws_slug: this.wsSlug.trim(),
+            admin_label: this.adminLabel.trim(),
+          }),
         });
-        if (!r1.ok) {
-          const d = await r1.json().catch(() => ({}));
-          this.step1Error = d.detail || `Error ${r1.status} al crear workspace`;
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          if (r.status === 403) {
+            this.step1Error = 'El sistema ya tiene workspaces. Ve a Settings para crear más con tus credenciales de admin.';
+          } else {
+            this.step1Error = d.detail || `Error ${r.status}`;
+          }
           return;
         }
-        const ws = await r1.json();
-        this.workspaceId = ws.id;
+        const data = await r.json();
+        this.workspaceId = data.workspace_id;
+        this.adminKey = data.key;
 
-        // 2. Create admin key scoped to this workspace
-        const r2 = await fetch('/api-keys/', {
-          method: 'POST',
-          headers: bootstrapHeaders,
-          body: JSON.stringify({ label: this.adminLabel.trim(), workspace_id: ws.id, role: 'admin' }),
-        });
-        if (!r2.ok) {
-          const d = await r2.json().catch(() => ({}));
-          this.step1Error = d.detail || `Error ${r2.status} al crear API key`;
-          return;
-        }
-        const key = await r2.json();
-        this.adminKey = key.key;
-
-        // Save to localStorage for subsequent requests and dashboard use
-        localStorage.setItem('antcrew_api_key', key.key);
-        localStorage.setItem('antcrew_api_key_label', key.label);
+        localStorage.setItem('antcrew_api_key', data.key);
+        localStorage.setItem('antcrew_api_key_label', data.admin_label);
 
         this.step = 2;
       } catch (e) {
