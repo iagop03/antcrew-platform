@@ -223,7 +223,7 @@ async def check_ws_api_key(api_key: str | None) -> bool:
     """Validate an API key for WebSocket connections (no DI — uses engine directly)."""
     env_key = os.environ.get("PLATFORM_API_KEY")
     if env_key:
-        return api_key == env_key
+        return hmac.compare_digest(api_key or "", env_key)
 
     try:
         from sqlmodel import select

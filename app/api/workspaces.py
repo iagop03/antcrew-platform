@@ -624,18 +624,20 @@ class LLMKeyOut(BaseModel):
     created_at: datetime
 
 
-@router.patch("/{workspace_id}/llm-mode", response_model=WorkspacePublic,
-              dependencies=[Depends(require_role("admin"))])
+@router.patch("/{workspace_id}/llm-mode", response_model=WorkspacePublic)
 async def set_llm_mode(
     workspace_id: int,
     body: SetLLMModeRequest,
     session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(require_role("admin")),
 ) -> WorkspacePublic:
     """Switch a workspace between managed (platform key) and byok (customer key) modes.
 
     Cannot switch to 'byok' unless at least one LLM key is already stored.
     Switching back to 'managed' is always allowed (stored keys are preserved).
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
     if not ws:
         raise HTTPException(404, f"Workspace {workspace_id} not found")
@@ -658,13 +660,15 @@ async def set_llm_mode(
     return WorkspacePublic.model_validate(ws)
 
 
-@router.get("/{workspace_id}/llm-keys", response_model=list[LLMKeyOut],
-            dependencies=[Depends(require_role("admin"))])
+@router.get("/{workspace_id}/llm-keys", response_model=list[LLMKeyOut])
 async def list_llm_keys(
     workspace_id: int,
     session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(require_role("admin")),
 ) -> list[LLMKeyOut]:
     """List configured LLM providers for a workspace. Never returns plaintext keys."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     if not (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first():
         raise HTTPException(404, f"Workspace {workspace_id} not found")
     rows = (await session.exec(
@@ -673,18 +677,20 @@ async def list_llm_keys(
     return [LLMKeyOut(provider=r.provider, created_at=r.created_at) for r in rows]
 
 
-@router.post("/{workspace_id}/llm-keys", status_code=201,
-             dependencies=[Depends(require_role("admin"))])
+@router.post("/{workspace_id}/llm-keys", status_code=201)
 async def store_llm_key(
     workspace_id: int,
     body: StoreLLMKeyRequest,
     session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(require_role("admin")),
 ) -> dict:
     """Store or rotate a BYOK LLM API key for a workspace.
 
     The key is encrypted at rest using Fernet (BYOK_ENCRYPTION_KEY env var).
     Overwriting an existing key for the same provider requires confirm_overwrite=true.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     if not (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first():
         raise HTTPException(404, f"Workspace {workspace_id} not found")
 
@@ -720,14 +726,16 @@ async def store_llm_key(
     return {"workspace_id": workspace_id, "provider": body.provider, "configured": True}
 
 
-@router.delete("/{workspace_id}/llm-keys/{provider}", status_code=204,
-               dependencies=[Depends(require_role("admin"))])
+@router.delete("/{workspace_id}/llm-keys/{provider}", status_code=204)
 async def delete_llm_key(
     workspace_id: int,
     provider: str,
     session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(require_role("admin")),
 ) -> None:
     """Remove a BYOK key. If it was the last key, resets llm_key_mode to 'managed'."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     if provider not in ("anthropic", "openai"):
         raise HTTPException(422, "provider must be 'anthropic' or 'openai'")
 
