@@ -136,13 +136,14 @@ async def _check_stripe_config() -> None:
 
 
 async def _check_auth_mode() -> None:
-    """Warn loudly if the platform starts in open (unauthenticated) mode.
+    """Warn or block when the platform starts in open (unauthenticated) mode.
 
-    Open mode is intentional for local dev but dangerous if exposed on a
-    non-loopback interface.  We check both conditions and emit a WARNING
-    that is hard to miss in logs and stdout.
+    Open mode is intentional for local dev but dangerous if exposed publicly.
+    Set ANTCREW_REQUIRE_AUTH=true to block startup when no credentials are configured.
     """
     env_key = os.environ.get("PLATFORM_API_KEY")
+    require_auth = os.environ.get("ANTCREW_REQUIRE_AUTH", "").lower() in ("1", "true", "yes")
+
     if env_key:
         log.info("auth: single-key mode (PLATFORM_API_KEY set)")
         return
@@ -162,23 +163,31 @@ async def _check_auth_mode() -> None:
     except Exception as exc:
         log.warning("auth: could not query ApiKey table (%s) — defaulting to open mode", exc)
 
-    # Detect if we're exposed beyond localhost
+    # No credentials configured — open mode
+    if require_auth:
+        raise RuntimeError(
+            "ANTCREW_REQUIRE_AUTH=true but no API keys exist and PLATFORM_API_KEY is not set. "
+            "Create at least one API key via POST /api-keys/ or set PLATFORM_API_KEY, "
+            "then restart. Unset ANTCREW_REQUIRE_AUTH to allow open mode for local dev."
+        )
+
     host = os.environ.get("HOST", "127.0.0.1")
     is_public = host not in ("127.0.0.1", "localhost", "::1")
 
     border = "=" * 72
     msg = (
         f"\n{border}\n"
-        "  ⚠  ANTCREW-PLATFORM STARTING IN OPEN (UNAUTHENTICATED) MODE\n"
+        "  ANTCREW-PLATFORM STARTING IN OPEN (UNAUTHENTICATED) MODE\n"
         "     All API endpoints are accessible without any credentials.\n"
         "\n"
         "  To enable authentication:\n"
         "    Option A — set PLATFORM_API_KEY env var (single key)\n"
         "    Option B — POST /api-keys to create scoped keys in the DB\n"
+        "  To block startup when no credentials exist: ANTCREW_REQUIRE_AUTH=true\n"
     )
     if is_public:
         msg += (
-            f"\n  🚨  HOST={host!r} — this server is reachable beyond localhost.\n"
+            f"\n  HOST={host!r} — this server is reachable beyond localhost.\n"
             "     Running without auth on a public interface is a security risk.\n"
         )
     msg += f"{border}\n"
@@ -188,7 +197,6 @@ async def _check_auth_mode() -> None:
     else:
         log.warning("auth: open mode (no PLATFORM_API_KEY, no DB keys) — local dev only")
 
-    # Also print directly so it shows even when log output is JSON-structured
     print(msg, flush=True)
 
 
@@ -199,7 +207,7 @@ async def _hitl_cleanup_loop() -> None:
     from sqlmodel import select
     from sqlmodel.ext.asyncio.session import AsyncSession
     from app.core.database import engine as _engine
-    from app.models.run import HitlReview
+    from app.models.run import HitlReview, HitlAuditEntry
 
     timeout_s = float(_os.environ.get("HITL_TIMEOUT_S", "3600"))
     log.info("hitl cleanup started (timeout=%.0fs)", timeout_s)
@@ -216,10 +224,17 @@ async def _hitl_cleanup_loop() -> None:
                     )
                 )
                 stale = result.all()
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
                 for r in stale:
                     r.status = "timeout"
-                    r.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    r.resolved_at = now
                     session.add(r)
+                    session.add(HitlAuditEntry(
+                        review_id=r.review_id,
+                        actor_label=None,
+                        action="timed_out",
+                        note=f"Auto-timed-out after {timeout_s:.0f}s",
+                    ))
                 if stale:
                     await session.commit()
                     log.info("hitl cleanup: marked %d stale review(s) as timeout", len(stale))

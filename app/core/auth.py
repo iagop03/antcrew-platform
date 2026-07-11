@@ -61,7 +61,7 @@ class WorkspaceContext:
     """Auth context propagated to route handlers."""
     workspace_id: Optional[int]
     created_by: Optional[str]  # API key label or "env_key"
-    role: str = "admin"         # admin | write | read | reviewer
+    role: str = "write"         # admin | write | read | reviewer — never "admin" by accident
     membership_ids: list[int] = field(default_factory=list)
 
     @property
@@ -145,13 +145,13 @@ async def _authenticate(raw_key: Optional[str], session) -> WorkspaceContext:
         )).first()
         if any_key is not None:
             raise HTTPException(401, "Invalid X-Api-Key")
-        return WorkspaceContext(workspace_id=None, created_by=None)  # open mode
+        return WorkspaceContext(workspace_id=None, created_by=None, role="admin")  # open mode
     else:
         any_key = (await session.exec(
             select(ApiKey).where(ApiKey.revoked_at == None).limit(1)  # noqa: E711
         )).first()
         if any_key is None:
-            return WorkspaceContext(workspace_id=None, created_by=None)  # open mode
+            return WorkspaceContext(workspace_id=None, created_by=None, role="admin")  # open mode
         raise HTTPException(401, "X-Api-Key header required")
 
 

@@ -1,7 +1,6 @@
 """HITL review resolution and listing."""
 from __future__ import annotations
 
-import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
@@ -16,6 +15,7 @@ from app.core.auth import require_api_key, get_workspace_context, WorkspaceConte
 from app.core.channel import resolve_review
 from app.core.database import get_session
 from app.models.run import HitlReview, HitlReviewAssignee, HitlAuditEntry, ApiKey, Run
+from app.services.webhook import fire_event_webhooks, notify_new_delivery
 from app.services.runs import list_reviews as list_reviews_svc
 
 
@@ -438,12 +438,12 @@ async def submit_review(
     except Exception:
         pass
 
+    resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
     review.status = _DECISION_TO_STATUS.get(body.decision, body.decision)
     review.decision = body.decision
     review.edited_json = body.edited
     review.feedback = body.feedback
-    review.resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    # Record who resolved it in assigned_to if not already set
+    review.resolved_at = resolved_at
     if not review.assigned_to and ctx.created_by:
         review.assigned_to = ctx.created_by
     session.add(review)
@@ -456,6 +456,26 @@ async def submit_review(
         note=body.feedback,
     ))
 
+    # Fire webhooks for the review's workspace (subscribed to "hitl.review_resolved" or "*")
+    run_row = (await session.exec(select(Run).where(Run.run_id == review.run_id))).first()
+    ws_id = run_row.workspace_id if run_row else None
+    webhook_count = await fire_event_webhooks(
+        session,
+        workspace_id=ws_id,
+        event_type="hitl.review_resolved",
+        run_id=review.run_id,
+        payload={
+            "review_id": review_id,
+            "run_id": review.run_id,
+            "agent_name": review.agent_name,
+            "decision": body.decision,
+            "actor_label": ctx.created_by,
+            "resolved_at": resolved_at.isoformat(),
+        },
+    )
+
     await session.commit()
+    if webhook_count:
+        notify_new_delivery()
     await session.refresh(review)
     return (await _to_public(session, [review]))[0]
