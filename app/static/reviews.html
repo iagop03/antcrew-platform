@@ -15,13 +15,14 @@
   <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
   <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
   <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
-  <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
   <a href="/reviews" class="text-sm text-white font-medium flex items-center gap-1.5">
     Reviews
     <span x-show="allCount > 0"
       class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-black text-xs font-bold"
       x-text="allCount"></span>
   </a>
+  <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
+  <a href="/webhooks" class="text-sm text-gray-400 hover:text-white">Webhooks</a>
   <div class="ml-auto flex items-center gap-2">
     <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500" title="Live"></span>
     <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500" title="Reconnecting…"></span>
