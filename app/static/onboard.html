@@ -51,6 +51,14 @@
 
     <div class="space-y-4">
       <div>
+        <label class="block text-xs text-gray-400 mb-1.5">
+          PLATFORM_API_KEY
+          <span class="text-gray-600 ml-1">— déjalo vacío si el servidor está en modo abierto</span>
+        </label>
+        <input x-model="platformKey" type="password" placeholder="Solo necesaria si PLATFORM_API_KEY está configurada"
+          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+      </div>
+      <div>
         <label class="block text-xs text-gray-400 mb-1.5">Nombre del workspace</label>
         <input x-model="wsName" placeholder="ej: Equipo Backend"
           class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
@@ -242,7 +250,7 @@
     </div>
 
     <div class="flex gap-3">
-      <a href="/"
+      <a href="/dashboard"
         class="flex-1 py-2.5 rounded-lg font-medium text-sm text-center transition bg-indigo-600 hover:bg-indigo-500 text-white">
         Ir al dashboard
       </a>
@@ -262,6 +270,7 @@ function onboard() {
     steps: ['Workspace', 'Revisores', 'Modo LLM', 'Listo'],
 
     // Step 1
+    platformKey: '',
     wsName: '',
     wsSlug: '',
     adminLabel: '',
@@ -302,10 +311,13 @@ function onboard() {
       this.step1Error = '';
       this.step1Loading = true;
       try {
+        const bootstrapHeaders = { 'Content-Type': 'application/json' };
+        if (this.platformKey.trim()) bootstrapHeaders['X-Api-Key'] = this.platformKey.trim();
+
         // 1. Create workspace
         const r1 = await fetch('/workspaces/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: bootstrapHeaders,
           body: JSON.stringify({ name: this.wsName.trim(), slug: this.wsSlug.trim() }),
         });
         if (!r1.ok) {
@@ -319,7 +331,7 @@ function onboard() {
         // 2. Create admin key scoped to this workspace
         const r2 = await fetch('/api-keys/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: bootstrapHeaders,
           body: JSON.stringify({ label: this.adminLabel.trim(), workspace_id: ws.id, role: 'admin' }),
         });
         if (!r2.ok) {
