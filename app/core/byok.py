@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import Optional
 
 log = logging.getLogger(__name__)
@@ -18,7 +19,28 @@ log = logging.getLogger(__name__)
 MANAGED_COST_MULTIPLIER: float = 3.0
 BYOK_SERVICE_MULTIPLIER: float = 0.4
 
-_VALID_PROVIDERS = frozenset({"anthropic", "openai"})
+_VALID_PROVIDERS = frozenset({"anthropic", "openai", "groq", "gemini", "ollama"})
+
+
+@dataclass
+class BYOKKey:
+    """Decrypted BYOK credentials for a workspace provider."""
+    key: Optional[str]      # API key; None for keyless providers (ollama)
+    base_url: Optional[str]  # custom endpoint URL; None unless provider needs it
+
+
+def _provider_for_model(model_str: str) -> str:
+    """Infer the BYOK provider name from a model string."""
+    s = model_str.strip().lower()
+    if s.startswith("gpt") or s.startswith("o1") or s.startswith("o3") or s.startswith("openai:"):
+        return "openai"
+    if s.startswith("groq:"):
+        return "groq"
+    if s.startswith("gemini"):
+        return "gemini"
+    if s.startswith("ollama:"):
+        return "ollama"
+    return "anthropic"
 
 
 def _encrypt(key: str) -> str:
@@ -48,8 +70,8 @@ async def get_workspace_llm_key(
     session,
     workspace_id: int,
     provider: str,
-) -> Optional[str]:
-    """Return the decrypted LLM API key for a BYOK workspace, or None if not configured."""
+) -> Optional[BYOKKey]:
+    """Return decrypted BYOK credentials for a workspace provider, or None if not configured."""
     from sqlmodel import select
     from app.models.run import LLMProviderKey
 
@@ -60,7 +82,18 @@ async def get_workspace_llm_key(
     )).first()
     if row is None:
         return None
-    return _decrypt(row.key_enc)
+    raw_key = _decrypt(row.key_enc) if row.key_enc else None
+    return BYOKKey(key=raw_key or None, base_url=getattr(row, "base_url", None))
+
+
+async def get_workspace_llm_key_for_model(
+    session,
+    workspace_id: int,
+    model_str: str,
+) -> Optional[BYOKKey]:
+    """Infer provider from model string and return BYOK credentials, or None."""
+    provider = _provider_for_model(model_str)
+    return await get_workspace_llm_key(session, workspace_id, provider)
 
 
 def get_cost_multiplier(llm_key_mode: str) -> float:

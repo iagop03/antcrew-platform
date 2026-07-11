@@ -196,6 +196,18 @@ async def _migrate_stripe_fields(eng) -> None:
         pass  # PostgreSQL or table absent — skip
 
 
+async def _migrate_llm_base_url(eng) -> None:
+    """Idempotent migration: add base_url column to llm_provider_key if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(llm_provider_key)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "base_url" not in col_names:
+                await conn.execute(text("ALTER TABLE llm_provider_key ADD COLUMN base_url TEXT"))
+    except Exception:
+        pass  # PostgreSQL or table absent — skip
+
+
 async def init_db() -> None:
     if "postgresql" in DB_URL:
         await _run_alembic_upgrade()
@@ -208,6 +220,7 @@ async def init_db() -> None:
     await _migrate_eval_run_id(engine)
     await _migrate_workspace_membership(engine)
     await _migrate_stripe_fields(engine)
+    await _migrate_llm_base_url(engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

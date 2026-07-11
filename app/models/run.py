@@ -283,6 +283,7 @@ class LLMProviderKey(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     workspace_id: int = Field(index=True)
-    provider: str  # anthropic | openai
-    key_enc: str   # Fernet-encrypted or plaintext (dev mode without BYOK_ENCRYPTION_KEY)
+    provider: str  # anthropic | openai | groq | gemini | ollama
+    key_enc: str   # Fernet-encrypted or plaintext (dev mode without BYOK_ENCRYPTION_KEY); empty for keyless providers
+    base_url: Optional[str] = Field(default=None)  # required for ollama / custom OpenAI-compat endpoints
     created_at: datetime = Field(default_factory=_utcnow)

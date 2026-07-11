@@ -262,7 +262,7 @@
         <div>
           <div class="flex items-center justify-between mb-3">
             <p class="text-sm text-gray-400">Claves BYOK configuradas</p>
-            <button @click="showAddKey=true; addKeyForm={provider:'anthropic',api_key:'',confirm_overwrite:false}; llmError=''"
+            <button @click="showAddKey=true; addKeyForm={provider:'anthropic',api_key:'',base_url:'',confirm_overwrite:false}; llmError=''"
               class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               Añadir clave
@@ -488,14 +488,27 @@
           <label class="block text-xs text-gray-500 mb-1.5">Proveedor</label>
           <select x-model="addKeyForm.provider"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
-            <option value="anthropic">Anthropic</option>
-            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="openai">OpenAI (GPT / o-series)</option>
+            <option value="groq">Groq</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="ollama">Ollama (local)</option>
           </select>
         </div>
-        <div>
+        <div x-show="addKeyForm.provider !== 'ollama'">
           <label class="block text-xs text-gray-500 mb-1.5">API key</label>
           <input x-model="addKeyForm.api_key" type="password"
-            :placeholder="addKeyForm.provider === 'anthropic' ? 'sk-ant-api03-…' : 'sk-proj-…'"
+            :placeholder="apiKeyPlaceholder(addKeyForm.provider)"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <div x-show="addKeyForm.provider === 'ollama' || addKeyForm.provider === 'openai'">
+          <label class="block text-xs text-gray-500 mb-1.5">
+            Base URL
+            <span x-show="addKeyForm.provider === 'ollama'" class="text-gray-600"> (p.ej. http://localhost:11434)</span>
+            <span x-show="addKeyForm.provider === 'openai'" class="text-gray-600"> (opcional, para endpoints compatibles)</span>
+          </label>
+          <input x-model="addKeyForm.base_url" type="text"
+            :placeholder="addKeyForm.provider === 'ollama' ? 'http://localhost:11434' : 'https://api.openai.com/v1'"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <label x-show="llmProviderConfigured(addKeyForm.provider)" class="flex items-center gap-2.5 text-sm cursor-pointer">
@@ -507,7 +520,8 @@
         <div class="flex gap-2 justify-end pt-1">
           <button @click="showAddKey=false"
             class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
-          <button @click="addLlmKey()" :disabled="!addKeyForm.api_key.trim()"
+          <button @click="addLlmKey()"
+            :disabled="addKeyForm.provider !== 'ollama' && !addKeyForm.api_key.trim()"
             class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors">
             Guardar clave
           </button>
@@ -739,16 +753,29 @@ function settings() {
       return this.llmKeys.some(k => k.provider === provider);
     },
 
+    apiKeyPlaceholder(provider) {
+      const map = { anthropic: 'sk-ant-api03-…', openai: 'sk-proj-…', groq: 'gsk_…', gemini: 'AIza…' };
+      return map[provider] || 'api-key…';
+    },
+
     async addLlmKey() {
       this.llmError = '';
       try {
+        const payload = {
+          provider: this.addKeyForm.provider,
+          api_key: this.addKeyForm.api_key,
+          confirm_overwrite: this.addKeyForm.confirm_overwrite,
+        };
+        if (this.addKeyForm.base_url && this.addKeyForm.base_url.trim()) {
+          payload.base_url = this.addKeyForm.base_url.trim();
+        }
         const r = await fetch(`/workspaces/${this.llmWsId}/llm-keys`, {
           method: 'POST', headers: this.apiHeaders(),
-          body: JSON.stringify({ provider: this.addKeyForm.provider, api_key: this.addKeyForm.api_key, confirm_overwrite: this.addKeyForm.confirm_overwrite }),
+          body: JSON.stringify(payload),
         });
         if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al guardar'; return; }
         this.showAddKey = false;
-        this.addKeyForm = { provider: 'anthropic', api_key: '', confirm_overwrite: false };
+        this.addKeyForm = { provider: 'anthropic', api_key: '', base_url: '', confirm_overwrite: false };
         await this.loadLlmData();
       } catch(e) { this.llmError = e.message; }
     },

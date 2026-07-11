@@ -597,30 +597,39 @@ class SetLLMModeRequest(BaseModel):
         return v
 
 
+_BYOK_PROVIDERS = frozenset({"anthropic", "openai", "groq", "gemini", "ollama"})
+_KEYLESS_PROVIDERS = frozenset({"ollama"})
+
+
 class StoreLLMKeyRequest(BaseModel):
-    provider: str  # "anthropic" | "openai"
-    api_key: str
+    provider: str
+    api_key: str = ""
+    base_url: Optional[str] = None
     confirm_overwrite: bool = False
 
     @field_validator("provider")
     @classmethod
     def provider_valid(cls, v: str) -> str:
-        if v not in ("anthropic", "openai"):
-            raise ValueError("provider must be 'anthropic' or 'openai'")
+        if v not in _BYOK_PROVIDERS:
+            raise ValueError(f"provider must be one of: {', '.join(sorted(_BYOK_PROVIDERS))}")
         return v
 
     @field_validator("api_key")
     @classmethod
-    def key_not_empty(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("api_key must not be empty")
-        return v
+    def key_valid(cls, v: str) -> str:
+        return v.strip()
+
+    @model_validator(mode="after")
+    def key_required_unless_keyless(self) -> "StoreLLMKeyRequest":
+        if self.provider not in _KEYLESS_PROVIDERS and not self.api_key:
+            raise ValueError(f"api_key is required for provider '{self.provider}'")
+        return self
 
 
 class LLMKeyOut(BaseModel):
     provider: str
     configured: bool = True
+    base_url: Optional[str] = None
     created_at: datetime
 
 
@@ -674,7 +683,7 @@ async def list_llm_keys(
     rows = (await session.exec(
         select(LLMProviderKey).where(LLMProviderKey.workspace_id == workspace_id)
     )).all()
-    return [LLMKeyOut(provider=r.provider, created_at=r.created_at) for r in rows]
+    return [LLMKeyOut(provider=r.provider, base_url=getattr(r, "base_url", None), created_at=r.created_at) for r in rows]
 
 
 @router.post("/{workspace_id}/llm-keys", status_code=201)
@@ -708,10 +717,11 @@ async def store_llm_key(
         )
 
     from app.core.byok import _encrypt
-    encrypted = _encrypt(body.api_key)
+    encrypted = _encrypt(body.api_key) if body.api_key else ""
 
     if existing:
         existing.key_enc = encrypted
+        existing.base_url = body.base_url
         from app.models.run import _utcnow
         existing.created_at = _utcnow()
         session.add(existing)
@@ -720,6 +730,7 @@ async def store_llm_key(
             workspace_id=workspace_id,
             provider=body.provider,
             key_enc=encrypted,
+            base_url=body.base_url,
         ))
 
     await session.commit()
@@ -736,8 +747,8 @@ async def delete_llm_key(
     """Remove a BYOK key. If it was the last key, resets llm_key_mode to 'managed'."""
     if not ws_accessible(workspace_id, ctx):
         raise HTTPException(403, "This workspace is not accessible with the current API key")
-    if provider not in ("anthropic", "openai"):
-        raise HTTPException(422, "provider must be 'anthropic' or 'openai'")
+    if provider not in _BYOK_PROVIDERS:
+        raise HTTPException(422, f"provider must be one of: {', '.join(sorted(_BYOK_PROVIDERS))}")
 
     row = (await session.exec(
         select(LLMProviderKey)

@@ -155,14 +155,14 @@
         class="text-left p-4 rounded-xl border transition">
         <div class="text-xs font-mono text-indigo-400 uppercase tracking-wide mb-2">BYOK</div>
         <div class="text-sm font-semibold mb-1">Clave propia</div>
-        <div class="text-xs text-gray-400 leading-relaxed">Conectas tu cuenta de Anthropic u OpenAI. Solo tarifa de servicio ×0.4.</div>
+        <div class="text-xs text-gray-400 leading-relaxed">Conectas tu proveedor LLM (Anthropic, OpenAI, Groq…). Solo tarifa de servicio ×0.4.</div>
       </button>
     </div>
 
     <!-- BYOK key inputs -->
     <div x-show="llmMode === 'byok'" x-cloak class="space-y-4 mb-5">
       <div class="bg-indigo-950/30 border border-indigo-900/60 rounded-lg px-4 py-3 text-xs text-indigo-300 leading-relaxed">
-        Añade al menos una clave. Puedes añadir o cambiar claves en cualquier momento desde el panel.
+        Añade al menos una clave. Puedes gestionar proveedores adicionales en Settings.
       </div>
       <div>
         <label class="flex items-center justify-between mb-1.5">
@@ -180,12 +180,20 @@
         <input x-model="byokOpenAIKey" type="password" placeholder="sk-…"
           class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
       </div>
+      <div>
+        <label class="flex items-center justify-between mb-1.5">
+          <span class="text-xs text-gray-400">Clave Groq <span class="text-gray-600">(opcional)</span></span>
+          <span class="text-xs text-gray-600">gsk_…</span>
+        </label>
+        <input x-model="byokGroqKey" type="password" placeholder="gsk_…"
+          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+      </div>
     </div>
 
     <p x-show="llmModeError" x-cloak class="text-red-400 text-xs mb-3" x-text="llmModeError"></p>
 
     <button @click="saveLlmMode()"
-      :disabled="llmModeLoading || (llmMode === 'byok' && !byokAnthropicKey.trim() && !byokOpenAIKey.trim())"
+      :disabled="llmModeLoading || (llmMode === 'byok' && !byokAnthropicKey.trim() && !byokOpenAIKey.trim() && !byokGroqKey.trim())"
       class="w-full py-2.5 rounded-lg font-medium text-sm transition bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
       <span x-show="!llmModeLoading" x-text="llmMode === 'byok' ? 'Guardar claves y continuar →' : 'Continuar →'"></span>
       <span x-show="llmModeLoading">Guardando…</span>
@@ -280,6 +288,7 @@ function onboard() {
     llmMode: 'managed',
     byokAnthropicKey: '',
     byokOpenAIKey: '',
+    byokGroqKey: '',
     llmModeLoading: false,
     llmModeError: '',
 
@@ -373,6 +382,7 @@ function onboard() {
         const keysToStore = [];
         if (this.byokAnthropicKey.trim()) keysToStore.push({ provider: 'anthropic', api_key: this.byokAnthropicKey.trim() });
         if (this.byokOpenAIKey.trim()) keysToStore.push({ provider: 'openai', api_key: this.byokOpenAIKey.trim() });
+        if (this.byokGroqKey.trim()) keysToStore.push({ provider: 'groq', api_key: this.byokGroqKey.trim() });
         for (const payload of keysToStore) {
           const r = await fetch(`/workspaces/${this.workspaceId}/llm-keys`, {
             method: 'POST', headers,
