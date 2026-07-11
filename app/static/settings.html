@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>antcrew · Settings</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="settings()" x-init="init()">
+
+<nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
+  <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
+  <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
+  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/reviews" class="text-sm text-gray-400 hover:text-white">Reviews</a>
+  <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
+  <a href="/webhooks" class="text-sm text-gray-400 hover:text-white">Webhooks</a>
+  <a href="/settings" class="text-sm text-white font-medium">Settings</a>
+  <div class="ml-auto"></div>
+</nav>
+
+<div class="px-6 py-5 border-b border-gray-800/60">
+  <h1 class="text-xl font-semibold">Settings</h1>
+  <p class="text-gray-400 text-sm mt-0.5">Workspaces, revisores y configuración LLM</p>
+</div>
+
+<!-- Tab bar -->
+<div class="px-6 border-b border-gray-800 flex">
+  <button @click="tab='workspaces'"
+    :class="tab==='workspaces' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
+    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
+    Workspaces
+    <span x-show="workspaces.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="workspaces.length"></span>
+  </button>
+  <button @click="tab='reviewers'"
+    :class="tab==='reviewers' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
+    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
+    Revisores
+    <span x-show="keys.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="keys.length"></span>
+  </button>
+  <button @click="tab='llm'"
+    :class="tab==='llm' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
+    class="px-1 py-3 text-sm border-b-2 -mb-px transition-colors">
+    Modo LLM
+  </button>
+</div>
+
+<div class="px-6 py-6 max-w-5xl">
+
+  <!-- ── WORKSPACES ── -->
+  <div x-show="tab==='workspaces'">
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-sm text-gray-400">Todos los workspaces configurados</span>
+      <button @click="showCreateWs=true; wsFormError=''"
+        class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Nuevo
+      </button>
+    </div>
+
+    <p x-show="wsError" class="text-red-400 text-sm mb-3" x-text="wsError"></p>
+    <div x-show="wsLoading" class="text-gray-600 text-sm py-8 text-center">Cargando…</div>
+
+    <div x-show="!wsLoading && workspaces.length === 0 && !wsError"
+      class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm">
+      No hay workspaces todavía.
+    </div>
+
+    <div x-show="!wsLoading && workspaces.length > 0" class="overflow-x-auto rounded-lg border border-gray-800">
+      <table class="w-full text-sm" style="font-variant-numeric:tabular-nums">
+        <thead>
+          <tr class="border-b border-gray-800 text-xs text-gray-600 uppercase tracking-wider">
+            <th class="px-4 py-2.5 text-left font-medium">Nombre</th>
+            <th class="px-4 py-2.5 text-left font-medium">Slug</th>
+            <th class="px-4 py-2.5 text-right font-medium">Presupuesto</th>
+            <th class="px-4 py-2.5 text-center font-medium">HITL</th>
+            <th class="px-4 py-2.5 text-center font-medium">LLM</th>
+            <th class="px-4 py-2.5 text-right font-medium">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="ws in workspaces" :key="ws.id">
+            <tr class="border-b border-gray-800/40 last:border-0 hover:bg-gray-900/40 transition-colors">
+              <td class="px-4 py-3 font-medium" x-text="ws.name"></td>
+              <td class="px-4 py-3 font-mono text-gray-500 text-xs" x-text="ws.slug"></td>
+              <td class="px-4 py-3 text-right text-gray-300">
+                <span x-show="ws.max_cost_usd != null" x-text="`$${ws.max_cost_usd?.toFixed(2)}`"></span>
+                <span x-show="ws.max_cost_usd == null" class="text-gray-700">—</span>
+              </td>
+              <td class="px-4 py-3 text-center text-xs">
+                <span x-show="ws.hitl_default" class="text-indigo-400">Sí</span>
+                <span x-show="!ws.hitl_default" class="text-gray-700">No</span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span :class="ws.llm_key_mode==='byok' ? 'bg-emerald-900/50 text-emerald-400' : 'bg-gray-800 text-gray-500'"
+                  class="inline-block px-2 py-0.5 rounded text-xs font-mono" x-text="ws.llm_key_mode"></span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <button @click="startEditWs(ws)"
+                    class="text-xs text-gray-500 hover:text-white px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
+                    Editar
+                  </button>
+                  <button @click="deleteWs(ws)"
+                    class="text-xs text-gray-700 hover:text-red-400 px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
+                    Eliminar
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── REVISORES ── -->
+  <div x-show="tab==='reviewers'">
+    <!-- New key banner -->
+    <div x-show="newKeyValue" x-transition
+      class="mb-5 p-4 bg-amber-950/40 border border-amber-700/40 rounded-lg">
+      <p class="text-amber-300 text-sm font-medium mb-2.5">Clave creada — cópiala ahora, no se volverá a mostrar</p>
+      <div class="flex items-center gap-2">
+        <code class="flex-1 font-mono text-xs bg-gray-900/80 px-3 py-2 rounded border border-gray-700 text-gray-100 break-all select-all"
+          x-text="newKeyValue"></code>
+        <button @click="copyKey()"
+          class="shrink-0 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
+          Copiar
+        </button>
+        <button @click="newKeyValue=''" class="shrink-0 text-gray-600 hover:text-gray-300 px-1.5 py-1 text-sm">✕</button>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-sm text-gray-400">API keys activas</span>
+      <button @click="showCreateKey=true; keyFormError=''"
+        class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Nueva key
+      </button>
+    </div>
+
+    <p x-show="keysError" class="text-red-400 text-sm mb-3" x-text="keysError"></p>
+    <div x-show="keysLoading" class="text-gray-600 text-sm py-8 text-center">Cargando…</div>
+
+    <div x-show="!keysLoading && keys.length === 0 && !keysError"
+      class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm">
+      No hay API keys configuradas.
+    </div>
+
+    <div x-show="!keysLoading && keys.length > 0" class="overflow-x-auto rounded-lg border border-gray-800">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-800 text-xs text-gray-600 uppercase tracking-wider">
+            <th class="px-4 py-2.5 text-left font-medium">Label</th>
+            <th class="px-4 py-2.5 text-left font-medium">Rol</th>
+            <th class="px-4 py-2.5 text-left font-medium">Workspace</th>
+            <th class="px-4 py-2.5 text-left font-medium">Email</th>
+            <th class="px-4 py-2.5 text-left font-medium">Creada</th>
+            <th class="px-4 py-2.5 text-right font-medium">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="key in keys" :key="key.label">
+            <tr class="border-b border-gray-800/40 last:border-0 hover:bg-gray-900/40 transition-colors">
+              <td class="px-4 py-3 font-mono text-sm" x-text="key.label"></td>
+              <td class="px-4 py-3">
+                <span :class="roleBadgeClass(key.role)"
+                  class="inline-block px-2 py-0.5 rounded text-xs font-medium" x-text="key.role"></span>
+              </td>
+              <td class="px-4 py-3 text-gray-500 text-xs" x-text="wsName(key.workspace_id)"></td>
+              <td class="px-4 py-3 text-gray-500 text-xs">
+                <span x-show="key.email" x-text="key.email"></span>
+                <span x-show="!key.email" class="text-gray-800">—</span>
+              </td>
+              <td class="px-4 py-3 text-gray-600 text-xs" x-text="fmtDate(key.created_at)"></td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <button @click="startEditKey(key)"
+                    class="text-xs text-gray-500 hover:text-white px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
+                    Editar
+                  </button>
+                  <button @click="revokeKey(key)"
+                    class="text-xs text-gray-700 hover:text-red-400 px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
+                    Revocar
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── MODO LLM ── -->
+  <div x-show="tab==='llm'">
+    <div class="mb-6">
+      <label class="block text-sm text-gray-400 mb-2">Workspace</label>
+      <select x-model="llmWsId" @change="selectLlmWs()"
+        class="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 w-72">
+        <option value="">— selecciona un workspace —</option>
+        <template x-for="ws in workspaces" :key="ws.id">
+          <option :value="ws.id" x-text="`${ws.name} (${ws.slug})`"></option>
+        </template>
+      </select>
+    </div>
+
+    <div x-show="!llmWsId" class="text-gray-700 text-sm">Selecciona un workspace para ver su configuración.</div>
+
+    <div x-show="llmWsId">
+      <p x-show="llmError" class="text-red-400 text-sm mb-4" x-text="llmError"></p>
+      <div x-show="llmLoading" class="text-gray-600 text-sm">Cargando…</div>
+
+      <div x-show="!llmLoading" class="flex flex-col gap-5">
+        <!-- Mode selector -->
+        <div class="p-4 bg-gray-900 border border-gray-800 rounded-lg">
+          <p class="text-xs text-gray-600 uppercase tracking-wider mb-3">Modo de facturación LLM</p>
+          <div class="flex items-center gap-2">
+            <button @click="setLlmMode('managed')"
+              :class="llmMode==='managed'
+                ? 'bg-indigo-600 text-white border-transparent'
+                : 'bg-transparent text-gray-400 border-gray-700 hover:text-gray-200 hover:border-gray-500'"
+              class="px-4 py-1.5 rounded border text-sm transition-colors">
+              Managed <span class="text-xs opacity-70">×3.0</span>
+            </button>
+            <button @click="setLlmMode('byok')"
+              :class="llmMode==='byok'
+                ? 'bg-emerald-700 text-white border-transparent'
+                : 'bg-transparent text-gray-400 border-gray-700 hover:text-gray-200 hover:border-gray-500'"
+              class="px-4 py-1.5 rounded border text-sm transition-colors"
+              :disabled="llmKeys.length === 0"
+              :title="llmKeys.length === 0 ? 'Añade al menos una clave antes de activar BYOK' : ''">
+              BYOK <span class="text-xs opacity-70">×0.4</span>
+            </button>
+          </div>
+          <p x-show="llmMode==='byok'" class="text-emerald-500 text-xs mt-2.5">Usando tus claves — multiplicador ×0.4 activo</p>
+          <p x-show="llmMode==='managed'" class="text-gray-600 text-xs mt-2.5">Usando claves de la plataforma — multiplicador ×3.0</p>
+        </div>
+
+        <!-- Keys list -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm text-gray-400">Claves BYOK configuradas</p>
+            <button @click="showAddKey=true; addKeyForm={provider:'anthropic',api_key:'',confirm_overwrite:false}; llmError=''"
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Añadir clave
+            </button>
+          </div>
+
+          <div x-show="llmKeys.length === 0"
+            class="border border-dashed border-gray-800 rounded-lg py-8 text-center text-gray-700 text-sm">
+            Sin claves BYOK. El workspace usa las claves de la plataforma.
+          </div>
+
+          <div x-show="llmKeys.length > 0" class="rounded-lg border border-gray-800 overflow-hidden">
+            <template x-for="k in llmKeys" :key="k.provider">
+              <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800/40 last:border-0 hover:bg-gray-900/40 transition-colors">
+                <div class="flex items-center gap-3">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span class="font-mono text-sm" x-text="k.provider"></span>
+                  <span class="text-gray-600 text-xs" x-text="`configurada ${fmtDate(k.created_at)}`"></span>
+                </div>
+                <button @click="deleteLlmKey(k.provider)"
+                  class="text-xs text-gray-700 hover:text-red-400 px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
+                  Eliminar
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+
+<!-- ══ MODALS ══ -->
+
+<!-- Shared backdrop -->
+<template x-teleport="body">
+  <div x-show="showCreateWs || !!editingWs || showCreateKey || !!editingKey || showAddKey"
+    x-transition:enter="transition duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+    x-transition:leave="transition duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-black/60 z-40"
+    @click="showCreateWs=false; editingWs=null; showCreateKey=false; editingKey=null; showAddKey=false">
+  </div>
+</template>
+
+<!-- Create Workspace -->
+<template x-teleport="body">
+  <div x-show="showCreateWs" class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 pointer-events-auto shadow-2xl"
+      @keydown.escape.window="showCreateWs=false" @click.stop>
+      <h3 class="text-base font-semibold mb-5">Nuevo workspace</h3>
+      <div class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Nombre</label>
+          <input x-model="createWsForm.name" @input="autoSlug()" type="text" placeholder="Mi proyecto"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Slug</label>
+          <input x-model="createWsForm.slug" type="text" placeholder="mi-proyecto"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+          <p class="text-xs text-gray-600 mt-1">Solo minúsculas, números y guiones</p>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Presupuesto máximo en USD <span class="text-gray-700">— opcional</span></label>
+          <input x-model="createWsForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="Sin límite"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <label class="flex items-center gap-2.5 text-sm cursor-pointer">
+          <input type="checkbox" x-model="createWsForm.hitl_default"
+            class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
+          <span class="text-gray-300">Activar revisión humana (HITL) por defecto</span>
+        </label>
+        <p x-show="wsFormError" class="text-red-400 text-xs" x-text="wsFormError"></p>
+        <div class="flex gap-2 justify-end pt-1">
+          <button @click="showCreateWs=false"
+            class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
+          <button @click="createWorkspace()" :disabled="!createWsForm.name.trim() || !createWsForm.slug.trim()"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors">
+            Crear workspace
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Edit Workspace -->
+<template x-teleport="body">
+  <div x-show="!!editingWs" class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 pointer-events-auto shadow-2xl"
+      @keydown.escape.window="editingWs=null" @click.stop>
+      <h3 class="text-base font-semibold" x-text="editingWs?.name"></h3>
+      <p class="font-mono text-xs text-gray-600 mb-5" x-text="editingWs?.slug"></p>
+      <div class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Presupuesto máximo en USD <span class="text-gray-700">— vacío = sin límite</span></label>
+          <input x-model="editWsForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="Sin límite"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Repositorio por defecto <span class="text-gray-700">— opcional</span></label>
+          <input x-model="editWsForm.default_repo_url" type="url" placeholder="https://github.com/org/repo"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <label class="flex items-center gap-2.5 text-sm cursor-pointer">
+          <input type="checkbox" x-model="editWsForm.hitl_default"
+            class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
+          <span class="text-gray-300">Revisión humana (HITL) por defecto</span>
+        </label>
+        <p x-show="wsFormError" class="text-red-400 text-xs" x-text="wsFormError"></p>
+        <div class="flex gap-2 justify-end pt-1">
+          <button @click="editingWs=null"
+            class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
+          <button @click="saveWs()"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
+            Guardar cambios
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Create Key -->
+<template x-teleport="body">
+  <div x-show="showCreateKey" class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 pointer-events-auto shadow-2xl"
+      @keydown.escape.window="showCreateKey=false" @click.stop>
+      <h3 class="text-base font-semibold mb-5">Nueva API key</h3>
+      <div class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Label <span class="text-gray-700">— identificador único</span></label>
+          <input x-model="createKeyForm.label" type="text" placeholder="revisor-maria"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Rol</label>
+          <select x-model="createKeyForm.role"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+            <option value="reviewer">reviewer — solo resolver reviews HITL</option>
+            <option value="read">read — solo lectura</option>
+            <option value="write">write — lanzar runs y leer</option>
+            <option value="admin">admin — acceso total</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Workspace <span class="text-gray-700">— opcional</span></label>
+          <select x-model="createKeyForm.workspace_id"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+            <option value="">Todos los workspaces</option>
+            <template x-for="ws in workspaces" :key="ws.id">
+              <option :value="ws.id" x-text="`${ws.name} (${ws.slug})`"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Email de notificación <span class="text-gray-700">— opcional</span></label>
+          <input x-model="createKeyForm.email" type="email" placeholder="revisor@empresa.com"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+          <p class="text-xs text-gray-700 mt-1">Se usa para asignaciones HITL</p>
+        </div>
+        <p x-show="keyFormError" class="text-red-400 text-xs" x-text="keyFormError"></p>
+        <div class="flex gap-2 justify-end pt-1">
+          <button @click="showCreateKey=false"
+            class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
+          <button @click="createKey()" :disabled="!createKeyForm.label.trim()"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors">
+            Crear key
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Edit Key -->
+<template x-teleport="body">
+  <div x-show="!!editingKey" class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 pointer-events-auto shadow-2xl"
+      @keydown.escape.window="editingKey=null" @click.stop>
+      <h3 class="text-base font-semibold font-mono" x-text="editingKey?.label"></h3>
+      <p class="text-xs text-gray-600 mb-5">Editar rol y email de notificación</p>
+      <div class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Rol</label>
+          <select x-model="editKeyForm.role"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+            <option value="reviewer">reviewer</option>
+            <option value="read">read</option>
+            <option value="write">write</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Email de notificación</label>
+          <input x-model="editKeyForm.email" type="email" placeholder="—"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <p x-show="keyFormError" class="text-red-400 text-xs" x-text="keyFormError"></p>
+        <div class="flex gap-2 justify-end pt-1">
+          <button @click="editingKey=null"
+            class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
+          <button @click="saveKey()"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Add LLM Key -->
+<template x-teleport="body">
+  <div x-show="showAddKey" class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 pointer-events-auto shadow-2xl"
+      @keydown.escape.window="showAddKey=false" @click.stop>
+      <h3 class="text-base font-semibold mb-5">Añadir clave BYOK</h3>
+      <div class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Proveedor</label>
+          <select x-model="addKeyForm.provider"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+            <option value="anthropic">Anthropic</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">API key</label>
+          <input x-model="addKeyForm.api_key" type="password"
+            :placeholder="addKeyForm.provider === 'anthropic' ? 'sk-ant-api03-…' : 'sk-proj-…'"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+        </div>
+        <label x-show="llmProviderConfigured(addKeyForm.provider)" class="flex items-center gap-2.5 text-sm cursor-pointer">
+          <input type="checkbox" x-model="addKeyForm.confirm_overwrite"
+            class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-amber-500">
+          <span class="text-amber-300">Sobrescribir la clave existente</span>
+        </label>
+        <p x-show="llmError" class="text-red-400 text-xs" x-text="llmError"></p>
+        <div class="flex gap-2 justify-end pt-1">
+          <button @click="showAddKey=false"
+            class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
+          <button @click="addLlmKey()" :disabled="!addKeyForm.api_key.trim()"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors">
+            Guardar clave
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+
+<script>
+function settings() {
+  return {
+    tab: 'workspaces',
+    apiKey: localStorage.getItem('antcrew_api_key') || '',
+
+    workspaces: [], wsLoading: false, wsError: '',
+    showCreateWs: false, editingWs: null,
+    createWsForm: { name: '', slug: '', max_cost_usd: '', hitl_default: false },
+    editWsForm: { max_cost_usd: '', hitl_default: false, default_repo_url: '' },
+    wsFormError: '',
+
+    keys: [], keysLoading: false, keysError: '',
+    showCreateKey: false, editingKey: null,
+    createKeyForm: { label: '', role: 'reviewer', workspace_id: '', email: '' },
+    editKeyForm: { role: 'reviewer', email: '' },
+    newKeyValue: '', keyFormError: '',
+
+    llmWsId: '', llmMode: 'managed', llmKeys: [],
+    llmLoading: false, llmError: '',
+    showAddKey: false,
+    addKeyForm: { provider: 'anthropic', api_key: '', confirm_overwrite: false },
+
+    apiHeaders() {
+      const h = { 'Content-Type': 'application/json' };
+      if (this.apiKey) h['X-Api-Key'] = this.apiKey;
+      return h;
+    },
+
+    async init() {
+      await Promise.all([this.loadWorkspaces(), this.loadKeys()]);
+    },
+
+    /* ── Workspaces ── */
+    async loadWorkspaces() {
+      this.wsLoading = true; this.wsError = '';
+      try {
+        const r = await fetch('/workspaces/', { headers: this.apiHeaders() });
+        if (!r.ok) throw new Error(await r.text());
+        this.workspaces = await r.json();
+      } catch(e) { this.wsError = e.message; }
+      this.wsLoading = false;
+    },
+
+    autoSlug() {
+      this.createWsForm.slug = this.createWsForm.name
+        .toLowerCase().trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    },
+
+    async createWorkspace() {
+      this.wsFormError = '';
+      const body = { name: this.createWsForm.name.trim(), slug: this.createWsForm.slug.trim(), hitl_default: this.createWsForm.hitl_default };
+      if (this.createWsForm.max_cost_usd) body.max_cost_usd = parseFloat(this.createWsForm.max_cost_usd);
+      try {
+        const r = await fetch('/workspaces/', { method: 'POST', headers: this.apiHeaders(), body: JSON.stringify(body) });
+        if (!r.ok) { const e = await r.json(); this.wsFormError = e.detail || JSON.stringify(e); return; }
+        this.showCreateWs = false;
+        this.createWsForm = { name: '', slug: '', max_cost_usd: '', hitl_default: false };
+        await this.loadWorkspaces();
+      } catch(e) { this.wsFormError = e.message; }
+    },
+
+    startEditWs(ws) {
+      this.editingWs = ws; this.wsFormError = '';
+      this.editWsForm = {
+        max_cost_usd: ws.max_cost_usd != null ? String(ws.max_cost_usd) : '',
+        hitl_default: ws.hitl_default,
+        default_repo_url: ws.default_repo_url || '',
+      };
+    },
+
+    async saveWs() {
+      this.wsFormError = '';
+      const id = this.editingWs.id;
+      const budget = this.editWsForm.max_cost_usd === '' ? null : parseFloat(this.editWsForm.max_cost_usd);
+      try {
+        const rs = await Promise.all([
+          fetch(`/workspaces/${id}/budget`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ max_cost_usd: budget }) }),
+          fetch(`/workspaces/${id}/hitl`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ hitl_default: this.editWsForm.hitl_default }) }),
+          fetch(`/workspaces/${id}/repo`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ default_repo_url: this.editWsForm.default_repo_url || null }) }),
+        ]);
+        for (const r of rs) {
+          if (!r.ok) { const e = await r.json(); this.wsFormError = e.detail || 'Error al guardar'; return; }
+        }
+        this.editingWs = null;
+        await this.loadWorkspaces();
+      } catch(e) { this.wsFormError = e.message; }
+    },
+
+    async deleteWs(ws) {
+      if (!confirm(`¿Eliminar "${ws.name}"? Esta acción no se puede deshacer.`)) return;
+      try {
+        const r = await fetch(`/workspaces/${ws.id}`, { method: 'DELETE', headers: this.apiHeaders() });
+        if (r.status !== 204 && !r.ok) { this.wsError = 'Error al eliminar el workspace'; return; }
+        await this.loadWorkspaces();
+      } catch(e) { this.wsError = e.message; }
+    },
+
+    /* ── Revisores ── */
+    async loadKeys() {
+      this.keysLoading = true; this.keysError = '';
+      try {
+        const r = await fetch('/api-keys/', { headers: this.apiHeaders() });
+        if (!r.ok) throw new Error(await r.text());
+        this.keys = await r.json();
+      } catch(e) { this.keysError = e.message; }
+      this.keysLoading = false;
+    },
+
+    async createKey() {
+      this.keyFormError = '';
+      const body = { label: this.createKeyForm.label.trim(), role: this.createKeyForm.role };
+      if (this.createKeyForm.workspace_id) body.workspace_id = parseInt(this.createKeyForm.workspace_id);
+      if (this.createKeyForm.email.trim()) body.email = this.createKeyForm.email.trim();
+      try {
+        const r = await fetch('/api-keys/', { method: 'POST', headers: this.apiHeaders(), body: JSON.stringify(body) });
+        if (!r.ok) { const e = await r.json(); this.keyFormError = e.detail || JSON.stringify(e); return; }
+        const data = await r.json();
+        this.newKeyValue = data.key;
+        this.showCreateKey = false;
+        this.createKeyForm = { label: '', role: 'reviewer', workspace_id: '', email: '' };
+        this.tab = 'reviewers';
+        await this.loadKeys();
+      } catch(e) { this.keyFormError = e.message; }
+    },
+
+    startEditKey(key) {
+      this.editingKey = { ...key }; this.keyFormError = '';
+      this.editKeyForm = { role: key.role, email: key.email || '' };
+    },
+
+    async saveKey() {
+      this.keyFormError = '';
+      try {
+        const r = await fetch(`/api-keys/${this.editingKey.label}`, {
+          method: 'PATCH', headers: this.apiHeaders(),
+          body: JSON.stringify({ role: this.editKeyForm.role, email: this.editKeyForm.email || null }),
+        });
+        if (!r.ok) { const e = await r.json(); this.keyFormError = e.detail || 'Error al guardar'; return; }
+        this.editingKey = null;
+        await this.loadKeys();
+      } catch(e) { this.keyFormError = e.message; }
+    },
+
+    async revokeKey(key) {
+      if (!confirm(`¿Revocar "${key.label}"? La clave dejará de funcionar inmediatamente.`)) return;
+      try {
+        await fetch(`/api-keys/${key.label}`, { method: 'DELETE', headers: this.apiHeaders() });
+        await this.loadKeys();
+      } catch(e) { this.keysError = e.message; }
+    },
+
+    roleBadgeClass(role) {
+      return {
+        admin:    'bg-red-900/50 text-red-300',
+        write:    'bg-blue-900/50 text-blue-300',
+        read:     'bg-gray-700 text-gray-400',
+        reviewer: 'bg-amber-900/50 text-amber-300',
+      }[role] || 'bg-gray-700 text-gray-400';
+    },
+
+    wsName(id) {
+      if (!id) return '—';
+      return this.workspaces.find(w => w.id === id)?.name || `#${id}`;
+    },
+
+    async copyKey() {
+      try { await navigator.clipboard.writeText(this.newKeyValue); } catch(e) {}
+    },
+
+    /* ── LLM Mode ── */
+    async selectLlmWs() {
+      if (this.llmWsId) await this.loadLlmData();
+    },
+
+    async loadLlmData() {
+      if (!this.llmWsId) return;
+      this.llmLoading = true; this.llmError = '';
+      try {
+        const ws = this.workspaces.find(w => w.id == this.llmWsId);
+        this.llmMode = ws?.llm_key_mode || 'managed';
+        const r = await fetch(`/workspaces/${this.llmWsId}/llm-keys`, { headers: this.apiHeaders() });
+        if (!r.ok) throw new Error(await r.text());
+        this.llmKeys = await r.json();
+      } catch(e) { this.llmError = e.message; }
+      this.llmLoading = false;
+    },
+
+    async setLlmMode(mode) {
+      this.llmError = '';
+      try {
+        const r = await fetch(`/workspaces/${this.llmWsId}/llm-mode`, {
+          method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ mode }),
+        });
+        if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al cambiar modo'; return; }
+        this.llmMode = mode;
+        await this.loadWorkspaces();
+      } catch(e) { this.llmError = e.message; }
+    },
+
+    llmProviderConfigured(provider) {
+      return this.llmKeys.some(k => k.provider === provider);
+    },
+
+    async addLlmKey() {
+      this.llmError = '';
+      try {
+        const r = await fetch(`/workspaces/${this.llmWsId}/llm-keys`, {
+          method: 'POST', headers: this.apiHeaders(),
+          body: JSON.stringify({ provider: this.addKeyForm.provider, api_key: this.addKeyForm.api_key, confirm_overwrite: this.addKeyForm.confirm_overwrite }),
+        });
+        if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al guardar'; return; }
+        this.showAddKey = false;
+        this.addKeyForm = { provider: 'anthropic', api_key: '', confirm_overwrite: false };
+        await this.loadLlmData();
+      } catch(e) { this.llmError = e.message; }
+    },
+
+    async deleteLlmKey(provider) {
+      if (!confirm(`¿Eliminar la clave de ${provider}? Si es la última, el workspace volverá a modo managed.`)) return;
+      try {
+        await fetch(`/workspaces/${this.llmWsId}/llm-keys/${provider}`, { method: 'DELETE', headers: this.apiHeaders() });
+        await this.loadLlmData();
+        await this.loadWorkspaces();
+      } catch(e) { this.llmError = e.message; }
+    },
+
+    fmtDate(d) {
+      if (!d) return '—';
+      return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    },
+  };
+}
+</script>
+</body>
+</html>

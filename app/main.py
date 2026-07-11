@@ -573,3 +573,8 @@ async def webhooks_page():
 @app.get("/onboard")
 async def onboard_page():
     return FileResponse(_STATIC / "onboard.html")
+
+
+@app.get("/settings")
+async def settings_page():
+    return FileResponse(_STATIC / "settings.html")
