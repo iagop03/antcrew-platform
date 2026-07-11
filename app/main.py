@@ -541,6 +541,11 @@ async def health(session=Depends(get_session)):
 
 
 @app.get("/")
+async def landing():
+    return FileResponse(_STATIC / "landing.html")
+
+
+@app.get("/dashboard")
 async def dashboard():
     return FileResponse(_STATIC / "index.html")
 
