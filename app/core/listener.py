@@ -112,8 +112,9 @@ async def _persist_event(event: "Event") -> None:
                         ))
                         notify_new_delivery()
 
-                    # Report metered usage to Stripe (fire-and-forget)
-                    if ws_row and ws_row.stripe_customer_id and run.cost_usd > 0:
+                    # Report metered usage to Stripe (fire-and-forget, Stripe workspaces only)
+                    if (ws_row and ws_row.stripe_customer_id and run.cost_usd > 0
+                            and getattr(ws_row, "billing_provider", "mor") == "stripe"):
                         from app.services import billing as _billing
                         asyncio.ensure_future(
                             _billing.report_run_cost(

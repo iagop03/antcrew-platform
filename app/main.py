@@ -18,7 +18,7 @@ from sqlmodel import select
 from app.core.database import init_db, get_session
 from app.core.listener import start_listening, stop_listening
 from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, evals
-from app.api import eval_schedules, engine, billing
+from app.api import eval_schedules, engine, billing, webhook_mor
 
 _STATIC = Path(__file__).parent / "static"
 _VERSION = "0.4.0"
@@ -386,6 +386,34 @@ async def _check_byok_config() -> None:
     )
 
 
+async def _check_mor_config() -> None:
+    """Warn or block when Lemon Squeezy webhooks are accepted without signature verification.
+
+    Accepting MoR webhooks without verifying the HMAC-SHA256 X-Signature header lets
+    anyone forge subscription events (mark unpaid subscriptions as active, cancel rivals).
+    In production this is a hard error; locally it is a warning.
+    """
+    webhook_secret = os.environ.get("LEMON_SQUEEZY_WEBHOOK_SECRET")
+    if webhook_secret:
+        log.info("mor: Lemon Squeezy webhook secret set — signature verification active")
+        return
+
+    host = os.environ.get("HOST", "127.0.0.1")
+    is_public = host not in ("127.0.0.1", "localhost", "::1")
+
+    if is_public:
+        raise RuntimeError(
+            "LEMON_SQUEEZY_WEBHOOK_SECRET is not set. "
+            "Starting in production without webhook signature verification would allow "
+            "anyone to forge subscription events (activate cancelled plans, block active ones). "
+            "Set LEMON_SQUEEZY_WEBHOOK_SECRET from your Lemon Squeezy webhook settings."
+        )
+    log.warning(
+        "mor: LEMON_SQUEEZY_WEBHOOK_SECRET not set — webhook signatures will not be verified "
+        "(dev mode only, not suitable for production)"
+    )
+
+
 async def _check_cors_config() -> None:
     """Block startup when CORS_ORIGINS=* is used on a public-facing host.
 
@@ -424,6 +452,7 @@ async def lifespan(app: FastAPI):
     await _check_cors_config()
     await _check_sandbox_mode()
     await _check_stripe_config()
+    await _check_mor_config()
     await _check_slack_config()
     await _check_byok_config()
     start_listening()
@@ -488,6 +517,7 @@ app.include_router(evals.router)
 app.include_router(eval_schedules.router)
 app.include_router(engine.router)
 app.include_router(billing.router)
+app.include_router(webhook_mor.router)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 

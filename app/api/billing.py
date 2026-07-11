@@ -89,7 +89,7 @@ async def _apply_subscription_status(
     stripe_customer_id: str,
     new_status: str,
 ) -> None:
-    """Update workspace.stripe_subscription_status for the matching customer."""
+    """Update workspace.subscription_status for the matching Stripe customer."""
     ws = (await session.exec(
         select(Workspace).where(Workspace.stripe_customer_id == stripe_customer_id)
     )).first()
@@ -99,7 +99,7 @@ async def _apply_subscription_status(
             stripe_customer_id,
         )
         return
-    ws.stripe_subscription_status = new_status
+    ws.subscription_status = new_status
     session.add(ws)
     await session.commit()
     log.info(
@@ -115,15 +115,16 @@ async def _apply_subscription_status(
 class AttachBilling(BaseModel):
     stripe_customer_id: str
     stripe_subscription_id: Optional[str] = None
-    stripe_subscription_status: Optional[str] = "active"
+    stripe_subscription_status: Optional[str] = "active"  # written to neutral subscription_status
 
 
 class BillingOut(BaseModel):
     workspace_id: int
     slug: str
+    billing_provider: str
     stripe_customer_id: Optional[str]
     stripe_subscription_id: Optional[str]
-    stripe_subscription_status: Optional[str]
+    subscription_status: Optional[str]
     total_cost_usd: float
     max_cost_usd: Optional[float]
 
@@ -146,9 +147,10 @@ async def get_workspace_billing(
     return BillingOut(
         workspace_id=ws.id,  # type: ignore[arg-type]
         slug=ws.slug,
+        billing_provider=getattr(ws, "billing_provider", "mor"),
         stripe_customer_id=ws.stripe_customer_id,
         stripe_subscription_id=ws.stripe_subscription_id,
-        stripe_subscription_status=ws.stripe_subscription_status,
+        subscription_status=getattr(ws, "subscription_status", None),
         total_cost_usd=ws.total_cost_usd,
         max_cost_usd=ws.max_cost_usd,
     )
@@ -175,10 +177,11 @@ async def attach_stripe(
     if not ws:
         raise HTTPException(404, f"Workspace {workspace_id} not found")
     ws.stripe_customer_id = body.stripe_customer_id
+    ws.billing_provider = "stripe"
     if body.stripe_subscription_id is not None:
         ws.stripe_subscription_id = body.stripe_subscription_id
     if body.stripe_subscription_status is not None:
-        ws.stripe_subscription_status = body.stripe_subscription_status
+        ws.subscription_status = body.stripe_subscription_status
     session.add(ws)
     await session.commit()
     await session.refresh(ws)
@@ -189,9 +192,10 @@ async def attach_stripe(
     return BillingOut(
         workspace_id=ws.id,  # type: ignore[arg-type]
         slug=ws.slug,
+        billing_provider=getattr(ws, "billing_provider", "stripe"),
         stripe_customer_id=ws.stripe_customer_id,
         stripe_subscription_id=ws.stripe_subscription_id,
-        stripe_subscription_status=ws.stripe_subscription_status,
+        subscription_status=getattr(ws, "subscription_status", None),
         total_cost_usd=ws.total_cost_usd,
         max_cost_usd=ws.max_cost_usd,
     )
@@ -230,7 +234,8 @@ async def create_stripe_customer(
             "Install stripe and set STRIPE_SECRET_KEY, or use /attach to manually link a customer.",
         )
     ws.stripe_customer_id = customer_id
-    ws.stripe_subscription_status = None  # no subscription yet
+    ws.billing_provider = "stripe"
+    ws.subscription_status = None  # no subscription yet
     session.add(ws)
     await session.commit()
     await session.refresh(ws)
@@ -241,9 +246,10 @@ async def create_stripe_customer(
     return BillingOut(
         workspace_id=ws.id,  # type: ignore[arg-type]
         slug=ws.slug,
+        billing_provider=getattr(ws, "billing_provider", "stripe"),
         stripe_customer_id=ws.stripe_customer_id,
         stripe_subscription_id=ws.stripe_subscription_id,
-        stripe_subscription_status=ws.stripe_subscription_status,
+        subscription_status=getattr(ws, "subscription_status", None),
         total_cost_usd=ws.total_cost_usd,
         max_cost_usd=ws.max_cost_usd,
     )
@@ -266,7 +272,7 @@ async def detach_stripe(
         raise HTTPException(404, f"Workspace {workspace_id} not found")
     ws.stripe_customer_id = None
     ws.stripe_subscription_id = None
-    ws.stripe_subscription_status = None
+    ws.subscription_status = None
     session.add(ws)
     await session.commit()
 

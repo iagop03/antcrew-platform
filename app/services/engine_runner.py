@@ -460,9 +460,9 @@ async def _check_engine_workspace(workspace_id: int) -> None:
         ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
         if ws is None:
             return
-        if ws.stripe_subscription_status in BLOCKED_STATUSES:
+        if ws.subscription_status in BLOCKED_STATUSES:
             raise ValueError(
-                f"Workspace subscription is '{ws.stripe_subscription_status}'. "
+                f"Workspace subscription is '{ws.subscription_status}'. "
                 "Please update your billing details to continue using the engine."
             )
         if ws.max_cost_usd is not None and ws.total_cost_usd >= ws.max_cost_usd:

@@ -29,7 +29,10 @@ class Workspace(SQLModel, table=True):
     hitl_timeout_s: Optional[float] = Field(default=None)  # per-workspace HITL timeout (overrides env HITL_TIMEOUT_S)
     stripe_customer_id: Optional[str] = Field(default=None, index=True)  # cus_...
     stripe_subscription_id: Optional[str] = Field(default=None)           # sub_...
-    stripe_subscription_status: Optional[str] = Field(default=None)       # active | trialing | past_due | canceled | unpaid
+    subscription_status: Optional[str] = Field(default=None)              # active | trialing | past_due | canceled | unpaid
+    billing_provider: str = Field(default="mor")                          # mor | stripe
+    mor_customer_id: Optional[str] = Field(default=None)                  # Lemon Squeezy customer ID
+    mor_subscription_id: Optional[str] = Field(default=None)              # Lemon Squeezy subscription ID
     llm_key_mode: str = Field(default="managed")  # managed | byok
     created_at: datetime = Field(default_factory=_utcnow)
 

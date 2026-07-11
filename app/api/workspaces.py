@@ -145,7 +145,8 @@ class WorkspacePublic(BaseModel):
     hitl_default: bool
     hitl_timeout_s: Optional[float] = None
     stripe_customer_id: Optional[str] = None
-    stripe_subscription_status: Optional[str] = None
+    subscription_status: Optional[str] = None
+    billing_provider: str = "mor"
     llm_key_mode: str = "managed"
     byok_providers: list[str] = []
     created_at: datetime
@@ -172,7 +173,8 @@ class WorkspacePublic(BaseModel):
                 "hitl_default": data.hitl_default,
                 "hitl_timeout_s": data.hitl_timeout_s,
                 "stripe_customer_id": getattr(data, "stripe_customer_id", None),
-                "stripe_subscription_status": getattr(data, "stripe_subscription_status", None),
+                "subscription_status": getattr(data, "subscription_status", None),
+                "billing_provider": getattr(data, "billing_provider", "mor"),
                 "llm_key_mode": getattr(data, "llm_key_mode", "managed"),
                 "byok_providers": getattr(data, "_byok_providers", []),
                 "created_at": data.created_at,

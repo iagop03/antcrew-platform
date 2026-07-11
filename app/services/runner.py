@@ -366,9 +366,9 @@ async def _check_workspace_budget(workspace_id: int) -> None:
 
         if ws is None:
             return
-        if ws.stripe_subscription_status in BLOCKED_STATUSES:
+        if ws.subscription_status in BLOCKED_STATUSES:
             raise ValueError(
-                f"Workspace subscription is '{ws.stripe_subscription_status}'. "
+                f"Workspace subscription is '{ws.subscription_status}'. "
                 "Please update your billing details to continue running pipelines."
             )
         if ws.max_cost_usd is None:

@@ -154,25 +154,44 @@ async def _migrate_workspace_membership(eng) -> None:
 
 
 async def _migrate_stripe_fields(eng) -> None:
-    """Idempotent migration: add Stripe billing columns to workspace if absent."""
+    """Idempotent migration: add/rename billing columns on workspace if absent."""
     try:
         async with eng.begin() as conn:
             cols = (await conn.execute(text("PRAGMA table_info(workspace)"))).fetchall()
             col_names = {row[1] for row in cols}
+
+            # Stripe-specific fields (named; kept as-is)
             for col_def, col_name in [
                 ("stripe_customer_id TEXT", "stripe_customer_id"),
                 ("stripe_subscription_id TEXT", "stripe_subscription_id"),
-                ("stripe_subscription_status TEXT", "stripe_subscription_status"),
             ]:
                 if col_name not in col_names:
-                    await conn.execute(
-                        text(f"ALTER TABLE workspace ADD COLUMN {col_def}")
-                    )
+                    await conn.execute(text(f"ALTER TABLE workspace ADD COLUMN {col_def}"))
+
             if "stripe_customer_id" not in col_names:
                 await conn.execute(text(
                     "CREATE INDEX IF NOT EXISTS ix_workspace_stripe_customer_id "
                     "ON workspace(stripe_customer_id)"
                 ))
+
+            # Rename legacy stripe_subscription_status → subscription_status
+            if "stripe_subscription_status" in col_names and "subscription_status" not in col_names:
+                await conn.execute(text(
+                    "ALTER TABLE workspace RENAME COLUMN "
+                    "stripe_subscription_status TO subscription_status"
+                ))
+                col_names.discard("stripe_subscription_status")
+                col_names.add("subscription_status")
+
+            # Provider-neutral and MoR lane fields
+            for col_def, col_name in [
+                ("subscription_status TEXT", "subscription_status"),
+                ("billing_provider TEXT NOT NULL DEFAULT 'mor'", "billing_provider"),
+                ("mor_customer_id TEXT", "mor_customer_id"),
+                ("mor_subscription_id TEXT", "mor_subscription_id"),
+            ]:
+                if col_name not in col_names:
+                    await conn.execute(text(f"ALTER TABLE workspace ADD COLUMN {col_def}"))
     except Exception:
         pass  # PostgreSQL or table absent — skip
 
