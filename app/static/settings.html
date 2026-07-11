@@ -25,6 +25,25 @@
   <p class="text-gray-400 text-sm mt-0.5">Workspaces, revisores y configuración LLM</p>
 </div>
 
+<!-- API key banner -->
+<div x-show="!apiKey"
+  class="px-6 py-3 bg-amber-950/40 border-b border-amber-800/40 flex items-center gap-3">
+  <span class="text-amber-300 text-xs font-medium shrink-0">API key requerida</span>
+  <input x-model="keyInput" type="password" placeholder="Introduce tu PLATFORM_API_KEY o una key de /api-keys/"
+    @keydown.enter="saveApiKey()"
+    class="flex-1 max-w-sm bg-gray-900 border border-amber-800/50 rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-indigo-500 text-gray-100 placeholder-gray-600">
+  <button @click="saveApiKey()" :disabled="!keyInput.trim()"
+    class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs rounded transition-colors shrink-0">
+    Guardar
+  </button>
+</div>
+<div x-show="apiKey"
+  class="px-6 py-2 border-b border-gray-800/40 flex items-center gap-2 bg-gray-900/30">
+  <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"></span>
+  <span class="text-xs text-gray-600 font-mono">X-Api-Key configurada</span>
+  <button @click="clearApiKey()" class="ml-auto text-xs text-gray-700 hover:text-red-400 transition-colors">Limpiar</button>
+</div>
+
 <!-- Tab bar -->
 <div class="px-6 border-b border-gray-800 flex">
   <button @click="tab='workspaces'"
@@ -504,6 +523,7 @@ function settings() {
   return {
     tab: 'workspaces',
     apiKey: localStorage.getItem('antcrew_api_key') || '',
+    keyInput: '',
 
     workspaces: [], wsLoading: false, wsError: '',
     showCreateWs: false, editingWs: null,
@@ -526,6 +546,20 @@ function settings() {
       const h = { 'Content-Type': 'application/json' };
       if (this.apiKey) h['X-Api-Key'] = this.apiKey;
       return h;
+    },
+
+    saveApiKey() {
+      const k = this.keyInput.trim();
+      if (!k) return;
+      this.apiKey = k;
+      localStorage.setItem('antcrew_api_key', k);
+      this.keyInput = '';
+      this.init();
+    },
+
+    clearApiKey() {
+      this.apiKey = '';
+      localStorage.removeItem('antcrew_api_key');
     },
 
     async init() {
