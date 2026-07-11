@@ -29,3 +29,27 @@ jobs:
         env:
           ANTCREW_SANDBOX: none
           LOG_FORMAT: text
+
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and security tools
+        run: |
+          pip install -e ".[dev]"
+          pip install "bandit[toml]" pip-audit
+
+      - name: bandit — static security analysis (MEDIUM+)
+        # -ll  skip LOW severity   -ii  skip LOW confidence
+        # Scans app/ only; tests/ excluded (assert statements are intentional there).
+        run: bandit -r app/ -ll -ii
+
+      - name: pip-audit — dependency CVE scan
+        run: pip-audit
