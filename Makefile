@@ -8,7 +8,7 @@ DATABASE_URL ?= sqlite+aiosqlite:///$(DB)
 
 ## Run all pending Alembic migrations
 migrate:
-	DATABASE_URL=$(DATABASE_URL) alembic upgrade head
+	DATABASE_URL=$(DATABASE_URL) python -m alembic upgrade head
 
 ## Generate a new migration (NAME= required)
 ## Usage: make migration NAME=add_my_column
@@ -16,7 +16,7 @@ migration:
 ifndef NAME
 	$(error NAME is required — e.g. make migration NAME=add_my_column)
 endif
-	DATABASE_URL=$(DATABASE_URL) alembic revision --autogenerate -m "$(NAME)"
+	DATABASE_URL=$(DATABASE_URL) python -m alembic revision --autogenerate -m "$(NAME)"
 	@echo "Review the generated migration in alembic/versions/ before committing."
 
 ## Check that all migrations have been applied (non-zero exit if pending)
@@ -25,24 +25,24 @@ check-migrations:
 
 ## Roll back one migration
 downgrade:
-	DATABASE_URL=$(DATABASE_URL) alembic downgrade -1
+	DATABASE_URL=$(DATABASE_URL) python -m alembic downgrade -1
 
 ## Show current migration revision
 current:
-	DATABASE_URL=$(DATABASE_URL) alembic current
+	DATABASE_URL=$(DATABASE_URL) python -m alembic current
 
 ## Show migration history
 history:
-	DATABASE_URL=$(DATABASE_URL) alembic history --verbose
+	DATABASE_URL=$(DATABASE_URL) python -m alembic history --verbose
 
 ## Start the platform (dev mode: SQLite, no auth, auto-reload)
 run:
-	DATABASE_URL=$(DATABASE_URL) uvicorn app.main:app --reload --port 8000
+	DATABASE_URL=$(DATABASE_URL) python -m uvicorn app.main:app --reload --port 8000
 
 ## Run all tests
 test:
-	pytest tests/ -q
+	python -m pytest tests/ -q
 
 ## Run tests with coverage
 coverage:
-	pytest tests/ -q --cov=app --cov-report=term-missing
+	python -m pytest tests/ -q --cov=app --cov-report=term-missing
