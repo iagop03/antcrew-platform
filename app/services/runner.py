@@ -33,6 +33,18 @@ _MAX_WORKERS = int(os.environ.get("ANTCREW_WORKERS", "4"))
 _DISPATCH_TIMEOUT = float(os.environ.get("ANTCREW_DISPATCH_TIMEOUT", "10"))
 _executor = ThreadPoolExecutor(max_workers=_MAX_WORKERS, thread_name_prefix="antcrew-runner")
 
+# Per-workspace asyncio locks used to serialise budget check + budget update pairs.
+# Prevents two concurrent dispatch() calls from both reading the same total_cost_usd
+# before either run has committed its cost (TOCTOU on the budget gate).
+# Only effective within a single process — PostgreSQL FOR UPDATE covers multi-process.
+_budget_locks: dict[int, asyncio.Lock] = {}
+
+
+def _get_budget_lock(workspace_id: int) -> asyncio.Lock:
+    if workspace_id not in _budget_locks:
+        _budget_locks[workspace_id] = asyncio.Lock()
+    return _budget_locks[workspace_id]
+
 def _build_team_registry() -> dict[str, tuple[str, str]]:
     """Merge built-in teams with any custom teams from ANTCREW_TEAMS env var.
 
@@ -321,15 +333,31 @@ async def _store_result(result) -> None:
 async def _check_workspace_budget(workspace_id: int) -> None:
     """Raise ValueError if the workspace has exhausted its budget or subscription is suspended.
 
-    Reads the cached total_cost_usd (O(1) single-row read) updated by
-    _mark_workspace_budget_status after each run completes.
+    Must be called while holding _get_budget_lock(workspace_id) to prevent TOCTOU races
+    where two concurrent dispatch() calls both read the same total_cost_usd before either
+    run has committed its cost.  The lock serialises check↔mark pairs within a process;
+    FOR UPDATE serialises across multiple processes on PostgreSQL.
+
+    Residual risk: in-flight runs whose cost has not yet been committed by
+    _mark_workspace_budget_status() are invisible to this check regardless of locking.
+    A reservation column would close that gap; this implementation trades full accuracy
+    for simplicity while making concurrent-dispatch overruns impossible.
     """
     from sqlmodel import select
     from app.models.run import Workspace
     from app.services.billing import BLOCKED_STATUSES
 
-    async with AsyncSession(engine, expire_on_commit=False) as session:
-        ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+    async with AsyncSession(engine, expire_on_commit=False) as sess:
+        # FOR UPDATE: row-level lock held until session closes.
+        # Prevents two concurrent budget checks from reading the same total_cost_usd
+        # on PostgreSQL (multi-process).  On SQLite/aiosqlite this is a no-op —
+        # the asyncio lock in dispatch() covers that case.
+        try:
+            stmt = select(Workspace).where(Workspace.id == workspace_id).with_for_update()
+            ws = (await sess.exec(stmt)).first()
+        except Exception:
+            ws = (await sess.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+
         if ws is None:
             return
         if ws.stripe_subscription_status in BLOCKED_STATUSES:
@@ -349,29 +377,31 @@ async def _check_workspace_budget(workspace_id: int) -> None:
 async def _mark_workspace_budget_status(workspace_id: int) -> None:
     """After a run completes, recompute total spend via SQL SUM and update cached field.
 
-    Uses a single SQL aggregation instead of loading all Run rows. The cached
-    total_cost_usd on Workspace is then used by _check_workspace_budget (O(1)).
+    Acquires _get_budget_lock(workspace_id) so that a concurrent dispatch() cannot
+    pass _check_workspace_budget() while this write is in-flight — the pair
+    (check, mark) is always mutually exclusive within the same process.
     """
     from sqlmodel import select
     from app.models.run import Workspace, Run
 
     try:
-        async with AsyncSession(engine, expire_on_commit=False) as session:
-            ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
-            if ws is None:
-                return
-            costs = await session.exec(
-                select(Run.cost_usd).where(Run.workspace_id == workspace_id)
-            )
-            total = sum(c or 0.0 for c in costs.all())
-            ws.total_cost_usd = total
-            if ws.max_cost_usd is not None and total >= ws.max_cost_usd:
-                log.warning(
-                    "runner: workspace %d budget exhausted ($%.4f of $%.2f limit)",
-                    workspace_id, total, ws.max_cost_usd,
+        async with _get_budget_lock(workspace_id):
+            async with AsyncSession(engine, expire_on_commit=False) as session:
+                ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+                if ws is None:
+                    return
+                costs = await session.exec(
+                    select(Run.cost_usd).where(Run.workspace_id == workspace_id)
                 )
-            session.add(ws)
-            await session.commit()
+                total = sum(c or 0.0 for c in costs.all())
+                ws.total_cost_usd = total
+                if ws.max_cost_usd is not None and total >= ws.max_cost_usd:
+                    log.warning(
+                        "runner: workspace %d budget exhausted ($%.4f of $%.2f limit)",
+                        workspace_id, total, ws.max_cost_usd,
+                    )
+                session.add(ws)
+                await session.commit()
     except Exception as exc:
         log.warning("runner: failed to update budget for workspace %d: %s", workspace_id, exc)
 
@@ -399,7 +429,8 @@ async def dispatch(
     HTTPS URL — never stored or logged).
     """
     if workspace_id is not None:
-        await _check_workspace_budget(workspace_id)
+        async with _get_budget_lock(workspace_id):
+            await _check_workspace_budget(workspace_id)
 
     # Look up per-workspace HITL timeout
     _hitl_timeout: Optional[float] = None
@@ -556,7 +587,8 @@ async def dispatch_custom(
     _validate_custom_dag(steps)
 
     if workspace_id is not None:
-        await _check_workspace_budget(workspace_id)
+        async with _get_budget_lock(workspace_id):
+            await _check_workspace_budget(workspace_id)
 
     # Look up per-workspace HITL timeout if workspace is known
     _hitl_timeout: Optional[float] = None
