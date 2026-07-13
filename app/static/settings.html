@@ -131,6 +131,10 @@
               </td>
               <td class="px-4 py-3 text-right">
                 <div class="flex items-center justify-end gap-1">
+                  <button x-show="ws.is_trial" @click="startEditWs(ws)"
+                    class="text-xs text-amber-400 hover:text-amber-300 px-2.5 py-1 rounded hover:bg-amber-900/20 transition-colors">
+                    Upgrade
+                  </button>
                   <button @click="startEditWs(ws)"
                     class="text-xs text-gray-500 hover:text-white px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
                     Editar
@@ -388,6 +392,25 @@
             class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
           <span class="text-gray-300">Revisión humana (HITL) por defecto</span>
         </label>
+        <template x-if="editingWs?.is_trial">
+          <div class="border-t border-gray-800 pt-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-amber-400 font-mono uppercase tracking-wide">Trial activo</span>
+              <span class="text-xs text-gray-400 font-mono"
+                x-text="`$${Math.max(0, (editingWs.max_cost_usd ?? 0) - (editingWs.total_cost_usd ?? 0)).toFixed(2)} restantes`"></span>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">Añadir crédito (USD)</label>
+              <input x-model="editWsForm.add_credit" type="number" step="0.01" min="0" placeholder="0.00"
+                class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+            </div>
+            <label class="flex items-center gap-2.5 text-sm cursor-pointer">
+              <input type="checkbox" x-model="editWsForm.exit_trial"
+                class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
+              <span class="text-gray-300">Salir del modo trial <span class="text-gray-600 text-xs">(activa facturación normal)</span></span>
+            </label>
+          </div>
+        </template>
         <p x-show="wsFormError" class="text-red-400 text-xs" x-text="wsFormError"></p>
         <div class="flex gap-2 justify-end pt-1">
           <button @click="editingWs=null"
@@ -556,7 +579,7 @@ function settings() {
     workspaces: [], wsLoading: false, wsError: '',
     showCreateWs: false, editingWs: null,
     createWsForm: { name: '', slug: '', max_cost_usd: '', hitl_default: false },
-    editWsForm: { max_cost_usd: '', hitl_default: false, default_repo_url: '' },
+    editWsForm: { max_cost_usd: '', hitl_default: false, default_repo_url: '', add_credit: '', exit_trial: false },
     wsFormError: '',
 
     keys: [], keysLoading: false, keysError: '',
@@ -631,6 +654,8 @@ function settings() {
         max_cost_usd: ws.max_cost_usd != null ? String(ws.max_cost_usd) : '',
         hitl_default: ws.hitl_default,
         default_repo_url: ws.default_repo_url || '',
+        add_credit: '',
+        exit_trial: false,
       };
     },
 
@@ -639,11 +664,22 @@ function settings() {
       const id = this.editingWs.id;
       const budget = this.editWsForm.max_cost_usd === '' ? null : parseFloat(this.editWsForm.max_cost_usd);
       try {
-        const rs = await Promise.all([
+        const reqs = [
           fetch(`/workspaces/${id}/budget`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ max_cost_usd: budget }) }),
           fetch(`/workspaces/${id}/hitl`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ hitl_default: this.editWsForm.hitl_default }) }),
           fetch(`/workspaces/${id}/repo`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ default_repo_url: this.editWsForm.default_repo_url || null }) }),
-        ]);
+        ];
+        const addCredit = parseFloat(this.editWsForm.add_credit || '0');
+        if (this.editingWs.is_trial && (this.editWsForm.exit_trial || addCredit > 0)) {
+          reqs.push(fetch(`/workspaces/${id}/trial`, {
+            method: 'PATCH', headers: this.apiHeaders(),
+            body: JSON.stringify({
+              is_trial: !this.editWsForm.exit_trial,
+              additional_credit_usd: addCredit > 0 ? addCredit : null,
+            }),
+          }));
+        }
+        const rs = await Promise.all(reqs);
         for (const r of rs) {
           if (!r.ok) { const e = await r.json(); this.wsFormError = e.detail || 'Error al guardar'; return; }
         }
