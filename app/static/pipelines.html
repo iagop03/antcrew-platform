@@ -549,8 +549,8 @@ function app() {
       const def = typeof p.definition === 'string' ? JSON.parse(p.definition) : p.definition;
       this.nodes = (def.nodes || []).map(n => ({ hitl: false, channel_type: 'platform', ...n }));
       this.edges = (def.edges || []).map(e => ({...e, id: e.id || edgeId()}));
-      this.zoom = 1;
-      this.pan = { x: 40, y: 40 };
+      this.zoom = def.zoom || 1;
+      this.pan = def.pan ? { ...def.pan } : { x: 40, y: 40 };
       this.saveStatus = '';
     },
 
@@ -562,8 +562,9 @@ function app() {
       this.nodes = [];
       this.edges = [];
       this.selectedNodeId = null;
+      this.zoom = 1;
+      this.pan = { x: 40, y: 40 };
       this.saveStatus = '';
-      // Pre-assign a temp local id so we can save
       this.activeId = '__new__';
     },
 
@@ -573,7 +574,7 @@ function app() {
       const body = {
         name: this.activeName + ' (copia)',
         workspace_id: ws.id,
-        definition: { nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})) },
+        definition: { nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})), zoom: this.zoom, pan: { ...this.pan } },
       };
       const key = localStorage.getItem('antcrew_api_key') || '';
       const r = await fetch('/pipelines/', {
@@ -591,7 +592,7 @@ function app() {
       if (this.isTemplate) return;
       this.saving = true;
       this.saveStatus = 'saving';
-      const definition = { nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})) };
+      const definition = { nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})), zoom: this.zoom, pan: { ...this.pan } };
       const key = localStorage.getItem('antcrew_api_key') || '';
       const headers = {'Content-Type':'application/json', ...(key?{'X-Api-Key':key}:{})};
 

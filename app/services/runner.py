@@ -101,7 +101,12 @@ def _make_team(
     kwargs: dict = {}
     if model or byok_api_key or byok_base_url:
         from antcrew.config import build_llm as _build_llm
-        llm = _build_llm(model or "claude", api_key=byok_api_key, base_url=byok_base_url)
+        _llm_kw: dict = {}
+        if byok_api_key is not None:
+            _llm_kw["api_key"] = byok_api_key
+        if byok_base_url is not None:
+            _llm_kw["base_url"] = byok_base_url
+        llm = _build_llm(model or "claude", **_llm_kw)
         if max_cost_usd is not None:
             llm.max_cost_usd = max_cost_usd
         kwargs["llm"] = llm
@@ -559,7 +564,12 @@ def _run_custom_sync(
     from antcrew.teams.custom_team import CustomTeam
     from antcrew.config import build_llm
 
-    llm = build_llm(model or "claude", api_key=byok_api_key, base_url=byok_base_url)
+    _llm_kw2: dict = {}
+    if byok_api_key is not None:
+        _llm_kw2["api_key"] = byok_api_key
+    if byok_base_url is not None:
+        _llm_kw2["base_url"] = byok_base_url
+    llm = build_llm(model or "claude", **_llm_kw2)
     if max_cost_usd is not None:
         llm.max_cost_usd = max_cost_usd
 

@@ -17,6 +17,9 @@
   <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
   <a href="/webhooks" class="text-sm text-gray-400 hover:text-white">Webhooks</a>
   <a href="/settings" class="text-sm text-gray-400 hover:text-white">Settings</a>
+  <template x-if="run && run.team === 'visual_pipeline'">
+    <a href="/pipelines" class="text-sm text-indigo-400 hover:text-indigo-300 ml-2">← Pipelines</a>
+  </template>
   <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
     <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500"></span>
     <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500"></span>
@@ -68,7 +71,14 @@
             </template>
           </div>
           <h1 class="text-lg font-semibold text-white" x-text="run.request"></h1>
-          <p class="text-sm text-indigo-300 mt-1" x-text="run.team"></p>
+          <div class="flex items-center gap-2 mt-1">
+            <p class="text-sm text-indigo-300" x-text="run.team"></p>
+            <template x-if="run.team === 'visual_pipeline'">
+              <span class="text-xs bg-indigo-950 border border-indigo-800 text-indigo-300 px-2 py-0.5 rounded-full font-mono">
+                visual pipeline
+              </span>
+            </template>
+          </div>
         </div>
         <div class="text-right text-sm text-gray-400 space-y-1">
           <div x-text="run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '—'"></div>
@@ -190,8 +200,89 @@
         </div>
       </template>
 
+      <!-- ── PIPELINE SIDEBAR ── -->
+      <template x-if="run && run.team === 'visual_pipeline'">
+        <div class="space-y-5">
+          <!-- Agent flow mini-view -->
+          <div>
+            <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
+              Agentes
+              <span class="text-gray-600 normal-case font-normal" x-text="'(' + capabilityRuns.length + ')'"></span>
+            </h2>
+            <template x-if="capabilityRuns.length === 0">
+              <p class="text-gray-500 text-sm">Esperando primer agente…</p>
+            </template>
+            <div class="space-y-1.5">
+              <template x-for="cap in capabilityRuns" :key="cap.name">
+                <div class="bg-gray-900 border rounded-lg px-3 py-2.5"
+                     :class="!cap.done ? 'border-indigo-900/70' : 'border-gray-800'">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                      <div class="w-2 h-2 rounded-full shrink-0"
+                           :class="!cap.done ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500'"></div>
+                      <span class="font-mono text-xs text-gray-200" x-text="cap.name"></span>
+                    </div>
+                    <template x-if="cap.done">
+                      <span class="text-xs text-gray-500" x-text="cap.duration + 's'"></span>
+                    </template>
+                    <template x-if="!cap.done">
+                      <span class="text-xs text-yellow-500">running</span>
+                    </template>
+                  </div>
+                  <template x-if="!cap.done && liveTokens[cap.name]">
+                    <pre class="mt-1.5 text-xs font-mono text-green-400/80 bg-black/30 rounded p-1.5
+                                leading-tight max-h-20 overflow-hidden whitespace-pre-wrap break-all"
+                         x-text="liveTokens[cap.name]"></pre>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Cost summary -->
+          <template x-if="run.status !== 'running'">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg px-3 py-3 space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-500">Coste total</span>
+                <span class="font-mono text-gray-200" x-text="run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '—'"></span>
+              </div>
+              <div class="flex items-center justify-between text-xs" x-show="run.duration_s">
+                <span class="text-gray-500">Duración</span>
+                <span class="font-mono text-gray-200" x-text="run.duration_s ? run.duration_s.toFixed(0) + 's' : ''"></span>
+              </div>
+              <div class="flex items-center justify-between text-xs" x-show="totalCacheRead + totalCacheWrite > 0">
+                <span class="text-gray-500">Cache</span>
+                <span class="font-mono text-blue-400 text-xs"
+                      x-text="'↓' + totalCacheRead.toLocaleString() + ' ↑' + totalCacheWrite.toLocaleString()"></span>
+              </div>
+            </div>
+          </template>
+
+          <!-- Back to pipelines -->
+          <a href="/pipelines"
+             class="flex items-center justify-center gap-2 w-full bg-gray-900 border border-gray-800 hover:border-indigo-600 rounded-lg px-3 py-2 text-sm text-gray-400 hover:text-indigo-300 transition">
+            ← Volver a Pipelines
+          </a>
+
+          <!-- State JSON (collapsed) -->
+          <div x-show="stateJson">
+            <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">Estado final</h2>
+            <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+              <button @click="stateExpanded = !stateExpanded"
+                class="w-full px-3 py-2 text-xs text-gray-400 hover:text-white text-left transition flex justify-between">
+                <span>state JSON</span>
+                <span x-text="stateExpanded ? '▲' : '▼'"></span>
+              </button>
+              <pre x-show="stateExpanded"
+                   class="px-3 py-2 text-xs text-green-300 font-mono overflow-auto max-h-80 border-t border-gray-800"
+                   x-text="stateJson"></pre>
+            </div>
+          </div>
+        </div>
+      </template>
+
       <!-- ── TEAM SIDEBAR ── -->
-      <template x-if="run && run.team !== 'engine'">
+      <template x-if="run && run.team !== 'engine' && run.team !== 'visual_pipeline'">
         <div class="space-y-5">
           <!-- Tickets -->
           <div>
@@ -295,7 +386,7 @@ function runDetail() {
       if (!this.runId) { this.runError = 'Invalid URL — no run ID found.'; this.loadingRun = false; return; }
 
       await Promise.all([this.loadRun(), this.loadEvents(), this.loadState()]);
-      if (this.run && this.run.team !== 'engine') await this.loadTickets();
+      if (this.run && this.run.team !== 'engine' && this.run.team !== 'visual_pipeline') await this.loadTickets();
       this._deriveCapabilities();
       await this.loadPendingReview();
       this.connectWs();
@@ -431,7 +522,8 @@ function runDetail() {
         }
         if (ev.type === 'pipeline.end') {
           const tasks = [this.loadRun(), this.loadState()];
-          if (!this.run || this.run.team !== 'engine') tasks.push(this.loadTickets());
+          const t = this.run && this.run.team;
+          if (t && t !== 'engine' && t !== 'visual_pipeline') tasks.push(this.loadTickets());
           Promise.all(tasks);
         }
         if (ev.type === 'hitl.review_required' && ev.run_id === this.runId) {

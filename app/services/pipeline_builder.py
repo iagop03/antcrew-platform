@@ -61,7 +61,12 @@ def build_team_from_definition(
 
         # Build a dedicated LLM for this node
         node_model = node.get("model") or default_model
-        node_llm = build_llm(node_model, api_key=byok_api_key, base_url=byok_base_url)
+        _kw: dict = {}
+        if byok_api_key is not None:
+            _kw["api_key"] = byok_api_key
+        if byok_base_url is not None:
+            _kw["base_url"] = byok_base_url
+        node_llm = build_llm(node_model, **_kw)
 
         agent = instantiate_agent(agent_type, node_llm)
         if agent is None:
