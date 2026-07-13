@@ -674,6 +674,35 @@ async def dispatch_custom(
         return None
 
 
+def _resolve_node_channel(
+    channel_type: str,
+    platform_channel: PlatformChannel,
+    slack_creds: Optional[dict],
+    telegram_creds: Optional[dict],
+):
+    """Return the appropriate channel object for a node's channel_type."""
+    if channel_type == "slack" and slack_creds:
+        try:
+            from antcrew.integrations.slack import SlackChannel
+            return SlackChannel(
+                bot_token=slack_creds["bot_token"],
+                channel_id=slack_creds["channel_id"],
+                app_token=slack_creds.get("app_token"),
+            )
+        except Exception as exc:
+            log.warning("runner: SlackChannel unavailable (%s) — falling back to PlatformChannel", exc)
+    elif channel_type == "telegram" and telegram_creds:
+        try:
+            from antcrew.integrations.telegram.integration import TelegramChannel
+            return TelegramChannel(
+                token=telegram_creds["token"],
+                chat_id=telegram_creds.get("chat_id"),
+            )
+        except Exception as exc:
+            log.warning("runner: TelegramChannel unavailable (%s) — falling back to PlatformChannel", exc)
+    return platform_channel
+
+
 def _run_pipeline_sync(
     definition: dict,
     request: str,
@@ -684,25 +713,50 @@ def _run_pipeline_sync(
     model: str = "claude",
     byok_api_key: Optional[str] = None,
     byok_base_url: Optional[str] = None,
+    slack_creds: Optional[dict] = None,
+    telegram_creds: Optional[dict] = None,
 ):
-    """Run a visual pipeline definition synchronously in a thread-pool worker."""
-    from antcrew.config import build_llm
+    """Run a visual pipeline definition synchronously in a thread-pool worker.
+
+    Per-node config from definition:
+      node.model        → each agent uses its own LLM instance
+      node.hitl         → agent.approval_required = True
+      node.channel_type → "platform" | "slack" | "telegram"
+    """
     from app.services.pipeline_builder import build_team_from_definition
     from antcrew.core.events import bus as _bus, new_run_id
-    from antcrew.teams.base import InteractiveMixin
 
-    llm = build_llm(model or "claude", api_key=byok_api_key, base_url=byok_base_url)
-    if max_cost_usd is not None:
-        llm.max_cost_usd = max_cost_usd
+    # Build agents — each node gets its own LLM from node.model
+    agents, supervisor = build_team_from_definition(
+        definition,
+        default_model=model or "claude",
+        byok_api_key=byok_api_key,
+        byok_base_url=byok_base_url,
+    )
 
-    agents, supervisor = build_team_from_definition(definition, llm)
+    # Apply per-node HITL + channel; honour force_hitl for all agents
+    nodes_by_id = {n["id"]: n for n in definition.get("nodes", [])}
+    any_hitl = force_hitl
 
-    # Inject HITL channel if requested
-    if force_hitl:
-        for agent in agents.values():
-            if not getattr(agent, "channel", None):
-                agent.channel = platform_channel
+    for node_id, agent in agents.items():
+        node = nodes_by_id.get(node_id, {})
+        is_hitl = node.get("hitl", False) or force_hitl
+        if is_hitl:
+            ch_type = node.get("channel_type") or "platform"
+            agent.channel = _resolve_node_channel(
+                ch_type, platform_channel, slack_creds, telegram_creds
+            )
             agent.approval_required = True
+            any_hitl = True
+
+    # Apply per-node max_cost_usd cap to each agent's LLM
+    if max_cost_usd is not None:
+        seen_llms: set[int] = set()
+        for agent in agents.values():
+            llm = getattr(agent, "llm", None)
+            if llm is not None and id(llm) not in seen_llms:
+                llm.max_cost_usd = max_cost_usd
+                seen_llms.add(id(llm))
 
     _run_id = new_run_id()
     _bus.emit("pipeline.start", {"team": "visual_pipeline", "request": request},
@@ -715,22 +769,77 @@ def _run_pipeline_sync(
         "_thread_id": thread_id,
     }
 
-    app = supervisor.build(agents)
-    state = app.invoke(initial_state, config={"configurable": {"thread_id": thread_id}})
+    app_graph = supervisor.build(agents)
+    if any_hitl:
+        state = _run_interactive_pipeline(app_graph, initial_state, agents, thread_id)
+    else:
+        state = app_graph.invoke(initial_state, config={"configurable": {"thread_id": thread_id}})
 
-    cost = getattr(llm, "_total_cost_usd", None) or 0.0
-    try:
-        summary = llm.get_usage_summary()
-        cost = (summary or {}).get("total_cost_usd", 0.0) or 0.0
-    except Exception:
-        pass
+    # Aggregate cost across all unique LLMs
+    seen: set[int] = set()
+    cost = 0.0
+    for agent in agents.values():
+        llm = getattr(agent, "llm", None)
+        if llm is not None and id(llm) not in seen:
+            seen.add(id(llm))
+            try:
+                s = llm.get_usage_summary()
+                cost += (s or {}).get("total_cost_usd", 0.0) or 0.0
+            except Exception:
+                pass
 
-    _bus.emit("pipeline.end",
-              {"cost_usd": cost, "success": True},
+    _bus.emit("pipeline.end", {"cost_usd": cost, "success": True},
               run_id=_run_id, thread_id=thread_id)
 
     from antcrew.core.run_result import RunResult
     return RunResult(state=state, thread_id=thread_id, cost_usd=cost)
+
+
+def _run_interactive_pipeline(app_graph, initial_state: dict, agents: dict, thread_id: str) -> dict:
+    """Run a visual pipeline with HITL pauses using run_interactive() semantics."""
+    from antcrew.teams.base import AGENT_ARTIFACT
+
+    config = {"configurable": {"thread_id": thread_id}}
+    app_graph.invoke(initial_state, config=config)
+
+    while True:
+        snapshot = app_graph.get_state(config)
+        if not snapshot.next:
+            break
+        prev_agent = snapshot.values.get("current_agent", "")
+        agent = agents.get(prev_agent)
+        channel = getattr(agent, "channel", None) if agent else None
+
+        state_key, _ = AGENT_ARTIFACT.get(prev_agent, ("", None))
+        artifact = snapshot.values.get(state_key) if state_key else None
+        options = getattr(agent, "response_options", None) or ["approve", "reject"]
+
+        if channel:
+            import asyncio, concurrent.futures
+            try:
+                asyncio.get_running_loop()
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    result = pool.submit(asyncio.run,
+                        channel.send_for_review(artifact, prev_agent, thread_id, options)
+                    ).result()
+            except RuntimeError:
+                result = asyncio.run(
+                    channel.send_for_review(artifact, prev_agent, thread_id, options)
+                )
+        else:
+            result = {"decision": "approve", "edited": None, "feedback": None}
+
+        decision = result.get("decision", "approve")
+        if decision == "reject":
+            break
+        if decision == "edit" and result.get("edited"):
+            from antcrew.teams.base import InteractiveMixin
+            _mixin = InteractiveMixin()
+            _mixin._apply_edit(app_graph, config, prev_agent, result["edited"])
+
+        app_graph.invoke(None, config=config)
+
+    return app_graph.get_state(config).values
 
 
 async def dispatch_pipeline(
@@ -744,7 +853,11 @@ async def dispatch_pipeline(
     force_hitl: bool = False,
     model: str = "claude",
 ) -> Optional[str]:
-    """Dispatch a visual pipeline (from pipeline_def JSON) in the background."""
+    """Dispatch a visual pipeline (from pipeline_def JSON) in the background.
+
+    Fetches workspace Slack/Telegram credentials so per-node channel_type can be
+    wired up in _run_pipeline_sync without a second async DB call.
+    """
     if workspace_id is not None:
         async with _get_budget_lock(workspace_id):
             await _check_workspace_budget(workspace_id)
@@ -752,6 +865,12 @@ async def dispatch_pipeline(
     _hitl_timeout: Optional[float] = None
     _byok_api_key: Optional[str] = None
     _byok_base_url: Optional[str] = None
+    _slack_creds: Optional[dict] = None
+    _telegram_creds: Optional[dict] = None
+
+    # Determine which channel types any node requests
+    node_channel_types = {n.get("channel_type") for n in definition.get("nodes", [])}
+
     if workspace_id is not None:
         from sqlmodel import select as _sel
         from app.models.run import Workspace as _WS
@@ -766,6 +885,29 @@ async def dispatch_pipeline(
                     if _byok:
                         _byok_api_key = _byok.key
                         _byok_base_url = _byok.base_url
+                # Slack creds — only fetch if a node requests slack channel
+                if "slack" in node_channel_types and getattr(_ws, "slack_bot_token_enc", None):
+                    try:
+                        from app.core.slack_hitl import _decrypt as _slack_dec
+                        _slack_creds = {
+                            "bot_token": _slack_dec(_ws.slack_bot_token_enc),
+                            "channel_id": getattr(_ws, "slack_channel_id", None) or "",
+                            "app_token": (
+                                _slack_dec(_ws.slack_app_token_enc)
+                                if getattr(_ws, "slack_app_token_enc", None) else None
+                            ),
+                        }
+                    except Exception as exc:
+                        log.warning("dispatch_pipeline: failed to decrypt Slack creds: %s", exc)
+
+    # Telegram creds from env (no per-workspace storage yet)
+    if "telegram" in node_channel_types:
+        tok = os.environ.get("TELEGRAM_BOT_TOKEN")
+        if tok:
+            _telegram_creds = {
+                "token": tok,
+                "chat_id": os.environ.get("TELEGRAM_CHAT_ID"),
+            }
 
     loop = asyncio.get_running_loop()
     run_id_future: asyncio.Future[str] = loop.create_future()
@@ -783,7 +925,7 @@ async def dispatch_pipeline(
             fn = functools.partial(
                 _run_pipeline_sync, definition, request, thread_id,
                 max_cost_usd, platform_channel, force_hitl, model,
-                _byok_api_key, _byok_base_url,
+                _byok_api_key, _byok_base_url, _slack_creds, _telegram_creds,
             )
             result = await loop.run_in_executor(_executor, fn)
             await _store_result(result)
