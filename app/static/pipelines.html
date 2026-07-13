@@ -666,7 +666,7 @@ function app() {
         const data = await r.json();
         this.showRunModal = false;
         if (data.run_id) {
-          window.location.href = `/runs/${data.run_id}`;
+          window.location.href = `/run/${data.run_id}`;
         }
       } catch(e) {
         this.runError = e.message;
