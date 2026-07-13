@@ -376,6 +376,12 @@ async def _check_workspace_budget(workspace_id: int) -> None:
         if ws.max_cost_usd is None:
             return
         if ws.total_cost_usd >= ws.max_cost_usd:
+            if getattr(ws, "is_trial", False):
+                raise ValueError(
+                    f"Trial credit exhausted: ${ws.total_cost_usd:.4f} spent of "
+                    f"${ws.max_cost_usd:.2f} trial credit. "
+                    "Upgrade to a paid plan from your workspace settings to continue."
+                )
             raise ValueError(
                 f"Workspace budget exhausted: ${ws.total_cost_usd:.4f} spent of "
                 f"${ws.max_cost_usd:.2f} limit. Update the workspace budget to continue."

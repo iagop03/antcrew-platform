@@ -101,11 +101,25 @@
         <tbody>
           <template x-for="ws in workspaces" :key="ws.id">
             <tr class="border-b border-gray-800/40 last:border-0 hover:bg-gray-900/40 transition-colors">
-              <td class="px-4 py-3 font-medium" x-text="ws.name"></td>
+              <td class="px-4 py-3 font-medium">
+                <div class="flex items-center gap-2">
+                  <span x-text="ws.name"></span>
+                  <span x-show="ws.is_trial"
+                    class="inline-block px-1.5 py-0.5 rounded text-xs font-mono bg-amber-900/50 text-amber-400">trial</span>
+                </div>
+              </td>
               <td class="px-4 py-3 font-mono text-gray-500 text-xs" x-text="ws.slug"></td>
               <td class="px-4 py-3 text-right text-gray-300">
-                <span x-show="ws.max_cost_usd != null" x-text="`$${ws.max_cost_usd?.toFixed(2)}`"></span>
-                <span x-show="ws.max_cost_usd == null" class="text-gray-700">—</span>
+                <template x-if="ws.is_trial && ws.max_cost_usd != null">
+                  <span class="text-amber-400 text-xs"
+                    x-text="`$${(ws.max_cost_usd - ws.total_cost_usd).toFixed(2)} / $${ws.max_cost_usd.toFixed(2)}`"></span>
+                </template>
+                <template x-if="!ws.is_trial">
+                  <span>
+                    <span x-show="ws.max_cost_usd != null" x-text="`$${ws.max_cost_usd?.toFixed(2)}`"></span>
+                    <span x-show="ws.max_cost_usd == null" class="text-gray-700">—</span>
+                  </span>
+                </template>
               </td>
               <td class="px-4 py-3 text-center text-xs">
                 <span x-show="ws.hitl_default" class="text-indigo-400">Sí</span>

@@ -18,6 +18,10 @@ log = logging.getLogger(__name__)
 
 MANAGED_COST_MULTIPLIER: float = 3.0
 BYOK_SERVICE_MULTIPLIER: float = 0.4
+TRIAL_MULTIPLIER: float = 1.0  # trial runs at raw cost (no margin); change via env if needed
+
+# Credit granted to new workspaces in trial mode. Configurable at runtime — no redeploy needed.
+TRIAL_CREDIT_USD: float = float(os.environ.get("TRIAL_CREDIT_USD", "5.0"))
 
 _VALID_PROVIDERS = frozenset({"anthropic", "openai", "groq", "gemini", "ollama"})
 
@@ -96,6 +100,8 @@ async def get_workspace_llm_key_for_model(
     return await get_workspace_llm_key(session, workspace_id, provider)
 
 
-def get_cost_multiplier(llm_key_mode: str) -> float:
-    """Return the billing multiplier for a workspace's LLM key mode."""
+def get_cost_multiplier(llm_key_mode: str, is_trial: bool = False) -> float:
+    """Return the billing multiplier for a workspace."""
+    if is_trial:
+        return TRIAL_MULTIPLIER
     return BYOK_SERVICE_MULTIPLIER if llm_key_mode == "byok" else MANAGED_COST_MULTIPLIER

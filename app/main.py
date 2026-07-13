@@ -574,7 +574,13 @@ async def onboard_bootstrap(
             "Use admin credentials via /workspaces/ and /api-keys/.",
         )
 
-    ws = Workspace(name=body.ws_name.strip(), slug=body.ws_slug.strip())
+    from app.core.byok import TRIAL_CREDIT_USD
+    ws = Workspace(
+        name=body.ws_name.strip(),
+        slug=body.ws_slug.strip(),
+        is_trial=True,
+        max_cost_usd=TRIAL_CREDIT_USD,
+    )
     session.add(ws)
     await session.commit()
     await session.refresh(ws)

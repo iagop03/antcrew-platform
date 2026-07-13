@@ -85,10 +85,13 @@ async def _persist_event(event: "Event") -> None:
                             select(Workspace).where(Workspace.id == run.workspace_id)
                         )).first()
 
-                    # Apply billing multiplier: managed ×3.0, byok ×0.4
+                    # Apply billing multiplier: trial ×1.0, byok ×0.4, managed ×3.0
                     if ws_row and raw_cost_usd > 0:
                         from app.core.byok import get_cost_multiplier
-                        multiplier = get_cost_multiplier(getattr(ws_row, "llm_key_mode", "managed"))
+                        multiplier = get_cost_multiplier(
+                            getattr(ws_row, "llm_key_mode", "managed"),
+                            is_trial=getattr(ws_row, "is_trial", False),
+                        )
                         run.cost_usd = round(raw_cost_usd * multiplier, 6)
                     else:
                         run.cost_usd = raw_cost_usd

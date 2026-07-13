@@ -196,6 +196,21 @@ async def _migrate_stripe_fields(eng) -> None:
         pass  # PostgreSQL or table absent — skip
 
 
+async def _migrate_workspace_is_trial(eng) -> None:
+    """Idempotent migration: add is_trial column to workspace if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(workspace)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "is_trial" not in col_names:
+                # Default 0 (False) for existing workspaces — only new ones start in trial.
+                await conn.execute(text(
+                    "ALTER TABLE workspace ADD COLUMN is_trial BOOLEAN NOT NULL DEFAULT 0"
+                ))
+    except Exception:
+        pass  # PostgreSQL or table absent — skip
+
+
 async def _migrate_llm_base_url(eng) -> None:
     """Idempotent migration: add base_url column to llm_provider_key if absent."""
     try:
@@ -220,6 +235,7 @@ async def init_db() -> None:
     await _migrate_eval_run_id(engine)
     await _migrate_workspace_membership(engine)
     await _migrate_stripe_fields(engine)
+    await _migrate_workspace_is_trial(engine)
     await _migrate_llm_base_url(engine)
 
 

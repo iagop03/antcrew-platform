@@ -130,83 +130,9 @@
     </button>
   </div>
 
-  <!-- ── STEP 3 ── LLM mode ─────────────────────────────────────────── -->
+
+  <!-- ── STEP 3 ── Listo ──────────────────────────────────────────────── -->
   <div x-show="step === 3" x-cloak>
-    <h2 class="text-lg font-semibold mb-1">Modo de claves LLM</h2>
-    <p class="text-gray-400 text-sm mb-6">
-      Elige cómo antcrew accede a los modelos de lenguaje. Puedes cambiar esto en cualquier momento.
-    </p>
-
-    <!-- Mode selector cards -->
-    <div class="grid grid-cols-2 gap-3 mb-5">
-      <button @click="llmMode = 'managed'"
-        :class="llmMode === 'managed'
-          ? 'border-indigo-500 bg-indigo-950/50 ring-1 ring-indigo-500'
-          : 'border-gray-700 bg-gray-900 hover:border-gray-600'"
-        class="text-left p-4 rounded-xl border transition">
-        <div class="text-xs font-mono text-gray-500 uppercase tracking-wide mb-2">Managed</div>
-        <div class="text-sm font-semibold mb-1">Clave gestionada</div>
-        <div class="text-xs text-gray-400 leading-relaxed">antcrew provee la clave. Sin configuración extra. Coste ×3.</div>
-      </button>
-      <button @click="llmMode = 'byok'"
-        :class="llmMode === 'byok'
-          ? 'border-indigo-500 bg-indigo-950/50 ring-1 ring-indigo-500'
-          : 'border-gray-700 bg-gray-900 hover:border-gray-600'"
-        class="text-left p-4 rounded-xl border transition">
-        <div class="text-xs font-mono text-indigo-400 uppercase tracking-wide mb-2">BYOK</div>
-        <div class="text-sm font-semibold mb-1">Clave propia</div>
-        <div class="text-xs text-gray-400 leading-relaxed">Conectas tu proveedor LLM (Anthropic, OpenAI, Groq…). Solo tarifa de servicio ×0.4.</div>
-      </button>
-    </div>
-
-    <!-- BYOK key inputs -->
-    <div x-show="llmMode === 'byok'" x-cloak class="space-y-4 mb-5">
-      <div class="bg-indigo-950/30 border border-indigo-900/60 rounded-lg px-4 py-3 text-xs text-indigo-300 leading-relaxed">
-        Añade al menos una clave. Puedes gestionar proveedores adicionales en Settings.
-      </div>
-      <div>
-        <label class="flex items-center justify-between mb-1.5">
-          <span class="text-xs text-gray-400">Clave Anthropic <span class="text-gray-600">(opcional)</span></span>
-          <span class="text-xs text-gray-600">sk-ant-api03-…</span>
-        </label>
-        <input x-model="byokAnthropicKey" type="password" placeholder="sk-ant-api03-…"
-          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
-      </div>
-      <div>
-        <label class="flex items-center justify-between mb-1.5">
-          <span class="text-xs text-gray-400">Clave OpenAI <span class="text-gray-600">(opcional)</span></span>
-          <span class="text-xs text-gray-600">sk-…</span>
-        </label>
-        <input x-model="byokOpenAIKey" type="password" placeholder="sk-…"
-          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
-      </div>
-      <div>
-        <label class="flex items-center justify-between mb-1.5">
-          <span class="text-xs text-gray-400">Clave Groq <span class="text-gray-600">(opcional)</span></span>
-          <span class="text-xs text-gray-600">gsk_…</span>
-        </label>
-        <input x-model="byokGroqKey" type="password" placeholder="gsk_…"
-          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
-      </div>
-    </div>
-
-    <p x-show="llmModeError" x-cloak class="text-red-400 text-xs mb-3" x-text="llmModeError"></p>
-
-    <button @click="saveLlmMode()"
-      :disabled="llmModeLoading || (llmMode === 'byok' && !byokAnthropicKey.trim() && !byokOpenAIKey.trim() && !byokGroqKey.trim())"
-      class="w-full py-2.5 rounded-lg font-medium text-sm transition bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-      <span x-show="!llmModeLoading" x-text="llmMode === 'byok' ? 'Guardar claves y continuar →' : 'Continuar →'"></span>
-      <span x-show="llmModeLoading">Guardando…</span>
-    </button>
-
-    <button @click="step = 4"
-      class="mt-2 w-full py-2 text-xs text-gray-600 hover:text-gray-400 transition">
-      Omitir — configurar más tarde
-    </button>
-  </div>
-
-  <!-- ── STEP 4 ── Done ──────────────────────────────────────────────── -->
-  <div x-show="step === 4" x-cloak>
     <div class="text-center mb-6">
       <div class="text-5xl mb-3">✓</div>
       <h2 class="text-lg font-semibold mb-1">¡Todo listo!</h2>
@@ -232,8 +158,8 @@
         <span class="text-sm" x-text="reviewers.length + ' añadidos'"></span>
       </div>
       <div class="flex justify-between items-center pt-1">
-        <span class="text-xs text-gray-500">Modo LLM</span>
-        <span class="text-sm font-mono" x-text="llmMode === 'byok' ? 'BYOK (clave propia)' : 'Managed (×3)'"></span>
+        <span class="text-xs text-gray-500">Plan</span>
+        <span class="text-sm font-mono text-emerald-400">Prueba gratuita activa</span>
       </div>
     </div>
 
@@ -267,7 +193,7 @@
 function onboard() {
   return {
     step: 1,
-    steps: ['Workspace', 'Revisores', 'Modo LLM', 'Listo'],
+    steps: ['Workspace', 'Revisores', 'Listo'],
 
     // Step 1
     wsName: '',
@@ -283,14 +209,6 @@ function onboard() {
     reviewerLoading: false,
     reviewerError: '',
     reviewers: [],
-
-    // Step 3 — LLM mode
-    llmMode: 'managed',
-    byokAnthropicKey: '',
-    byokOpenAIKey: '',
-    byokGroqKey: '',
-    llmModeLoading: false,
-    llmModeError: '',
 
     // UI
     copied: '',
@@ -370,44 +288,6 @@ function onboard() {
         this.reviewerError = e.message;
       } finally {
         this.reviewerLoading = false;
-      }
-    },
-
-    async saveLlmMode() {
-      this.llmModeError = '';
-      if (this.llmMode === 'managed') { this.step = 4; return; }
-      this.llmModeLoading = true;
-      try {
-        const headers = { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey };
-        const keysToStore = [];
-        if (this.byokAnthropicKey.trim()) keysToStore.push({ provider: 'anthropic', api_key: this.byokAnthropicKey.trim() });
-        if (this.byokOpenAIKey.trim()) keysToStore.push({ provider: 'openai', api_key: this.byokOpenAIKey.trim() });
-        if (this.byokGroqKey.trim()) keysToStore.push({ provider: 'groq', api_key: this.byokGroqKey.trim() });
-        for (const payload of keysToStore) {
-          const r = await fetch(`/workspaces/${this.workspaceId}/llm-keys`, {
-            method: 'POST', headers,
-            body: JSON.stringify(payload),
-          });
-          if (!r.ok) {
-            const d = await r.json().catch(() => ({}));
-            this.llmModeError = d.detail || `Error ${r.status} al guardar la clave ${payload.provider}`;
-            return;
-          }
-        }
-        const r2 = await fetch(`/workspaces/${this.workspaceId}/llm-mode`, {
-          method: 'PATCH', headers,
-          body: JSON.stringify({ mode: 'byok' }),
-        });
-        if (!r2.ok) {
-          const d = await r2.json().catch(() => ({}));
-          this.llmModeError = d.detail || `Error ${r2.status} al cambiar modo`;
-          return;
-        }
-        this.step = 4;
-      } catch (e) {
-        this.llmModeError = e.message;
-      } finally {
-        this.llmModeLoading = false;
       }
     },
 

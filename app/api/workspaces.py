@@ -148,6 +148,7 @@ class WorkspacePublic(BaseModel):
     subscription_status: Optional[str] = None
     billing_provider: str = "mor"
     llm_key_mode: str = "managed"
+    is_trial: bool = True
     byok_providers: list[str] = []
     created_at: datetime
 
@@ -176,6 +177,7 @@ class WorkspacePublic(BaseModel):
                 "subscription_status": getattr(data, "subscription_status", None),
                 "billing_provider": getattr(data, "billing_provider", "mor"),
                 "llm_key_mode": getattr(data, "llm_key_mode", "managed"),
+                "is_trial": getattr(data, "is_trial", True),
                 "byok_providers": getattr(data, "_byok_providers", []),
                 "created_at": data.created_at,
             }
@@ -207,12 +209,14 @@ async def create_workspace(body: CreateWorkspace, session: AsyncSession = Depend
     result = await session.exec(select(Workspace).where(Workspace.slug == body.slug))
     if result.first():
         raise HTTPException(409, f"Workspace with slug {body.slug!r} already exists")
+    from app.core.byok import TRIAL_CREDIT_USD
     ws = Workspace(
         name=body.name,
         slug=body.slug,
-        max_cost_usd=body.max_cost_usd,
+        max_cost_usd=body.max_cost_usd if body.max_cost_usd is not None else TRIAL_CREDIT_USD,
         default_repo_url=body.default_repo_url,
         hitl_default=body.hitl_default,
+        is_trial=True,
     )
     session.add(ws)
     await session.commit()
@@ -580,6 +584,46 @@ async def delete_workspace(workspace_id: int, session: AsyncSession = Depends(ge
         raise HTTPException(404, f"Workspace {workspace_id} not found")
     await session.delete(ws)
     await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Trial management
+# ---------------------------------------------------------------------------
+
+class TrialUpdateRequest(BaseModel):
+    is_trial: bool
+    additional_credit_usd: Optional[float] = None  # adds to max_cost_usd when > 0
+
+
+@router.patch("/{workspace_id}/trial", response_model=WorkspacePublic,
+              dependencies=[Depends(require_role("admin"))])
+async def update_trial(
+    workspace_id: int,
+    body: TrialUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(require_role("admin")),
+) -> WorkspacePublic:
+    """Set or clear trial status. Optionally top up the credit (max_cost_usd) for the workspace.
+
+    Use to:
+    - Exit trial: is_trial=false (workspace moves to regular managed/byok billing)
+    - Re-grant credit: is_trial=true + additional_credit_usd=5 (adds credit to allow more runs)
+    """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
+    ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+    if not ws:
+        raise HTTPException(404, f"Workspace {workspace_id} not found")
+
+    ws.is_trial = body.is_trial
+    if body.additional_credit_usd is not None and body.additional_credit_usd > 0:
+        current = ws.max_cost_usd or 0.0
+        ws.max_cost_usd = round(current + body.additional_credit_usd, 4)
+
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+    return WorkspacePublic.model_validate(ws)
 
 
 # ---------------------------------------------------------------------------
