@@ -21,7 +21,7 @@ from sqlmodel import select
 from app.core.database import init_db, get_session
 from app.core.listener import start_listening, stop_listening
 from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, evals
-from app.api import eval_schedules, engine, billing, webhook_mor
+from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as pipelines_api
 
 _STATIC = Path(__file__).parent / "static"
 _VERSION = "0.4.0"
@@ -521,6 +521,7 @@ app.include_router(eval_schedules.router)
 app.include_router(engine.router)
 app.include_router(billing.router)
 app.include_router(webhook_mor.router)
+app.include_router(pipelines_api.router)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
@@ -648,3 +649,8 @@ async def onboard_page():
 @app.get("/settings")
 async def settings_page():
     return FileResponse(_STATIC / "settings.html")
+
+
+@app.get("/pipelines")
+async def pipelines_page():
+    return FileResponse(_STATIC / "pipelines.html")

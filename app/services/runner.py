@@ -674,6 +674,140 @@ async def dispatch_custom(
         return None
 
 
+def _run_pipeline_sync(
+    definition: dict,
+    request: str,
+    thread_id: str,
+    max_cost_usd: Optional[float],
+    platform_channel: PlatformChannel,
+    force_hitl: bool,
+    model: str = "claude",
+    byok_api_key: Optional[str] = None,
+    byok_base_url: Optional[str] = None,
+):
+    """Run a visual pipeline definition synchronously in a thread-pool worker."""
+    from antcrew.config import build_llm
+    from app.services.pipeline_builder import build_team_from_definition
+    from antcrew.core.events import bus as _bus, new_run_id
+    from antcrew.teams.base import InteractiveMixin
+
+    llm = build_llm(model or "claude", api_key=byok_api_key, base_url=byok_base_url)
+    if max_cost_usd is not None:
+        llm.max_cost_usd = max_cost_usd
+
+    agents, supervisor = build_team_from_definition(definition, llm)
+
+    # Inject HITL channel if requested
+    if force_hitl:
+        for agent in agents.values():
+            if not getattr(agent, "channel", None):
+                agent.channel = platform_channel
+            agent.approval_required = True
+
+    _run_id = new_run_id()
+    _bus.emit("pipeline.start", {"team": "visual_pipeline", "request": request},
+              run_id=_run_id, thread_id=thread_id)
+
+    initial_state: dict = {
+        "request": request,
+        "messages": [{"role": "user", "content": request}],
+        "_run_id": _run_id,
+        "_thread_id": thread_id,
+    }
+
+    app = supervisor.build(agents)
+    state = app.invoke(initial_state, config={"configurable": {"thread_id": thread_id}})
+
+    cost = getattr(llm, "_total_cost_usd", None) or 0.0
+    try:
+        summary = llm.get_usage_summary()
+        cost = (summary or {}).get("total_cost_usd", 0.0) or 0.0
+    except Exception:
+        pass
+
+    _bus.emit("pipeline.end",
+              {"cost_usd": cost, "success": True},
+              run_id=_run_id, thread_id=thread_id)
+
+    from antcrew.core.run_result import RunResult
+    return RunResult(state=state, thread_id=thread_id, cost_usd=cost)
+
+
+async def dispatch_pipeline(
+    definition: dict,
+    request: str,
+    thread_id: str = "default",
+    *,
+    max_cost_usd: Optional[float] = None,
+    created_by: Optional[str] = None,
+    workspace_id: Optional[int] = None,
+    force_hitl: bool = False,
+    model: str = "claude",
+) -> Optional[str]:
+    """Dispatch a visual pipeline (from pipeline_def JSON) in the background."""
+    if workspace_id is not None:
+        async with _get_budget_lock(workspace_id):
+            await _check_workspace_budget(workspace_id)
+
+    _hitl_timeout: Optional[float] = None
+    _byok_api_key: Optional[str] = None
+    _byok_base_url: Optional[str] = None
+    if workspace_id is not None:
+        from sqlmodel import select as _sel
+        from app.models.run import Workspace as _WS
+        async with AsyncSession(engine, expire_on_commit=False) as _sess:
+            _ws = (await _sess.exec(_sel(_WS).where(_WS.id == workspace_id))).first()
+            if _ws:
+                if _ws.hitl_timeout_s is not None:
+                    _hitl_timeout = _ws.hitl_timeout_s
+                if getattr(_ws, "llm_key_mode", "managed") == "byok":
+                    from app.core.byok import get_workspace_llm_key_for_model
+                    _byok = await get_workspace_llm_key_for_model(_sess, workspace_id, model)
+                    if _byok:
+                        _byok_api_key = _byok.key
+                        _byok_base_url = _byok.base_url
+
+    loop = asyncio.get_running_loop()
+    run_id_future: asyncio.Future[str] = loop.create_future()
+    platform_channel = PlatformChannel(timeout_s=_hitl_timeout)
+
+    def _on_pipeline_start(event) -> None:
+        if event.run_id and not run_id_future.done():
+            platform_channel.set_run_id(event.run_id)
+            loop.call_soon_threadsafe(run_id_future.set_result, event.run_id)
+
+    bus.subscribe("pipeline.start", _on_pipeline_start)
+
+    async def _bg() -> None:
+        try:
+            fn = functools.partial(
+                _run_pipeline_sync, definition, request, thread_id,
+                max_cost_usd, platform_channel, force_hitl, model,
+                _byok_api_key, _byok_base_url,
+            )
+            result = await loop.run_in_executor(_executor, fn)
+            await _store_result(result)
+            if workspace_id is not None:
+                await _mark_workspace_budget_status(workspace_id)
+        except Exception as exc:
+            log.error("runner: visual pipeline failed: %s", exc)
+            if not run_id_future.done():
+                loop.call_soon_threadsafe(run_id_future.set_result, None)
+        finally:
+            bus.unsubscribe("pipeline.start", _on_pipeline_start)
+
+    asyncio.ensure_future(_bg())
+
+    try:
+        run_id = await asyncio.wait_for(asyncio.shield(run_id_future), timeout=_DISPATCH_TIMEOUT)
+        if (created_by or workspace_id is not None) and run_id:
+            await _set_run_attribution(run_id, created_by, workspace_id)
+        return run_id
+    except asyncio.TimeoutError:
+        log.warning("runner: visual pipeline.start not received within %.0f s", _DISPATCH_TIMEOUT)
+        return None
+
+
 def shutdown() -> None:
     """Shutdown the thread pool. Call during app teardown."""
     _executor.shutdown(wait=False, cancel_futures=True)

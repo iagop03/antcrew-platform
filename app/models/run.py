@@ -38,6 +38,20 @@ class Workspace(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
 
 
+class PipelineDef(SQLModel, table=True):
+    """User-defined visual pipeline stored as a JSON graph."""
+
+    __tablename__ = "pipeline_def"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: Optional[int] = Field(default=None, foreign_key="workspace.id", index=True)
+    name: str
+    description: Optional[str] = Field(default=None)
+    is_template: bool = Field(default=False)
+    definition: str  # JSON: {nodes: [...], edges: [...]}
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class Run(SQLModel, table=True):
     """One pipeline execution."""
 

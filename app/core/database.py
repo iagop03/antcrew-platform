@@ -223,6 +223,33 @@ async def _migrate_llm_base_url(eng) -> None:
         pass  # PostgreSQL or table absent — skip
 
 
+async def _migrate_pipeline_def(eng) -> None:
+    """Idempotent migration: create pipeline_def table if absent."""
+    try:
+        async with eng.begin() as conn:
+            tables = (await conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table' AND name='pipeline_def'")
+            )).fetchall()
+            if not tables:
+                await conn.execute(text(
+                    "CREATE TABLE pipeline_def ("
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "workspace_id INTEGER REFERENCES workspace(id), "
+                    "name TEXT NOT NULL, "
+                    "description TEXT, "
+                    "is_template BOOLEAN NOT NULL DEFAULT 0, "
+                    "definition TEXT NOT NULL, "
+                    "created_at DATETIME"
+                    ")"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_pipeline_def_workspace_id "
+                    "ON pipeline_def(workspace_id)"
+                ))
+    except Exception:
+        pass  # PostgreSQL handled by Alembic or create_all
+
+
 async def init_db() -> None:
     if "postgresql" in DB_URL:
         await _run_alembic_upgrade()
@@ -237,6 +264,7 @@ async def init_db() -> None:
     await _migrate_stripe_fields(engine)
     await _migrate_workspace_is_trial(engine)
     await _migrate_llm_base_url(engine)
+    await _migrate_pipeline_def(engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

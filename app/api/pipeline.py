@@ -163,6 +163,82 @@ class CustomPipelineRequest(BaseModel):
         return v.strip()
 
 
+class VisualPipelineRequest(BaseModel):
+    pipeline_id: str  # int ID for user pipelines; "template:xxx" for built-in templates
+    request: str
+    thread_id: str = "default"
+    max_cost_usd: Optional[float] = None
+    hitl: bool = False
+    model: str = "claude"
+
+    @field_validator("request")
+    @classmethod
+    def request_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("request must not be empty")
+        return v.strip()
+
+
+@router.post("/visual", status_code=202, response_model=RunAccepted,
+             dependencies=[Depends(require_role("admin", "write"))])
+async def trigger_visual_pipeline(
+    body: VisualPipelineRequest,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    """Run a visually-defined pipeline by its pipeline_id.
+
+    pipeline_id can be an integer (user pipeline) or "template:fullstack",
+    "template:dev", "template:content", or "template:research" for built-in templates.
+    """
+    from app.api.pipelines import _TEMPLATES, get_pipeline
+    from app.services.runner import dispatch_pipeline
+
+    # Resolve definition
+    if isinstance(body.pipeline_id, str) and body.pipeline_id.startswith("template:"):
+        template = next((t for t in _TEMPLATES if t["id"] == body.pipeline_id), None)
+        if not template:
+            raise HTTPException(404, f"Template {body.pipeline_id!r} not found")
+        definition = template["definition"]
+    else:
+        try:
+            pid = int(body.pipeline_id)
+        except (ValueError, TypeError):
+            raise HTTPException(400, "Invalid pipeline_id")
+        from app.models.run import PipelineDef
+        import json
+        row = await session.get(PipelineDef, pid)
+        if not row:
+            raise HTTPException(404, "Pipeline not found")
+        definition = json.loads(row.definition)
+
+    effective_hitl = body.hitl
+    if ctx.workspace_id is not None:
+        from app.models.run import Workspace as _WS
+        ws = (await session.exec(select(_WS).where(_WS.id == ctx.workspace_id))).first()
+        if ws and not effective_hitl and ws.hitl_default:
+            effective_hitl = True
+
+    try:
+        run_id = await dispatch_pipeline(
+            definition=definition,
+            request=body.request,
+            thread_id=body.thread_id,
+            max_cost_usd=body.max_cost_usd,
+            created_by=ctx.created_by,
+            workspace_id=ctx.workspace_id,
+            force_hitl=effective_hitl,
+            model=body.model,
+        )
+    except (ValueError, ImportError) as exc:
+        raise HTTPException(422, str(exc))
+
+    return RunAccepted(
+        run_id=run_id, team=f"visual:{body.pipeline_id}",
+        hitl=effective_hitl, repo_context=False,
+    )
+
+
 @router.post("/pipeline", status_code=202, response_model=RunAccepted,
              dependencies=[Depends(require_role("admin", "write"))])
 async def trigger_custom_pipeline(

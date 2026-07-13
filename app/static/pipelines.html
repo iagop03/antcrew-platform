@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipelines — antcrew</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>
+[x-cloak]{display:none}
+body{overflow:hidden}
+#canvas-svg{width:100%;height:100%;cursor:default;user-select:none}
+.node-group{cursor:grab}
+.node-group:active{cursor:grabbing}
+.node-body{transition:filter .15s}
+.node-group.selected .node-body{filter:drop-shadow(0 0 6px rgba(99,102,241,.8))}
+.handle-out{cursor:crosshair;opacity:.7;transition:opacity .1s,r .1s}
+.handle-out:hover{opacity:1}
+.handle-in{pointer-events:none}
+.edge-path{cursor:pointer}
+.edge-path:hover{stroke-opacity:.7}
+.edge-label-bg{cursor:pointer}
+.edge-delete{cursor:pointer;opacity:0}
+.edge-group:hover .edge-delete{opacity:1}
+.palette-chip{cursor:grab;border:1px solid rgba(255,255,255,.08);transition:background .12s,border-color .12s}
+.palette-chip:hover{border-color:rgba(255,255,255,.25)}
+.palette-chip:active{cursor:grabbing}
+</style>
+</head>
+<body class="bg-gray-950 text-gray-100 flex flex-col h-screen" x-data="app()" x-init="init()">
+
+<!-- ── Topbar ── -->
+<header class="flex items-center gap-3 px-4 py-2.5 bg-gray-900 border-b border-gray-800 shrink-0">
+  <a href="/dashboard" class="text-gray-600 hover:text-gray-300 text-sm transition-colors">← Dashboard</a>
+  <span class="text-gray-700">|</span>
+  <span class="font-mono font-bold text-indigo-400 text-sm">antcrew</span>
+  <span class="text-gray-700 text-xs">/ Pipelines</span>
+
+  <div class="flex-1 flex items-center gap-2 max-w-xs">
+    <input x-show="activeId && !isTemplate" x-cloak
+      x-model="activeName"
+      class="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-indigo-500"
+      placeholder="Nombre del pipeline">
+  </div>
+  <span x-show="activeId && isTemplate" class="text-sm text-gray-400 italic" x-text="activeName"></span>
+  <span x-show="activeId && isTemplate" class="text-xs bg-gray-800 text-gray-500 px-2 py-0.5 rounded font-mono">template</span>
+
+  <div class="ml-auto flex items-center gap-2">
+    <span x-show="saveStatus" x-cloak class="text-xs"
+      :class="saveStatus==='saved'?'text-emerald-400':saveStatus==='error'?'text-red-400':'text-gray-500'"
+      x-text="saveStatus==='saved'?'✓ Guardado':saveStatus==='saving'?'Guardando…':'Error al guardar'"></span>
+
+    <button x-show="activeId && !isTemplate" @click="savePipeline()"
+      :disabled="saving"
+      class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded transition-colors disabled:opacity-50">
+      Guardar
+    </button>
+
+    <button x-show="activeId && isTemplate" @click="forkTemplate()"
+      class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors">
+      Clonar como nuevo →
+    </button>
+
+    <button x-show="activeId" @click="showRunModal=true"
+      class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-sm rounded transition-colors">
+      ▶ Ejecutar
+    </button>
+  </div>
+</header>
+
+<!-- ── Main layout ── -->
+<div class="flex flex-1 min-h-0">
+
+  <!-- Left sidebar: pipeline list + palette -->
+  <aside class="w-56 shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col overflow-hidden">
+
+    <!-- Pipeline list -->
+    <div class="flex items-center justify-between px-3 py-2 border-b border-gray-800">
+      <span class="text-xs text-gray-500 uppercase tracking-wide">Pipelines</span>
+      <button @click="newPipeline()"
+        class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors" title="Nuevo pipeline">+ New</button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto py-1">
+      <!-- Templates section -->
+      <p class="px-3 pt-2 pb-1 text-xs text-gray-600 uppercase tracking-wide">Templates</p>
+      <template x-for="p in templates" :key="p.id">
+        <button @click="loadPipeline(p)"
+          class="w-full text-left px-3 py-2 text-xs hover:bg-gray-800 transition-colors"
+          :class="activeId === p.id ? 'bg-gray-800 text-white' : 'text-gray-400'">
+          <span x-text="p.name"></span>
+        </button>
+      </template>
+
+      <!-- User pipelines section -->
+      <template x-if="userPipelines.length > 0">
+        <div>
+          <p class="px-3 pt-3 pb-1 text-xs text-gray-600 uppercase tracking-wide">Mis pipelines</p>
+          <template x-for="p in userPipelines" :key="p.id">
+            <div class="flex items-center group">
+              <button @click="loadPipeline(p)"
+                class="flex-1 text-left px-3 py-2 text-xs hover:bg-gray-800 transition-colors"
+                :class="activeId === p.id ? 'bg-gray-800 text-white' : 'text-gray-400'">
+                <span x-text="p.name"></span>
+              </button>
+              <button @click="deletePipeline(p)"
+                class="pr-2 text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs">✕</button>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <!-- Agent palette -->
+    <div class="border-t border-gray-800 p-2">
+      <p class="text-xs text-gray-600 uppercase tracking-wide mb-2 px-1">Agentes</p>
+      <div class="grid grid-cols-1 gap-1 max-h-52 overflow-y-auto">
+        <template x-for="agent in palette" :key="agent.type">
+          <div class="palette-chip rounded px-2 py-1.5 bg-gray-800/60 text-xs font-mono select-none"
+            :style="`border-left: 3px solid ${agent.color}`"
+            draggable="true"
+            @dragstart="onPaletteDragStart($event, agent)">
+            <span class="text-gray-300" x-text="agent.label"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Canvas area -->
+  <div class="flex-1 relative overflow-hidden bg-gray-950" id="canvas-container"
+    @dragover.prevent
+    @drop="onCanvasDrop($event)">
+
+    <!-- Grid background -->
+    <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" id="grid-svg">
+      <defs>
+        <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+          <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)"/>
+    </svg>
+
+    <!-- Empty state -->
+    <div x-show="!activeId" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div class="text-center">
+        <p class="text-gray-700 text-sm mb-2">Selecciona o crea un pipeline</p>
+        <p class="text-gray-800 text-xs">Arrastra agentes desde la paleta al canvas</p>
+      </div>
+    </div>
+
+    <svg id="canvas-svg" x-show="activeId" x-cloak
+      @mousedown="onSvgMouseDown($event)"
+      @mousemove="onSvgMouseMove($event)"
+      @mouseup="onSvgMouseUp($event)"
+      @mouseleave="onSvgMouseUp($event)">
+
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#6366f1"/>
+        </marker>
+        <marker id="arrow-cond" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#f59e0b"/>
+        </marker>
+        <marker id="arrow-temp" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#6366f1" opacity=".6"/>
+        </marker>
+      </defs>
+
+      <!-- Pan/zoom group -->
+      <g id="stage" :transform="`translate(${pan.x},${pan.y}) scale(${zoom})`">
+
+        <!-- Edges layer -->
+        <g id="edges-layer">
+          <template x-for="edge in edges" :key="edge.id">
+            <g class="edge-group">
+              <!-- Invisible wide click target -->
+              <path :d="edgePath(edge)" fill="none" stroke="transparent" stroke-width="12"
+                class="edge-path" @click="selectEdge(edge)"/>
+              <!-- Visible edge -->
+              <path :d="edgePath(edge)" fill="none"
+                :stroke="edge.condition ? '#f59e0b' : '#6366f1'"
+                stroke-width="2" stroke-opacity=".8"
+                :marker-end="edge.condition ? 'url(#arrow-cond)' : 'url(#arrow)'"/>
+              <!-- Condition label -->
+              <template x-if="edge.condition">
+                <g :transform="`translate(${edgeMid(edge).x},${edgeMid(edge).y})`">
+                  <rect x="-42" y="-10" width="84" height="20" rx="4"
+                    fill="#1c1917" stroke="#f59e0b" stroke-width="1" class="edge-label-bg"
+                    @click="editEdgeCondition(edge)"/>
+                  <text text-anchor="middle" y="5" fill="#fbbf24" font-size="10" font-family="monospace"
+                    x-text="edge.condition" @click="editEdgeCondition(edge)"/>
+                </g>
+              </template>
+              <!-- Delete button -->
+              <g :transform="`translate(${edgeMid(edge).x},${edgeMid(edge).y})`" class="edge-delete"
+                @click="removeEdge(edge)">
+                <circle r="8" fill="#7f1d1d"/>
+                <text text-anchor="middle" y="4" fill="white" font-size="11">✕</text>
+              </g>
+            </g>
+          </template>
+        </g>
+
+        <!-- Nodes layer -->
+        <g id="nodes-layer">
+          <template x-for="node in nodes" :key="node.id">
+            <g class="node-group" :class="selectedNodeId===node.id?'selected':''"
+              :transform="`translate(${node.x},${node.y})`"
+              @mousedown="onNodeMouseDown($event, node)">
+              <!-- Shadow -->
+              <rect x="2" y="4" width="160" height="48" rx="8" fill="rgba(0,0,0,.4)"/>
+              <!-- Body -->
+              <rect class="node-body" width="160" height="48" rx="8"
+                :fill="nodeColor(node.type)+'22'"
+                :stroke="selectedNodeId===node.id ? '#818cf8' : nodeColor(node.type)"
+                stroke-width="1.5"/>
+              <!-- Label -->
+              <text x="72" y="20" text-anchor="middle" fill="#e2e8f0" font-size="11"
+                font-family="ui-monospace,monospace" font-weight="600"
+                x-text="node.label || node.type"></text>
+              <!-- Model badge -->
+              <text x="72" y="36" text-anchor="middle" fill="#64748b" font-size="9"
+                font-family="ui-monospace,monospace" x-text="node.model||'claude'"></text>
+              <!-- Delete button -->
+              <g transform="translate(148,4)" @mousedown.stop @click="removeNode(node)"
+                class="edge-delete" style="cursor:pointer">
+                <circle r="7" fill="#450a0a"/>
+                <text text-anchor="middle" y="4" fill="#fca5a5" font-size="9">✕</text>
+              </g>
+              <!-- Input handle (left) -->
+              <circle class="handle-in" cx="0" cy="24" r="5"
+                :fill="nodeColor(node.type)" opacity=".8"/>
+              <!-- Output handle (right) -->
+              <circle class="handle-out" cx="160" cy="24" r="6"
+                :fill="nodeColor(node.type)"
+                @mousedown.stop="onHandleMouseDown($event, node)"/>
+            </g>
+          </template>
+        </g>
+
+      </g><!-- /stage -->
+
+      <!-- Temp edge while drawing connection -->
+      <path id="temp-edge" x-show="drawing" x-cloak
+        :d="tempEdgePath"
+        fill="none" stroke="#6366f1" stroke-width="2" stroke-dasharray="8,4"
+        opacity=".6" marker-end="url(#arrow-temp)" pointer-events="none"/>
+
+    </svg><!-- /canvas-svg -->
+
+    <!-- Zoom controls -->
+    <div class="absolute bottom-4 right-4 flex items-center gap-1 bg-gray-900/80 border border-gray-800 rounded-lg px-1 py-0.5">
+      <button @click="zoom=Math.max(.3,zoom-.15)" class="px-2 py-1 text-gray-400 hover:text-white text-sm">−</button>
+      <span class="text-xs text-gray-500 w-10 text-center" x-text="Math.round(zoom*100)+'%'"></span>
+      <button @click="zoom=Math.min(2,zoom+.15)" class="px-2 py-1 text-gray-400 hover:text-white text-sm">+</button>
+      <button @click="zoom=1;pan={x:40,y:40}" class="px-2 py-1 text-gray-500 hover:text-white text-xs border-l border-gray-800 ml-1 pl-2">⌂</button>
+    </div>
+  </div>
+
+  <!-- Right: Properties panel -->
+  <aside x-show="selectedNodeId" x-cloak x-transition
+    class="w-52 shrink-0 bg-gray-900 border-l border-gray-800 flex flex-col p-4 gap-4">
+    <template x-if="selectedNode">
+      <div class="space-y-4">
+        <div>
+          <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Nodo</p>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Etiqueta</label>
+              <input x-model="selectedNode.label" @input="render()"
+                class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Tipo</label>
+              <p class="text-xs font-mono text-gray-400 bg-gray-800 rounded px-2 py-1.5" x-text="selectedNode.type"></p>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">Modelo</label>
+              <select x-model="selectedNode.model" @change="render()"
+                class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
+                <option value="claude">claude (default)</option>
+                <option value="gpt-4o">gpt-4o</option>
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
+                <option value="groq:llama-3.3-70b-versatile">groq:llama3.3-70b</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Conexiones</p>
+          <div class="space-y-1">
+            <template x-for="e in edgesFromNode(selectedNodeId)" :key="e.id">
+              <div class="flex items-center gap-1 text-xs text-gray-500">
+                <span class="text-indigo-400">→</span>
+                <span x-text="e.to"></span>
+                <span x-show="e.condition" class="text-amber-500 text-xs" x-text="'['+e.condition+']'"></span>
+              </div>
+            </template>
+            <p x-show="edgesFromNode(selectedNodeId).length===0" class="text-xs text-gray-700">Sin conexiones salientes</p>
+          </div>
+        </div>
+      </div>
+    </template>
+  </aside>
+
+</div><!-- /main -->
+
+<!-- ── Run modal ── -->
+<template x-teleport="body">
+  <div x-show="showRunModal" class="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4"
+    @click.self="showRunModal=false">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 space-y-4">
+      <h3 class="font-semibold">Ejecutar pipeline</h3>
+      <p class="text-xs text-gray-500" x-text="activeName"></p>
+
+      <div>
+        <label class="block text-xs text-gray-400 mb-1.5">Request / instrucción</label>
+        <textarea x-model="runRequest" rows="3"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"
+          placeholder="Describe lo que quieres construir…"></textarea>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1.5">Workspace</label>
+          <select x-model="runWorkspaceId"
+            class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
+            <option value="">— ninguno —</option>
+            <template x-for="ws in workspaces" :key="ws.id">
+              <option :value="ws.id" x-text="ws.name"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1.5">Modelo</label>
+          <select x-model="runModel"
+            class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
+            <option value="claude">claude</option>
+            <option value="gpt-4o">gpt-4o</option>
+            <option value="groq:llama-3.3-70b-versatile">groq:llama3.3</option>
+            <option value="gemini-1.5-flash">gemini-flash</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" x-model="runHitl" class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
+        <span class="text-gray-300">Revisión humana (HITL)</span>
+      </label>
+
+      <p x-show="runError" class="text-red-400 text-xs" x-text="runError"></p>
+
+      <div class="flex gap-2 justify-end pt-1">
+        <button @click="showRunModal=false" class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
+        <button @click="executeRun()" :disabled="!runRequest.trim() || runLoading"
+          class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-sm rounded-md transition-colors disabled:opacity-50">
+          <span x-show="!runLoading">▶ Lanzar</span>
+          <span x-show="runLoading">Lanzando…</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- ── Edge condition edit modal ── -->
+<template x-teleport="body">
+  <div x-show="editingEdge" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    @click.self="editingEdge=null">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-80 p-5 space-y-3">
+      <h3 class="font-semibold text-sm">Condición del edge</h3>
+      <p class="text-xs text-gray-500">La condición se evalúa mirando <code class="text-amber-400">state["metadata"][key]</code>. Vacío = siempre.</p>
+      <input x-model="editingEdgeCondition" @keydown.enter="saveEdgeCondition()" @keydown.escape="editingEdge=null"
+        placeholder="ej: reviewer_fix_requested"
+        class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-amber-500">
+      <div class="flex gap-2 justify-end">
+        <button @click="editingEdge=null" class="px-3 py-1.5 text-sm text-gray-500 hover:text-white">Cancelar</button>
+        <button @click="saveEdgeCondition()" class="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-sm rounded">Guardar</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────────────
+const NODE_W = 160, NODE_H = 48;
+
+const AGENT_COLORS = {
+  business_analyst: '#7c3aed', pm: '#7c3aed',
+  sprint_planner: '#2563eb',
+  backend_dev: '#0891b2', frontend_dev: '#0891b2', feature: '#0891b2',
+  qa: '#059669',
+  reviewer: '#d97706',
+  devops: '#dc2626',
+  doc_writer: '#6b7280', codebase_scanner: '#6b7280',
+  researcher: '#7c3aed',
+  idea: '#ec4899', copywriter: '#ec4899', editor: '#ec4899',
+};
+
+function nodeColor(type) {
+  return AGENT_COLORS[type] || '#4f46e5';
+}
+
+let _edgeCounter = 0;
+function edgeId() { return 'e' + (++_edgeCounter); }
+
+// ── Alpine app ────────────────────────────────────────────────────────────
+function app() {
+  return {
+    // Pipeline list
+    templates: [],
+    userPipelines: [],
+    palette: [],
+    workspaces: [],
+
+    // Active pipeline
+    activeId: null,
+    activeName: '',
+    isTemplate: false,
+    nodes: [],
+    edges: [],
+
+    // Canvas state
+    zoom: 1,
+    pan: { x: 40, y: 40 },
+
+    // Interaction state
+    selectedNodeId: null,
+    dragging: null,   // {type:'node'|'canvas', nodeId?, startX, startY, origX?, origY?, offsetX?, offsetY?}
+    drawing: false,   // drawing a new edge
+    drawFromId: null,
+    drawCursorX: 0,
+    drawCursorY: 0,
+    tempEdgePath: '',
+
+    // Editing
+    editingEdge: null,
+    editingEdgeCondition: '',
+
+    // Save / run
+    saving: false,
+    saveStatus: '',
+    showRunModal: false,
+    runRequest: '',
+    runWorkspaceId: '',
+    runModel: 'claude',
+    runHitl: false,
+    runLoading: false,
+    runError: '',
+
+    // ── Computed helpers ──────────────────────────────────────────────────
+
+    get selectedNode() {
+      return this.nodes.find(n => n.id === this.selectedNodeId) || null;
+    },
+
+    nodeColor(type) { return nodeColor(type); },
+
+    edgesFromNode(nodeId) {
+      return this.edges.filter(e => e.from === nodeId);
+    },
+
+    edgePath(edge) {
+      const fn = this.nodes.find(n => n.id === edge.from);
+      const tn = this.nodes.find(n => n.id === edge.to);
+      if (!fn || !tn) return '';
+      const x1 = fn.x + NODE_W, y1 = fn.y + NODE_H / 2;
+      const x2 = tn.x,          y2 = tn.y + NODE_H / 2;
+      const cx = Math.abs(x2 - x1) / 2;
+      const c = Math.max(60, cx);
+      return `M ${x1} ${y1} C ${x1+c} ${y1} ${x2-c} ${y2} ${x2} ${y2}`;
+    },
+
+    edgeMid(edge) {
+      const fn = this.nodes.find(n => n.id === edge.from);
+      const tn = this.nodes.find(n => n.id === edge.to);
+      if (!fn || !tn) return { x: 0, y: 0 };
+      return {
+        x: (fn.x + NODE_W + tn.x) / 2,
+        y: (fn.y + tn.y + NODE_H) / 2,
+      };
+    },
+
+    // ── Init ─────────────────────────────────────────────────────────────
+
+    async init() {
+      await Promise.all([this.loadPipelineList(), this.loadPalette(), this.loadWorkspaces()]);
+    },
+
+    async loadPipelineList() {
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const r = await fetch('/pipelines/', { headers: key ? {'X-Api-Key': key} : {} });
+      if (!r.ok) return;
+      const all = await r.json();
+      this.templates = all.filter(p => p.is_template);
+      this.userPipelines = all.filter(p => !p.is_template);
+    },
+
+    async loadPalette() {
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const r = await fetch('/pipelines/agents', { headers: key ? {'X-Api-Key': key} : {} });
+      if (r.ok) this.palette = await r.json();
+    },
+
+    async loadWorkspaces() {
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const r = await fetch('/workspaces/', { headers: key ? {'X-Api-Key': key} : {} });
+      if (r.ok) this.workspaces = await r.json();
+    },
+
+    // ── Pipeline load/save ────────────────────────────────────────────────
+
+    loadPipeline(p) {
+      this.activeId = p.id;
+      this.activeName = p.name;
+      this.isTemplate = p.is_template;
+      this.selectedNodeId = null;
+      const def = typeof p.definition === 'string' ? JSON.parse(p.definition) : p.definition;
+      this.nodes = (def.nodes || []).map(n => ({...n}));
+      this.edges = (def.edges || []).map(e => ({...e, id: e.id || edgeId()}));
+      this.zoom = 1;
+      this.pan = { x: 40, y: 40 };
+      this.saveStatus = '';
+    },
+
+    newPipeline() {
+      const name = 'Nuevo Pipeline';
+      this.activeId = null; // will be set after save
+      this.activeName = name;
+      this.isTemplate = false;
+      this.nodes = [];
+      this.edges = [];
+      this.selectedNodeId = null;
+      this.saveStatus = '';
+      // Pre-assign a temp local id so we can save
+      this.activeId = '__new__';
+    },
+
+    async forkTemplate() {
+      const ws = this.workspaces[0];
+      if (!ws) { alert('Necesitas al menos un workspace.'); return; }
+      const body = {
+        name: this.activeName + ' (copia)',
+        workspace_id: ws.id,
+        definition: { nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})) },
+      };
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const r = await fetch('/pipelines/', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', ...(key?{'X-Api-Key':key}:{})},
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { alert('Error al clonar template'); return; }
+      const created = await r.json();
+      await this.loadPipelineList();
+      this.loadPipeline(created);
+    },
+
+    async savePipeline() {
+      if (this.isTemplate) return;
+      this.saving = true;
+      this.saveStatus = 'saving';
+      const definition = { nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})) };
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const headers = {'Content-Type':'application/json', ...(key?{'X-Api-Key':key}:{})};
+
+      try {
+        if (this.activeId === '__new__') {
+          const ws = this.workspaces[0];
+          if (!ws) { this.saveStatus='error'; this.saving=false; return; }
+          const r = await fetch('/pipelines/', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ name: this.activeName, workspace_id: ws.id, definition }),
+          });
+          if (!r.ok) throw new Error();
+          const created = await r.json();
+          this.activeId = created.id;
+        } else {
+          const r = await fetch(`/pipelines/${this.activeId}`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ name: this.activeName, definition }),
+          });
+          if (!r.ok) throw new Error();
+        }
+        this.saveStatus = 'saved';
+        await this.loadPipelineList();
+        setTimeout(() => { if (this.saveStatus==='saved') this.saveStatus=''; }, 2000);
+      } catch {
+        this.saveStatus = 'error';
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    async deletePipeline(p) {
+      if (!confirm(`¿Eliminar "${p.name}"?`)) return;
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      await fetch(`/pipelines/${p.id}`, {
+        method: 'DELETE',
+        headers: key ? {'X-Api-Key': key} : {},
+      });
+      if (this.activeId === p.id) {
+        this.activeId = null; this.nodes = []; this.edges = [];
+      }
+      await this.loadPipelineList();
+    },
+
+    // ── Run ───────────────────────────────────────────────────────────────
+
+    async executeRun() {
+      if (!this.runRequest.trim()) return;
+      this.runLoading = true;
+      this.runError = '';
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const body = {
+        pipeline_id: String(this.activeId),
+        request: this.runRequest,
+        model: this.runModel,
+        hitl: this.runHitl,
+      };
+      try {
+        const r = await fetch('/run/visual', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', ...(key?{'X-Api-Key':key}:{})},
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(()=>({}));
+          this.runError = d.detail || `Error ${r.status}`;
+          return;
+        }
+        const data = await r.json();
+        this.showRunModal = false;
+        if (data.run_id) {
+          window.location.href = `/runs/${data.run_id}`;
+        }
+      } catch(e) {
+        this.runError = e.message;
+      } finally {
+        this.runLoading = false;
+      }
+    },
+
+    // ── Canvas interaction ────────────────────────────────────────────────
+
+    render() { /* Alpine reactivity handles re-render */ },
+
+    _svgCoords(e) {
+      const svg = document.getElementById('canvas-svg');
+      const rect = svg.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left - this.pan.x) / this.zoom,
+        y: (e.clientY - rect.top  - this.pan.y) / this.zoom,
+      };
+    },
+
+    _svgClientCoords(e) {
+      const svg = document.getElementById('canvas-svg');
+      const rect = svg.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    },
+
+    onSvgMouseDown(e) {
+      if (e.target.closest('.node-group') || e.target.closest('.handle-out')) return;
+      if (this.drawing) { this.drawing = false; return; }
+      const c = this._svgClientCoords(e);
+      this.dragging = { type: 'canvas', startX: c.x - this.pan.x, startY: c.y - this.pan.y };
+      this.selectedNodeId = null;
+    },
+
+    onNodeMouseDown(e, node) {
+      if (e.target.classList.contains('handle-out')) return;
+      e.stopPropagation();
+      this.selectedNodeId = node.id;
+      const c = this._svgCoords(e);
+      this.dragging = {
+        type: 'node', nodeId: node.id,
+        offsetX: c.x - node.x, offsetY: c.y - node.y,
+      };
+    },
+
+    onHandleMouseDown(e, node) {
+      e.stopPropagation();
+      this.drawing = true;
+      this.drawFromId = node.id;
+      const c = this._svgClientCoords(e);
+      this.drawCursorX = c.x; this.drawCursorY = c.y;
+      this._updateTempEdge(node.x + NODE_W, node.y + NODE_H/2, c.x, c.y);
+    },
+
+    onSvgMouseMove(e) {
+      if (this.drawing) {
+        const c = this._svgClientCoords(e);
+        const fn = this.nodes.find(n => n.id === this.drawFromId);
+        if (fn) {
+          const x1 = fn.x * this.zoom + this.pan.x + NODE_W * this.zoom;
+          const y1 = fn.y * this.zoom + this.pan.y + NODE_H/2 * this.zoom;
+          this._updateTempEdge(x1, y1, c.x, c.y);
+        }
+        return;
+      }
+      if (!this.dragging) return;
+      if (this.dragging.type === 'canvas') {
+        const c = this._svgClientCoords(e);
+        this.pan.x = c.x - this.dragging.startX;
+        this.pan.y = c.y - this.dragging.startY;
+      } else if (this.dragging.type === 'node') {
+        const c = this._svgCoords(e);
+        const node = this.nodes.find(n => n.id === this.dragging.nodeId);
+        if (node) {
+          node.x = Math.round(c.x - this.dragging.offsetX);
+          node.y = Math.round(c.y - this.dragging.offsetY);
+        }
+      }
+    },
+
+    onSvgMouseUp(e) {
+      if (this.drawing) {
+        // Check if released on a handle-in or node body (target node)
+        const target = e.target.closest('.node-group');
+        if (target) {
+          const toId = target.getAttribute('data-id') || target.dataset.xModelId;
+          // Alpine sets x-key as data attribute — read it via the loop binding
+          // Find node by checking mouse position
+          const c = this._svgCoords(e);
+          const toNode = this.nodes.find(n =>
+            c.x >= n.x && c.x <= n.x + NODE_W &&
+            c.y >= n.y && c.y <= n.y + NODE_H
+          );
+          if (toNode && toNode.id !== this.drawFromId) {
+            const exists = this.edges.some(
+              e => e.from === this.drawFromId && e.to === toNode.id
+            );
+            if (!exists) {
+              this.edges.push({ id: edgeId(), from: this.drawFromId, to: toNode.id, condition: null });
+            }
+          }
+        }
+        this.drawing = false;
+        this.tempEdgePath = '';
+        return;
+      }
+      this.dragging = null;
+    },
+
+    _updateTempEdge(x1, y1, x2, y2) {
+      const c = Math.max(60, Math.abs(x2-x1)/2);
+      this.tempEdgePath = `M ${x1} ${y1} C ${x1+c} ${y1} ${x2-c} ${y2} ${x2} ${y2}`;
+    },
+
+    // ── Palette drag & drop ───────────────────────────────────────────────
+
+    onPaletteDragStart(e, agent) {
+      e.dataTransfer.setData('agent_type', agent.type);
+      e.dataTransfer.setData('agent_label', agent.label);
+    },
+
+    onCanvasDrop(e) {
+      e.preventDefault();
+      if (!this.activeId) { this.newPipeline(); }
+      const type = e.dataTransfer.getData('agent_type');
+      const label = e.dataTransfer.getData('agent_label');
+      if (!type) return;
+
+      // Avoid duplicate node types (one instance per type by default)
+      if (this.nodes.some(n => n.type === type)) {
+        alert(`Ya existe un nodo de tipo "${label}" en este pipeline.\nSi necesitas varios, édita el JSON directamente.`);
+        return;
+      }
+
+      const svg = document.getElementById('canvas-svg');
+      const rect = svg.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left - this.pan.x) / this.zoom);
+      const y = Math.round((e.clientY - rect.top  - this.pan.y) / this.zoom);
+
+      this.nodes.push({ id: type, type, label, model: 'claude', x, y });
+    },
+
+    // ── Edge editing ──────────────────────────────────────────────────────
+
+    selectEdge(edge) { /* edges selected via hover */ },
+
+    removeEdge(edge) {
+      this.edges = this.edges.filter(e => e.id !== edge.id);
+    },
+
+    removeNode(node) {
+      this.nodes = this.nodes.filter(n => n.id !== node.id);
+      this.edges = this.edges.filter(e => e.from !== node.id && e.to !== node.id);
+      if (this.selectedNodeId === node.id) this.selectedNodeId = null;
+    },
+
+    editEdgeCondition(edge) {
+      this.editingEdge = edge;
+      this.editingEdgeCondition = edge.condition || '';
+    },
+
+    saveEdgeCondition() {
+      if (this.editingEdge) {
+        this.editingEdge.condition = this.editingEdgeCondition.trim() || null;
+      }
+      this.editingEdge = null;
+    },
+  };
+}
+</script>
+</body>
+</html>
