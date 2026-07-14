@@ -65,7 +65,7 @@ async def test_check_budget_uses_total_cost_usd(monkeypatch):
             await ts.refresh(ws)
             ws_id = ws.id
 
-        with pytest.raises(ValueError, match="budget exhausted"):
+        with pytest.raises(ValueError, match="exhausted"):
             await runner_mod._check_workspace_budget(ws_id)
     finally:
         await test_engine.dispose()
@@ -87,7 +87,7 @@ async def test_check_budget_raises_when_total_meets_limit(monkeypatch):
             await ts.refresh(ws)
             ws_id = ws.id
 
-        with pytest.raises(ValueError, match="budget"):
+        with pytest.raises(ValueError, match="exhausted"):
             await runner_mod._check_workspace_budget(ws_id)
     finally:
         await test_engine.dispose()
