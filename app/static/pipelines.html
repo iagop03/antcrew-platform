@@ -27,7 +27,8 @@ body{overflow:hidden}
 .palette-chip:active{cursor:grabbing}
 </style>
 </head>
-<body class="bg-gray-950 text-gray-100 flex flex-col h-screen" x-data="app()" x-init="init()">
+<body class="bg-gray-950 text-gray-100 flex flex-col h-screen" x-data="app()" x-init="init()"
+  @keydown.window="onKeyDown($event)">
 
 <!-- ── Topbar ── -->
 <header class="flex items-center gap-3 px-4 py-2.5 bg-gray-900 border-b border-gray-800 shrink-0">
@@ -522,6 +523,7 @@ function app() {
     // Pipeline runs
     pipelineRuns: [],
     loadingPipelineRuns: false,
+    _runsPoller: null,
 
     // Save / run
     saving: false,
@@ -605,21 +607,32 @@ function app() {
 
     // ── Pipeline load/save ────────────────────────────────────────────────
 
+    _stopRunsPoller() {
+      if (this._runsPoller) { clearInterval(this._runsPoller); this._runsPoller = null; }
+    },
+
     async loadPipelineRuns() {
       if (!this.activeId || this.activeId === '__new__' || this.isTemplate) return;
+      this._stopRunsPoller();
       this.loadingPipelineRuns = true;
       try {
         const key = localStorage.getItem('antcrew_api_key') || '';
         const r = await fetch(`/runs/?team=pipeline:${this.activeId}&limit=10`, {
           headers: key ? {'X-Api-Key': key} : {},
         });
-        if (r.ok) this.pipelineRuns = await r.json();
+        if (r.ok) {
+          this.pipelineRuns = await r.json();
+          if (this.pipelineRuns.some(r => r.status === 'running')) {
+            this._runsPoller = setInterval(() => this.loadPipelineRuns(), 8000);
+          }
+        }
       } catch {} finally {
         this.loadingPipelineRuns = false;
       }
     },
 
     loadPipeline(p) {
+      this._stopRunsPoller();
       this.activeId = p.id;
       this.activeName = p.name;
       this.activeDescription = p.description || '';
@@ -636,6 +649,7 @@ function app() {
     },
 
     newPipeline() {
+      this._stopRunsPoller();
       const name = 'Nuevo Pipeline';
       this.activeId = null; // will be set after save
       this.activeName = name;
@@ -734,6 +748,7 @@ function app() {
         request: this.runRequest,
         model: this.runModel,
         hitl: this.runHitl,
+        ...(this.runWorkspaceId ? { workspace_id: parseInt(this.runWorkspaceId) } : {}),
       };
       try {
         const r = await fetch('/run/visual', {
@@ -910,6 +925,19 @@ function app() {
       this.nodes = this.nodes.filter(n => n.id !== node.id);
       this.edges = this.edges.filter(e => e.from !== node.id && e.to !== node.id);
       if (this.selectedNodeId === node.id) this.selectedNodeId = null;
+    },
+
+    onKeyDown(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+      if (e.key === 'Escape') {
+        this.selectedNodeId = null;
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedNodeId) {
+        e.preventDefault();
+        const node = this.nodes.find(n => n.id === this.selectedNodeId);
+        if (node) this.removeNode(node);
+      }
     },
 
     editEdgeCondition(edge) {

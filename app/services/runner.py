@@ -783,6 +783,11 @@ def _run_pipeline_sync(
                     if ds in agents and ds not in interrupt_before:
                         interrupt_before.append(ds)
         # If a hitl node is last (no downstream), it can't be interrupted after — skip.
+        if hitl_producers and not interrupt_before:
+            log.warning(
+                "runner: %d hitl node(s) have no downstream — HITL review skipped for: %s",
+                len(hitl_producers), ", ".join(sorted(hitl_producers)),
+            )
 
     # Apply per-node max_cost_usd cap to each agent's LLM
     if max_cost_usd is not None:

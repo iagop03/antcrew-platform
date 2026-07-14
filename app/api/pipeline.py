@@ -170,6 +170,7 @@ class VisualPipelineRequest(BaseModel):
     max_cost_usd: Optional[float] = None
     hitl: bool = False
     model: str = "claude"
+    workspace_id: Optional[int] = None  # override workspace; falls back to API key scope
 
     @field_validator("request")
     @classmethod
@@ -219,6 +220,8 @@ async def trigger_visual_pipeline(
         if ws and not effective_hitl and ws.hitl_default:
             effective_hitl = True
 
+    effective_workspace_id = body.workspace_id or ctx.workspace_id
+
     try:
         run_id = await dispatch_pipeline(
             definition=definition,
@@ -226,7 +229,7 @@ async def trigger_visual_pipeline(
             thread_id=body.thread_id,
             max_cost_usd=body.max_cost_usd,
             created_by=ctx.created_by,
-            workspace_id=ctx.workspace_id,
+            workspace_id=effective_workspace_id,
             force_hitl=effective_hitl,
             model=body.model,
             pipeline_id=body.pipeline_id,
