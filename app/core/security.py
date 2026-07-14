@@ -15,7 +15,7 @@ _BLOCKED_HOSTS: frozenset[str] = frozenset({
     "localhost",
     "127.0.0.1",
     "::1",
-    "0.0.0.0",
+    "0.0.0.0",  # nosec B104 — in a blocklist, not binding
     "169.254.169.254",       # AWS / GCP / Azure / DigitalOcean metadata
     "metadata.google.internal",
     "metadata.internal",
