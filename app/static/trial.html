@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>antcrew — Prueba gratuita</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ground:      #070b13;
+  --surface:     #0c1422;
+  --surface-2:   #131d30;
+  --border:      #1a2a48;
+  --border-mid:  #253d68;
+  --indigo:      #6366f1;
+  --indigo-dim:  #4f52c4;
+  --indigo-glow: #818cf8;
+  --text:        #c8d8f7;
+  --text-dim:    #6a7fa8;
+  --text-bright: #f0f4ff;
+  --teal:        #34d399;
+  --red:         #f87171;
+  --amber:       #fbbf24;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--ground);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Nav ── */
+nav {
+  border-bottom: 1px solid var(--border);
+  background: rgba(7,11,19,0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.nav-inner {
+  display: flex; align-items: center; gap: 28px;
+  padding: 14px 28px;
+  max-width: 1120px; margin: 0 auto;
+}
+.nav-logo {
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-weight: 700; font-size: 1rem;
+  color: var(--indigo-glow);
+  text-decoration: none;
+}
+.nav-links { display: flex; gap: 24px; list-style: none; margin-left: 4px; }
+.nav-links a {
+  color: var(--text-dim); text-decoration: none;
+  font-size: 0.875rem; transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--text-bright); }
+.nav-cta { margin-left: auto; }
+.btn-ghost-sm {
+  display: inline-flex; align-items: center;
+  padding: 7px 14px; border-radius: 6px;
+  font-size: 0.8125rem; font-weight: 500;
+  text-decoration: none;
+  background: transparent; color: var(--text-dim);
+  border: 1px solid var(--border-mid);
+  transition: all 0.15s; cursor: pointer;
+}
+.btn-ghost-sm:hover { color: var(--text-bright); border-color: var(--indigo-dim); }
+
+/* ── Main ── */
+main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+}
+
+.card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 28px 32px 0;
+}
+.card-eyebrow {
+  font-family: ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--indigo-glow);
+  margin-bottom: 10px;
+}
+.card-title {
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  line-height: 1.3;
+  text-wrap: balance;
+  margin-bottom: 6px;
+}
+.card-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.credit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 5px 10px;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--teal);
+  font-weight: 500;
+}
+.credit-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+  flex-shrink: 0;
+}
+
+.card-body { padding: 24px 32px 32px; }
+
+/* ── Form ── */
+.form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 16px; }
+.form-group:last-of-type { margin-bottom: 0; }
+.form-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.form-input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  border-radius: 7px;
+  color: var(--text-bright);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  padding: 10px 13px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-appearance: none;
+}
+.form-input::placeholder { color: var(--text-dim); }
+.form-input:focus {
+  border-color: var(--indigo);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+.form-input.error { border-color: var(--red); }
+.form-hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.form-actions { margin-top: 22px; }
+.btn-primary {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%;
+  padding: 11px 20px; border-radius: 7px;
+  font-size: 0.9375rem; font-weight: 500;
+  color: #fff;
+  background: var(--indigo);
+  border: none; cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+}
+.btn-primary:hover:not(:disabled) { background: var(--indigo-glow); }
+.btn-primary:active:not(:disabled) { transform: scale(0.99); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary:focus-visible {
+  outline: 2px solid var(--indigo-glow);
+  outline-offset: 2px;
+}
+
+.error-msg {
+  display: none;
+  margin-top: 14px;
+  padding: 10px 13px;
+  border-radius: 7px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--red);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.error-msg.visible { display: block; }
+
+/* ── Spinner ── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; border-top-color: rgba(255,255,255,0.6); }
+}
+
+/* ── Divider ── */
+.card-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0 32px;
+}
+.card-footer {
+  padding: 18px 32px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.card-footer a { color: var(--indigo-glow); text-decoration: none; }
+.card-footer a:hover { text-decoration: underline; }
+
+/* ── Success state ── */
+.success-view { display: none; }
+.success-view.visible { display: block; }
+.form-view { display: block; }
+.form-view.hidden { display: none; }
+
+.success-icon {
+  width: 44px; height: 44px;
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+}
+.success-icon svg { color: var(--teal); }
+
+.key-box {
+  margin-top: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.key-label {
+  padding: 8px 13px;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.key-inner {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.key-value {
+  flex: 1;
+  padding: 12px 13px;
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--indigo-glow);
+  word-break: break-all;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.copy-btn {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s;
+  display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+  align-self: stretch;
+}
+.copy-btn:hover { background: rgba(255,255,255,0.04); color: var(--text-bright); }
+.copy-btn:focus-visible { outline: 2px solid var(--indigo); outline-offset: -2px; }
+.copy-btn.copied { color: var(--teal); }
+
+.key-warning {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--amber);
+  display: flex; align-items: flex-start; gap: 6px;
+  line-height: 1.5;
+}
+.key-warning svg { flex-shrink: 0; margin-top: 2px; }
+
+.success-actions {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.btn-teal {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%;
+  padding: 11px 20px; border-radius: 7px;
+  font-size: 0.9375rem; font-weight: 500;
+  color: #012d1e;
+  background: var(--teal);
+  border: none; cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.15s;
+  font-family: inherit;
+}
+.btn-teal:hover { filter: brightness(1.08); }
+.btn-teal:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.btn-ghost-full {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%;
+  padding: 10px 20px; border-radius: 7px;
+  font-size: 0.875rem; font-weight: 500;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border-mid);
+  cursor: pointer; text-decoration: none;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+.btn-ghost-full:hover { color: var(--text-bright); border-color: var(--indigo-dim); }
+.btn-ghost-full:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+
+/* ── Workspace info ── */
+.ws-info {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ws-field {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+.ws-field-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.ws-field-value {
+  font-size: 0.875rem;
+  color: var(--text-bright);
+  font-weight: 500;
+  word-break: break-all;
+}
+.ws-field-value.mono {
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">antcrew</a>
+    <ul class="nav-links">
+      <li><a href="/">Inicio</a></li>
+      <li><a href="/docs" target="_blank" rel="noopener">Docs</a></li>
+    </ul>
+    <div class="nav-cta">
+      <a href="/login" class="btn-ghost-sm">Iniciar sesión</a>
+    </div>
+  </div>
+</nav>
+
+<main>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-eyebrow">Prueba gratuita</div>
+      <h1 class="card-title">Empieza en segundos</h1>
+      <p class="card-subtitle">Crea tu workspace y obtén una API key de inmediato. Sin tarjeta de crédito.</p>
+      <div class="credit-badge">
+        <span class="credit-dot"></span>
+        <span id="credit-amount">$5.00 USD de crédito incluido</span>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <!-- Form view -->
+      <div class="form-view" id="form-view">
+        <form id="trial-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="name">Nombre del workspace</label>
+            <input
+              class="form-input"
+              type="text"
+              id="name"
+              name="name"
+              placeholder="Mi empresa"
+              autocomplete="organization"
+              required
+            />
+            <span class="form-hint">Puede ser tu nombre, equipo o empresa.</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="email">Correo electrónico</label>
+            <input
+              class="form-input"
+              type="email"
+              id="email"
+              name="email"
+              placeholder="tu@empresa.com"
+              autocomplete="email"
+              required
+            />
+          </div>
+
+          <div class="error-msg" id="error-msg" role="alert" aria-live="polite"></div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary" id="submit-btn">
+              <span id="btn-text">Crear mi prueba gratuita</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Success view -->
+      <div class="success-view" id="success-view" aria-live="polite">
+        <div class="success-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 10 8 14 16 6"></polyline>
+          </svg>
+        </div>
+        <h2 style="font-size:1.125rem;font-weight:600;color:var(--text-bright);margin-bottom:6px;">Workspace creado</h2>
+        <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.55;">
+          Guarda tu API key ahora. Solo se muestra una vez.
+        </p>
+
+        <div class="ws-info" id="ws-info"></div>
+
+        <div class="key-box" style="margin-top:20px;">
+          <div class="key-label">API Key (admin)</div>
+          <div class="key-inner">
+            <div class="key-value" id="key-value"></div>
+            <button class="copy-btn" id="copy-btn" type="button" aria-label="Copiar API key">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="copy-label">Copiar</span>
+            </button>
+          </div>
+        </div>
+
+        <p class="key-warning">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          Esta clave no se volverá a mostrar. Guárdala en un lugar seguro antes de continuar.
+        </p>
+
+        <div class="success-actions">
+          <a href="/login" class="btn-teal" id="dashboard-link">
+            Ir al dashboard
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </a>
+          <a href="/docs" class="btn-ghost-full" target="_blank" rel="noopener">Ver documentación</a>
+        </div>
+      </div>
+    </div>
+
+    <hr class="card-divider" />
+    <div class="card-footer">
+      ¿Ya tienes cuenta? <a href="/login">Inicia sesión</a>.
+      La prueba gratuita incluye acceso completo a la plataforma con un crédito de uso de LLM.
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  const form       = document.getElementById('trial-form');
+  const submitBtn  = document.getElementById('submit-btn');
+  const btnText    = document.getElementById('btn-text');
+  const errorMsg   = document.getElementById('error-msg');
+  const formView   = document.getElementById('form-view');
+  const successView= document.getElementById('success-view');
+  const keyValue   = document.getElementById('key-value');
+  const copyBtn    = document.getElementById('copy-btn');
+  const copyLabel  = document.getElementById('copy-label');
+  const wsInfo     = document.getElementById('ws-info');
+
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('visible');
+  }
+  function clearError() {
+    errorMsg.classList.remove('visible');
+    errorMsg.textContent = '';
+  }
+
+  function setLoading(on) {
+    submitBtn.disabled = on;
+    btnText.textContent = on ? 'Creando workspace…' : 'Crear mi prueba gratuita';
+    if (on) {
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      spinner.id = 'spinner';
+      submitBtn.prepend(spinner);
+    } else {
+      const s = document.getElementById('spinner');
+      if (s) s.remove();
+    }
+  }
+
+  function showSuccess(data) {
+    // Update credit label if available
+    if (data.trial_credit_usd != null) {
+      document.getElementById('credit-amount').textContent =
+        '$' + Number(data.trial_credit_usd).toFixed(2) + ' USD de crédito incluido';
+    }
+
+    keyValue.textContent = data.key;
+
+    wsInfo.innerHTML = `
+      <div class="ws-field">
+        <div class="ws-field-label">Workspace</div>
+        <div class="ws-field-value">${escHtml(data.workspace_name)}</div>
+      </div>
+      <div class="ws-field">
+        <div class="ws-field-label">Slug</div>
+        <div class="ws-field-value mono">${escHtml(data.workspace_slug)}</div>
+      </div>
+    `;
+
+    formView.classList.add('hidden');
+    successView.classList.add('visible');
+    successView.focus?.();
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    clearError();
+
+    const name  = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+
+    if (!name) {
+      document.getElementById('name').classList.add('error');
+      showError('Escribe un nombre para el workspace.');
+      document.getElementById('name').focus();
+      return;
+    }
+    if (!email || !email.includes('@')) {
+      document.getElementById('email').classList.add('error');
+      showError('Introduce un correo electrónico válido.');
+      document.getElementById('email').focus();
+      return;
+    }
+
+    document.getElementById('name').classList.remove('error');
+    document.getElementById('email').classList.remove('error');
+    setLoading(true);
+
+    try {
+      const resp = await fetch('/trial/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email }),
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        const detail = data.detail || 'Error al crear el workspace. Inténtalo de nuevo.';
+        if (resp.status === 429) {
+          showError('Demasiados registros desde esta dirección IP. Inténtalo en 24 horas.');
+        } else {
+          showError(detail);
+        }
+        setLoading(false);
+        return;
+      }
+
+      showSuccess(data);
+    } catch (_) {
+      showError('No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.');
+      setLoading(false);
+    }
+  });
+
+  // Remove error styling on input
+  ['name', 'email'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () {
+      this.classList.remove('error');
+    });
+  });
+
+  // Copy API key
+  copyBtn.addEventListener('click', async function () {
+    const key = keyValue.textContent;
+    try {
+      await navigator.clipboard.writeText(key);
+    } catch (_) {
+      // Fallback for non-https
+      const ta = document.createElement('textarea');
+      ta.value = key;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    copyLabel.textContent = 'Copiado';
+    copyBtn.classList.add('copied');
+    setTimeout(function () {
+      copyLabel.textContent = 'Copiar';
+      copyBtn.classList.remove('copied');
+    }, 2000);
+  });
+})();
+</script>
+
+</body>
+</html>

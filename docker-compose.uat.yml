@@ -1,0 +1,40 @@
+# UAT environment overlay.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.uat.yml up -d
+#
+# Requires: .env.uat  (copy from .env.uat.example, fill in secrets)
+
+services:
+  platform:
+    build:
+      args:
+        APP_ENV: uat
+    env_file:
+      - .env.uat
+    environment:
+      APP_ENV: uat
+      HOST: 0.0.0.0
+      ANTCREW_SANDBOX: required
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      ANTCREW_REQUIRE_AUTH: "true"
+    volumes:
+      - []
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 2
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.uat
+    environment:
+      POSTGRES_DB: antcrew_uat
+    volumes:
+      - postgres_uat:/var/lib/postgresql/data
+
+volumes:
+  platform_data: null
+  postgres_uat:

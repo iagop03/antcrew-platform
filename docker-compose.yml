@@ -1,14 +1,33 @@
+# Local development compose — SQLite, open auth, hot reload.
+# For other environments use the matching override:
+#   int:  docker compose -f docker-compose.yml -f docker-compose.int.yml up
+#   uat:  docker compose -f docker-compose.yml -f docker-compose.uat.yml up
+#   prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+
 services:
   platform:
-    build: .
+    build:
+      context: .
+      args:
+        APP_ENV: dev
     ports:
       - "8000:8000"
+    env_file:
+      - .env                      # copy from .env.dev.example
     environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - PLATFORM_API_KEY=${PLATFORM_API_KEY:-}
-      - DATABASE_URL=sqlite+aiosqlite:////data/platform.db
+      APP_ENV: dev
+      HOST: 127.0.0.1             # loopback — keeps guards in dev-relaxed mode
+      DATABASE_URL: sqlite+aiosqlite:////data/platform.db
+      LOG_FORMAT: text            # human-readable logs for local dev
+      LOG_LEVEL: DEBUG
     volumes:
       - platform_data:/data
+      - .:/app                    # mount source for hot reload
+    command: >
+      uvicorn app.main:app
+      --host 127.0.0.1
+      --port 8000
+      --reload
 
 volumes:
   platform_data:

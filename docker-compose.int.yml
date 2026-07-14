@@ -1,0 +1,40 @@
+# Integration environment overlay.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.int.yml up -d
+#
+# Requires: .env.int  (copy from .env.int.example, fill in secrets)
+
+services:
+  platform:
+    build:
+      args:
+        APP_ENV: int
+    env_file:
+      - .env.int
+    environment:
+      APP_ENV: int
+      HOST: 0.0.0.0
+      ANTCREW_SANDBOX: required
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      ANTCREW_REQUIRE_AUTH: "true"
+    volumes:
+      - []                        # no source mount in int
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 2
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.int
+    environment:
+      POSTGRES_DB: antcrew_int
+    volumes:
+      - postgres_int:/var/lib/postgresql/data
+
+volumes:
+  platform_data: null             # override to remove dev SQLite volume
+  postgres_int:

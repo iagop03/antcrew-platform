@@ -4,7 +4,14 @@ __pycache__/
 venv/
 dist/
 *.egg-info/
+
+# Actual env files with secrets — examples (.env.*.example) are tracked
 .env
 .env.local
+.env.dev
+.env.int
+.env.uat
+.env.prod
+
 platform.db
 *.db-journal

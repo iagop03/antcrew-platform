@@ -1,0 +1,41 @@
+# Production environment overlay.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Requires: .env.prod  (copy from .env.prod.example, fill in secrets — NEVER commit)
+
+services:
+  platform:
+    build:
+      args:
+        APP_ENV: prod
+    env_file:
+      - .env.prod
+    environment:
+      APP_ENV: prod
+      HOST: 0.0.0.0
+      ANTCREW_SANDBOX: required
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      ANTCREW_REQUIRE_AUTH: "true"
+    volumes:
+      - []
+    restart: unless-stopped
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 4
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      POSTGRES_DB: antcrew_prod
+    volumes:
+      - postgres_prod:/var/lib/postgresql/data
+
+volumes:
+  platform_data: null
+  postgres_prod:

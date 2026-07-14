@@ -5,13 +5,15 @@ import asyncio
 import json
 import logging
 import os
+import re
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 import secrets
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,11 +22,27 @@ from sqlmodel import select
 
 from app.core.database import init_db, get_session
 from app.core.listener import start_listening, stop_listening
+from app.core.auth import _hash, _key_prefix
+from app.core.byok import TRIAL_CREDIT_USD
+from app.models.run import Workspace, ApiKey
 from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, evals
 from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as pipelines_api
 
 _STATIC = Path(__file__).parent / "static"
 _VERSION = "0.4.0"
+
+# ---------------------------------------------------------------------------
+# Environment — read once at import time so guards can reference it.
+# ---------------------------------------------------------------------------
+
+_VALID_APP_ENVS = frozenset({"dev", "int", "uat", "prod"})
+APP_ENV: str = os.environ.get("APP_ENV", "dev").lower()
+if APP_ENV not in _VALID_APP_ENVS:
+    raise RuntimeError(
+        f"APP_ENV={APP_ENV!r} is not valid. "
+        f"Must be one of: {', '.join(sorted(_VALID_APP_ENVS))}. "
+        "Example: APP_ENV=prod"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -62,31 +80,43 @@ log = logging.getLogger(__name__)
 
 
 async def _check_database_url() -> None:
-    """Block startup if SQLite is used on a public-facing host.
+    """Block startup if SQLite is used in non-dev environments or on a public host.
 
-    SQLite is single-writer and locks the whole file on writes — under any real
-    concurrent load it will cause 500s.  On a public host this is always wrong.
+    SQLite is single-writer and locks the whole file on writes — unsuitable for
+    any concurrent traffic. Non-dev environments also carry a cross-environment
+    contamination risk if they share a database instance.
     """
     db_url = os.environ.get("DATABASE_URL", "")
     if not db_url or "sqlite" not in db_url.lower():
         return
+
+    if APP_ENV != "dev":
+        raise RuntimeError(
+            f"DATABASE_URL uses SQLite but APP_ENV={APP_ENV!r}. "
+            "Non-dev environments require PostgreSQL to avoid single-writer lock "
+            "and cross-environment data contamination. "
+            "Set DATABASE_URL to a PostgreSQL connection string "
+            "(e.g. postgresql+asyncpg://user:pass@host/antcrew_{APP_ENV})."
+        )
+
     host = os.environ.get("HOST", "127.0.0.1")
     is_public = host not in ("127.0.0.1", "localhost", "::1")
     if is_public:
         raise RuntimeError(
             f"DATABASE_URL={db_url!r} uses SQLite on public host {host!r}. "
             "SQLite is single-writer and will lock under concurrent traffic. "
-            "Set DATABASE_URL to a PostgreSQL connection string for production deployments."
+            "Set DATABASE_URL to a PostgreSQL connection string."
         )
-    log.debug("database: SQLite OK on localhost")
+    log.debug("database: SQLite OK on localhost dev")
 
 
 async def _check_sandbox_mode() -> None:
-    """Block or loudly warn when engine runs would execute code outside Docker on a public host.
+    """Block when engine runs would execute code outside Docker.
 
-    The safe production value is ANTCREW_SANDBOX=required.  'auto' is acceptable
-    on localhost (Docker may be absent) but on any public interface it means generated
-    code and pip install post-install hooks execute unsandboxed on the host.
+    ANTCREW_SANDBOX=required is the only safe value for any non-dev environment.
+    'auto' on localhost is acceptable only in dev (Docker may be absent).
+    int/uat/prod may run on restricted networks but still execute real code with
+    real tokens — Docker isolation is non-negotiable regardless of host binding.
     """
     sandbox_mode = os.environ.get("ANTCREW_SANDBOX", "auto").lower()
     host = os.environ.get("HOST", "127.0.0.1")
@@ -96,14 +126,21 @@ async def _check_sandbox_mode() -> None:
         log.info("sandbox: ANTCREW_SANDBOX=required — Docker isolation enforced")
         return
 
-    if is_public and sandbox_mode != "required":
+    if APP_ENV != "dev":
+        raise RuntimeError(
+            f"ANTCREW_SANDBOX={sandbox_mode!r} in APP_ENV={APP_ENV!r}. "
+            "All non-dev environments must enforce Docker isolation regardless of network "
+            "exposure — int/uat run real code with real tokens on potentially shared infra. "
+            "Set ANTCREW_SANDBOX=required."
+        )
+
+    if is_public:
         raise RuntimeError(
             f"ANTCREW_SANDBOX={sandbox_mode!r} on public host {host!r}. "
             "Engine runs will execute generated code and pip install post-install hooks "
-            "directly on the host. Set ANTCREW_SANDBOX=required to enforce Docker isolation, "
-            "or set HOST to a loopback address for local-only deployments."
+            "directly on the host. Set ANTCREW_SANDBOX=required to enforce Docker isolation."
         )
-    log.debug("sandbox: ANTCREW_SANDBOX=%r (localhost — Docker optional)", sandbox_mode)
+    log.debug("sandbox: ANTCREW_SANDBOX=%r (localhost dev — Docker optional)", sandbox_mode)
 
 
 async def _check_stripe_config() -> None:
@@ -350,6 +387,31 @@ async def _eval_scheduler_loop() -> None:
             log.warning("eval scheduler error: %s", exc)
 
 
+async def _check_app_env() -> None:
+    """Log the active environment prominently so it is unmistakable in startup logs."""
+    log.info("antcrew-platform v%s  env=%s", _VERSION, APP_ENV)
+
+
+async def _check_stripe_key_mode() -> None:
+    """Block startup if a Stripe test key is used in APP_ENV=prod.
+
+    A test key (sk_test_…) in production means real customer charges silently fail —
+    subscriptions are not created, invoices not paid, and the billing system looks
+    healthy until a customer reports they were not charged.
+    """
+    stripe_key = os.environ.get("STRIPE_SECRET_KEY", "")
+    if not stripe_key or APP_ENV != "prod":
+        return
+    if stripe_key.startswith("sk_test_"):
+        raise RuntimeError(
+            "STRIPE_SECRET_KEY starts with 'sk_test_' but APP_ENV=prod. "
+            "A Stripe test key in production silently drops real charges — "
+            "subscriptions will not be created and customers will not be billed. "
+            "Set STRIPE_SECRET_KEY to your live key (sk_live_…)."
+        )
+    log.info("billing: Stripe live key active (APP_ENV=prod)")
+
+
 async def _check_byok_config() -> None:
     """Warn or block when customer LLM keys are stored without encryption.
 
@@ -449,12 +511,14 @@ async def _check_cors_config() -> None:
 async def lifespan(app: FastAPI):
     global _webhook_task, _scheduler_task
     _setup_logging()
+    await _check_app_env()
     await init_db()
     await _check_database_url()
     await _check_auth_mode()
     await _check_cors_config()
     await _check_sandbox_mode()
     await _check_stripe_config()
+    await _check_stripe_key_mode()
     await _check_mor_config()
     await _check_slack_config()
     await _check_byok_config()
@@ -604,6 +668,107 @@ async def onboard_bootstrap(
         "admin_label": key.label,
         "key": raw,
     }
+
+
+# ---------------------------------------------------------------------------
+# Public trial registration
+# ---------------------------------------------------------------------------
+
+# Simple in-memory tracker: ip -> list[timestamp] for 24-hour window
+_trial_ip_log: dict[str, list[float]] = {}
+_TRIAL_MAX_PER_IP: int = int(os.environ.get("TRIAL_MAX_PER_IP", "5"))
+_TRIAL_WINDOW_S: float = 86400.0  # 24 hours
+
+
+class _TrialRequest(BaseModel):
+    name: str   # workspace / company name
+    email: str  # used as API key label and contact
+
+
+@app.post("/trial/register", status_code=201, tags=["trial"])
+async def trial_register(
+    body: _TrialRequest,
+    request: Request,
+    session=Depends(get_session),
+):
+    """Public self-service trial registration.
+
+    Creates a workspace + admin API key with TRIAL_CREDIT_USD of free credit.
+    Rate-limited to TRIAL_MAX_PER_IP (default 5) registrations per IP per 24 h.
+    """
+    # ── IP rate limit ────────────────────────────────────────────────────────
+    ip = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    timestamps = _trial_ip_log.setdefault(ip, [])
+    timestamps[:] = [t for t in timestamps if t > now - _TRIAL_WINDOW_S]
+    if _TRIAL_MAX_PER_IP > 0 and len(timestamps) >= _TRIAL_MAX_PER_IP:
+        raise HTTPException(
+            429,
+            "Too many trial registrations from this IP. Try again in 24 hours.",
+            headers={"Retry-After": "86400"},
+        )
+
+    # ── Validate inputs ──────────────────────────────────────────────────────
+    name = body.name.strip()
+    email = body.email.strip().lower()
+    if not name or not email or "@" not in email:
+        raise HTTPException(400, "name and a valid email are required")
+
+    # ── Generate unique slug ─────────────────────────────────────────────────
+    base_slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "trial"
+    slug = base_slug
+    suffix = 1
+    while (await session.exec(select(Workspace).where(Workspace.slug == slug))).first():
+        slug = f"{base_slug}-{suffix}"
+        suffix += 1
+
+    # ── Create workspace ─────────────────────────────────────────────────────
+    ws = Workspace(
+        name=name,
+        slug=slug,
+        is_trial=True,
+        max_cost_usd=TRIAL_CREDIT_USD,
+    )
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    # ── Create admin API key ─────────────────────────────────────────────────
+    raw = secrets.token_urlsafe(32)
+    label = re.sub(r"[^a-z0-9-]", "-", email.split("@")[0])[:50]
+    # Ensure label uniqueness
+    base_label = label
+    lsuffix = 1
+    while (await session.exec(select(ApiKey).where(ApiKey.label == label))).first():
+        label = f"{base_label}-{lsuffix}"
+        lsuffix += 1
+
+    key = ApiKey(
+        label=label,
+        key_hash=_hash(raw),
+        key_prefix=_key_prefix(raw),
+        workspace_id=ws.id,
+        role="admin",
+        email=email,
+    )
+    session.add(key)
+    await session.commit()
+
+    timestamps.append(now)
+
+    return {
+        "workspace_id": ws.id,
+        "workspace_name": ws.name,
+        "workspace_slug": ws.slug,
+        "trial_credit_usd": TRIAL_CREDIT_USD,
+        "admin_label": label,
+        "key": raw,
+    }
+
+
+@app.get("/trial")
+async def trial_page():
+    return FileResponse(_STATIC / "trial.html")
 
 
 @app.get("/")
