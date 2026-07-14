@@ -731,7 +731,7 @@ def _run_pipeline_sync(
 
     Per-node config from definition:
       node.model        → each agent uses its own LLM instance
-      node.hitl         → agent.approval_required = True
+      node.hitl         → interrupt_before wired on downstream nodes (review producer output)
       node.channel_type → "platform" | "slack" | "telegram"
     """
     from app.services.pipeline_builder import build_team_from_definition
@@ -745,9 +745,20 @@ def _run_pipeline_sync(
         byok_base_url=byok_base_url,
     )
 
-    # Apply per-node HITL + channel; honour force_hitl for all agents
+    # Build edge map and compute interrupt_before for HITL.
+    # The interrupt must fire BEFORE a downstream node (not before the hitl node itself),
+    # so that the hitl agent runs first, sets current_agent, and its output is available
+    # for review before the next agent proceeds.
+    raw_edges = definition.get("edges", [])
+    edge_map: dict[str, list[str]] = {}
+    for e in raw_edges:
+        edge_map.setdefault(e["from"], []).append(e["to"])
+    all_targets: set[str] = {e["to"] for e in raw_edges}
+
     nodes_by_id = {n["id"]: n for n in definition.get("nodes", [])}
-    any_hitl = force_hitl
+    node_type_map = {n["id"]: (n.get("type") or n["id"]) for n in definition.get("nodes", [])}
+    any_hitl = False
+    hitl_producers: set[str] = set()
 
     for node_id, agent in agents.items():
         node = nodes_by_id.get(node_id, {})
@@ -757,8 +768,21 @@ def _run_pipeline_sync(
             agent.channel = _resolve_node_channel(
                 ch_type, platform_channel, slack_creds, telegram_creds
             )
-            agent.approval_required = True
+            hitl_producers.add(node_id)
             any_hitl = True
+
+    # Interrupt before the downstream consumers, not the producers themselves.
+    # force_hitl = all non-entry nodes; per-node hitl = direct downstream of each hitl node.
+    interrupt_before: list[str] = []
+    if any_hitl:
+        if force_hitl:
+            interrupt_before = [nid for nid in agents if nid in all_targets]
+        else:
+            for pid in hitl_producers:
+                for ds in edge_map.get(pid, []):
+                    if ds in agents and ds not in interrupt_before:
+                        interrupt_before.append(ds)
+        # If a hitl node is last (no downstream), it can't be interrupted after — skip.
 
     # Apply per-node max_cost_usd cap to each agent's LLM
     if max_cost_usd is not None:
@@ -781,9 +805,14 @@ def _run_pipeline_sync(
         "_thread_id": thread_id,
     }
 
-    app_graph = supervisor.build(agents)
-    if any_hitl:
-        state = _run_interactive_pipeline(app_graph, initial_state, agents, thread_id)
+    app_graph = supervisor.build(
+        agents,
+        interrupt_before=interrupt_before if interrupt_before else None,
+    )
+    if any_hitl and interrupt_before:
+        state = _run_interactive_pipeline(
+            app_graph, initial_state, agents, thread_id, node_type_map=node_type_map
+        )
     else:
         state = app_graph.invoke(initial_state, config={"configurable": {"thread_id": thread_id}})
 
@@ -807,7 +836,14 @@ def _run_pipeline_sync(
     return RunResult(state=state, thread_id=thread_id, cost_usd=cost)
 
 
-def _run_interactive_pipeline(app_graph, initial_state: dict, agents: dict, thread_id: str) -> dict:
+def _run_interactive_pipeline(
+    app_graph,
+    initial_state: dict,
+    agents: dict,
+    thread_id: str,
+    *,
+    node_type_map: Optional[dict] = None,
+) -> dict:
     """Run a visual pipeline with HITL pauses using run_interactive() semantics.
 
     Pattern mirrors InteractiveMixin.run_interactive() but works with any
@@ -816,6 +852,14 @@ def _run_interactive_pipeline(app_graph, initial_state: dict, agents: dict, thre
     import asyncio
     import json as _json
     from antcrew.teams.base import AGENT_ARTIFACT
+
+    def _artifact_info(agent_name: str) -> tuple:
+        """AGENT_ARTIFACT lookup with fallback to base agent type for duplicate nodes."""
+        result = AGENT_ARTIFACT.get(agent_name, ("", None))
+        if not result[0] and node_type_map:
+            base_type = node_type_map.get(agent_name, agent_name)
+            result = AGENT_ARTIFACT.get(base_type, ("", None))
+        return result
 
     config = {"configurable": {"thread_id": thread_id}}
     app_graph.invoke(initial_state, config=config)
@@ -831,7 +875,7 @@ def _run_interactive_pipeline(app_graph, initial_state: dict, agents: dict, thre
         agent = agents.get(prev_agent)
         channel = getattr(agent, "channel", None) if agent else None
 
-        state_key, artifact_cls = AGENT_ARTIFACT.get(prev_agent, ("", None))
+        state_key, artifact_cls = _artifact_info(prev_agent)
         artifact = snapshot.values.get(state_key) if state_key else None
         options = getattr(agent, "response_options", None) or ["approve", "reject"]
 

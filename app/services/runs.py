@@ -22,6 +22,7 @@ async def list_runs(
     limit: int = 50,
     offset: int = 0,
     team: Optional[str] = None,
+    team_prefix: Optional[str] = None,
     status: Optional[str] = None,
     since_id: Optional[int] = None,
     workspace_id: Optional[int] = None,
@@ -34,6 +35,8 @@ async def list_runs(
         stmt = stmt.where(Run.id < since_id)
     if team:
         stmt = stmt.where(Run.team == team)
+    elif team_prefix:
+        stmt = stmt.where(Run.team.startswith(team_prefix))
     if status:
         stmt = stmt.where(Run.status == status)
     if workspace_ids is not None:

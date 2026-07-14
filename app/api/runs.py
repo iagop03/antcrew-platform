@@ -102,13 +102,14 @@ async def index(
     offset: int = Query(0, ge=0),
     since_id: Optional[int] = Query(None, description="Cursor: return runs with id < since_id"),
     team: Optional[str] = None,
+    team_prefix: Optional[str] = Query(None, description="Filter by team name prefix, e.g. 'pipeline:'"),
     status: Optional[str] = None,
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
     return await list_runs(
-        session, limit=limit, offset=offset, team=team, status=status,
-        since_id=since_id, workspace_ids=ctx.workspace_ids,
+        session, limit=limit, offset=offset, team=team, team_prefix=team_prefix,
+        status=status, since_id=since_id, workspace_ids=ctx.workspace_ids,
     )
 
 

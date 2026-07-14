@@ -36,11 +36,15 @@ body{overflow:hidden}
   <span class="font-mono font-bold text-indigo-400 text-sm">antcrew</span>
   <span class="text-gray-700 text-xs">/ Pipelines</span>
 
-  <div class="flex-1 flex items-center gap-2 max-w-xs">
+  <div class="flex-1 flex items-center gap-2 max-w-sm">
     <input x-show="activeId && !isTemplate" x-cloak
       x-model="activeName"
       class="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-indigo-500"
       placeholder="Nombre del pipeline">
+    <input x-show="activeId && !isTemplate" x-cloak
+      x-model="activeDescription"
+      class="flex-1 bg-gray-800/60 border border-gray-700/60 rounded px-2 py-1 text-xs text-gray-400 focus:outline-none focus:border-indigo-500/70"
+      placeholder="Descripción (opcional)">
   </div>
   <span x-show="activeId && isTemplate" class="text-sm text-gray-400 italic" x-text="activeName"></span>
   <span x-show="activeId && isTemplate" class="text-xs bg-gray-800 text-gray-500 px-2 py-0.5 rounded font-mono">template</span>
@@ -493,6 +497,7 @@ function app() {
     // Active pipeline
     activeId: null,
     activeName: '',
+    activeDescription: '',
     isTemplate: false,
     nodes: [],
     edges: [],
@@ -617,6 +622,7 @@ function app() {
     loadPipeline(p) {
       this.activeId = p.id;
       this.activeName = p.name;
+      this.activeDescription = p.description || '';
       this.isTemplate = p.is_template;
       this.selectedNodeId = null;
       this.pipelineRuns = [];
@@ -637,6 +643,7 @@ function app() {
       this.nodes = [];
       this.edges = [];
       this.selectedNodeId = null;
+      this.activeDescription = '';
       this.zoom = 1;
       this.pan = { x: 40, y: 40 };
       this.saveStatus = '';
@@ -649,6 +656,7 @@ function app() {
       const body = {
         name: this.activeName + ' (copia)',
         workspace_id: ws.id,
+        description: this.activeDescription ? this.activeDescription + ' (copia)' : null,
         definition: { nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})), zoom: this.zoom, pan: { ...this.pan } },
       };
       const key = localStorage.getItem('antcrew_api_key') || '';
@@ -678,7 +686,7 @@ function app() {
           const r = await fetch('/pipelines/', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ name: this.activeName, workspace_id: ws.id, definition }),
+            body: JSON.stringify({ name: this.activeName, description: this.activeDescription || null, workspace_id: ws.id, definition }),
           });
           if (!r.ok) throw new Error();
           const created = await r.json();
@@ -687,7 +695,7 @@ function app() {
           const r = await fetch(`/pipelines/${this.activeId}`, {
             method: 'PATCH',
             headers,
-            body: JSON.stringify({ name: this.activeName, definition }),
+            body: JSON.stringify({ name: this.activeName, description: this.activeDescription || null, definition }),
           });
           if (!r.ok) throw new Error();
         }
@@ -873,10 +881,13 @@ function app() {
       const label = e.dataTransfer.getData('agent_label');
       if (!type) return;
 
-      // Avoid duplicate node types (one instance per type by default)
-      if (this.nodes.some(n => n.type === type)) {
-        alert(`Ya existe un nodo de tipo "${label}" en este pipeline.\nSi necesitas varios, édita el JSON directamente.`);
-        return;
+      // Generate a unique node ID: use the type directly the first time,
+      // then append _2, _3, … for subsequent instances of the same type.
+      let nodeId = type;
+      if (this.nodes.some(n => n.id === nodeId)) {
+        let i = 2;
+        while (this.nodes.some(n => n.id === `${type}_${i}`)) i++;
+        nodeId = `${type}_${i}`;
       }
 
       const svg = document.getElementById('canvas-svg');
@@ -884,7 +895,7 @@ function app() {
       const x = Math.round((e.clientX - rect.left - this.pan.x) / this.zoom);
       const y = Math.round((e.clientY - rect.top  - this.pan.y) / this.zoom);
 
-      this.nodes.push({ id: type, type, label, model: 'claude', hitl: false, channel_type: 'platform', x, y });
+      this.nodes.push({ id: nodeId, type, label, model: 'claude', hitl: false, channel_type: 'platform', x, y });
     },
 
     // ── Edge editing ──────────────────────────────────────────────────────

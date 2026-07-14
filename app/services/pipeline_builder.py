@@ -72,6 +72,11 @@ def build_team_from_definition(
         if agent is None:
             raise ValueError(f"Unknown agent type: {agent_type!r}")
 
+        # When node_id differs from agent_type (duplicate nodes), align agent.name
+        # so current_agent in TeamState matches the agents dict key for HITL lookup.
+        if node_id != agent_type:
+            agent.name = node_id
+
         agents[node_id] = agent
         log.debug("pipeline_node id=%s type=%s model=%s", node_id, agent_type, node_model)
 
