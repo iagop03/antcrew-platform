@@ -270,11 +270,12 @@ body{overflow:hidden}
     </div>
   </div>
 
-  <!-- Right: Properties panel -->
-  <aside x-show="selectedNodeId" x-cloak x-transition
-    class="w-52 shrink-0 bg-gray-900 border-l border-gray-800 flex flex-col p-4 gap-4">
+  <!-- Right: Properties panel / pipeline runs -->
+  <aside x-show="activeId" x-cloak x-transition
+    class="w-52 shrink-0 bg-gray-900 border-l border-gray-800 flex flex-col overflow-y-auto">
+    <!-- Node properties (when a node is selected) -->
     <template x-if="selectedNode">
-      <div class="space-y-4">
+      <div class="p-4 space-y-4">
         <div>
           <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Nodo</p>
           <div class="space-y-3">
@@ -331,6 +332,51 @@ body{overflow:hidden}
             <p x-show="edgesFromNode(selectedNodeId).length===0" class="text-xs text-gray-700">Sin conexiones salientes</p>
           </div>
         </div>
+      </div>
+    </template>
+
+    <!-- Recent runs (when no node selected and it's a user pipeline) -->
+    <template x-if="!selectedNode && activeId && !isTemplate">
+      <div class="p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Runs recientes</p>
+          <button @click="loadPipelineRuns()" class="text-gray-600 hover:text-gray-400 text-xs">↻</button>
+        </div>
+        <template x-if="pipelineRuns.length === 0 && !loadingPipelineRuns">
+          <p class="text-xs text-gray-700">Sin runs todavía.</p>
+        </template>
+        <template x-if="loadingPipelineRuns">
+          <div class="space-y-1">
+            <div class="h-8 bg-gray-800 rounded animate-pulse"></div>
+            <div class="h-8 bg-gray-800 rounded animate-pulse"></div>
+          </div>
+        </template>
+        <div class="space-y-1">
+          <template x-for="r in pipelineRuns" :key="r.run_id">
+            <a :href="'/run/' + r.run_id"
+               class="block rounded px-2 py-1.5 text-xs hover:bg-gray-800 transition group">
+              <div class="flex items-center justify-between gap-1 mb-0.5">
+                <span class="px-1.5 py-0.5 rounded-full text-xs font-medium leading-none"
+                  :class="{
+                    'bg-yellow-900/50 text-yellow-300': r.status==='running',
+                    'bg-green-900/50 text-green-300': r.status==='success',
+                    'bg-red-900/50 text-red-300': r.status==='error',
+                    'bg-gray-800 text-gray-400': !['running','success','error'].includes(r.status)
+                  }" x-text="r.status"></span>
+                <span class="font-mono text-gray-500" x-text="r.cost_usd ? '$'+r.cost_usd.toFixed(3) : '—'"></span>
+              </div>
+              <p class="text-gray-400 truncate" x-text="r.request"></p>
+              <p class="text-gray-600 text-xs" x-text="timeAgo(r.created_at)"></p>
+            </a>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Template placeholder -->
+    <template x-if="!selectedNode && isTemplate">
+      <div class="p-4">
+        <p class="text-xs text-gray-600">Selecciona un nodo para ver sus propiedades, o clona este template para ejecutarlo.</p>
       </div>
     </template>
   </aside>
@@ -468,6 +514,10 @@ function app() {
     editingEdge: null,
     editingEdgeCondition: '',
 
+    // Pipeline runs
+    pipelineRuns: [],
+    loadingPipelineRuns: false,
+
     // Save / run
     saving: false,
     saveStatus: '',
@@ -483,6 +533,15 @@ function app() {
 
     get selectedNode() {
       return this.nodes.find(n => n.id === this.selectedNodeId) || null;
+    },
+
+    timeAgo(iso) {
+      if (!iso) return '';
+      const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (s < 60) return s + 's';
+      if (s < 3600) return Math.floor(s/60) + 'm';
+      if (s < 86400) return Math.floor(s/3600) + 'h';
+      return Math.floor(s/86400) + 'd';
     },
 
     nodeColor(type) { return nodeColor(type); },
@@ -541,17 +600,33 @@ function app() {
 
     // ── Pipeline load/save ────────────────────────────────────────────────
 
+    async loadPipelineRuns() {
+      if (!this.activeId || this.activeId === '__new__' || this.isTemplate) return;
+      this.loadingPipelineRuns = true;
+      try {
+        const key = localStorage.getItem('antcrew_api_key') || '';
+        const r = await fetch(`/runs/?team=pipeline:${this.activeId}&limit=10`, {
+          headers: key ? {'X-Api-Key': key} : {},
+        });
+        if (r.ok) this.pipelineRuns = await r.json();
+      } catch {} finally {
+        this.loadingPipelineRuns = false;
+      }
+    },
+
     loadPipeline(p) {
       this.activeId = p.id;
       this.activeName = p.name;
       this.isTemplate = p.is_template;
       this.selectedNodeId = null;
+      this.pipelineRuns = [];
       const def = typeof p.definition === 'string' ? JSON.parse(p.definition) : p.definition;
       this.nodes = (def.nodes || []).map(n => ({ hitl: false, channel_type: 'platform', ...n }));
       this.edges = (def.edges || []).map(e => ({...e, id: e.id || edgeId()}));
       this.zoom = def.zoom || 1;
       this.pan = def.pan ? { ...def.pan } : { x: 40, y: 40 };
       this.saveStatus = '';
+      this.loadPipelineRuns();
     },
 
     newPipeline() {
@@ -667,6 +742,8 @@ function app() {
         this.showRunModal = false;
         if (data.run_id) {
           window.location.href = `/run/${data.run_id}`;
+        } else {
+          this.loadPipelineRuns();
         }
       } catch(e) {
         this.runError = e.message;

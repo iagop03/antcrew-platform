@@ -108,7 +108,16 @@
           <tr class="border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer transition"
               @click="window.location='/run/' + run.run_id">
             <td class="px-4 py-3 font-mono text-xs text-gray-400" x-text="run.run_id.slice(0,12) + '…'"></td>
-            <td class="px-4 py-3 text-indigo-300 font-medium" x-text="run.team"></td>
+            <td class="px-4 py-3 font-medium">
+              <template x-if="run.team?.startsWith('pipeline:')">
+                <span class="inline-flex items-center gap-1">
+                  <span class="text-xs bg-indigo-950 border border-indigo-800 text-indigo-300 px-1.5 py-0.5 rounded font-mono">pipeline</span>
+                </span>
+              </template>
+              <template x-if="!run.team?.startsWith('pipeline:')">
+                <span class="text-indigo-300" x-text="run.team"></span>
+              </template>
+            </td>
             <td class="px-4 py-3 text-gray-300 max-w-xs truncate" x-text="run.request"></td>
             <td class="px-4 py-3">
               <span class="px-2 py-0.5 rounded-full text-xs font-medium"

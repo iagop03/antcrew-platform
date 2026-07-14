@@ -229,6 +229,7 @@ async def trigger_visual_pipeline(
             workspace_id=ctx.workspace_id,
             force_hitl=effective_hitl,
             model=body.model,
+            pipeline_id=body.pipeline_id,
         )
     except (ValueError, ImportError) as exc:
         raise HTTPException(422, str(exc))

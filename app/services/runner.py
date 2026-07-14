@@ -725,6 +725,7 @@ def _run_pipeline_sync(
     byok_base_url: Optional[str] = None,
     slack_creds: Optional[dict] = None,
     telegram_creds: Optional[dict] = None,
+    pipeline_id: Optional[str] = None,
 ):
     """Run a visual pipeline definition synchronously in a thread-pool worker.
 
@@ -769,7 +770,8 @@ def _run_pipeline_sync(
                 seen_llms.add(id(llm))
 
     _run_id = new_run_id()
-    _bus.emit("pipeline.start", {"team": "visual_pipeline", "request": request},
+    _team_label = f"pipeline:{pipeline_id}" if pipeline_id else "visual_pipeline"
+    _bus.emit("pipeline.start", {"team": _team_label, "request": request},
               run_id=_run_id, thread_id=thread_id)
 
     initial_state: dict = {
@@ -806,7 +808,13 @@ def _run_pipeline_sync(
 
 
 def _run_interactive_pipeline(app_graph, initial_state: dict, agents: dict, thread_id: str) -> dict:
-    """Run a visual pipeline with HITL pauses using run_interactive() semantics."""
+    """Run a visual pipeline with HITL pauses using run_interactive() semantics.
+
+    Pattern mirrors InteractiveMixin.run_interactive() but works with any
+    Supervisor-built graph and agents dict without needing a Team instance.
+    """
+    import asyncio
+    import json as _json
     from antcrew.teams.base import AGENT_ARTIFACT
 
     config = {"configurable": {"thread_id": thread_id}}
@@ -816,36 +824,44 @@ def _run_interactive_pipeline(app_graph, initial_state: dict, agents: dict, thre
         snapshot = app_graph.get_state(config)
         if not snapshot.next:
             break
+
+        # current_agent is updated by each agent node before it returns,
+        # so it reflects the last agent to have run (whose output needs review).
         prev_agent = snapshot.values.get("current_agent", "")
         agent = agents.get(prev_agent)
         channel = getattr(agent, "channel", None) if agent else None
 
-        state_key, _ = AGENT_ARTIFACT.get(prev_agent, ("", None))
+        state_key, artifact_cls = AGENT_ARTIFACT.get(prev_agent, ("", None))
         artifact = snapshot.values.get(state_key) if state_key else None
         options = getattr(agent, "response_options", None) or ["approve", "reject"]
 
         if channel:
-            import asyncio, concurrent.futures
-            try:
-                asyncio.get_running_loop()
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    result = pool.submit(asyncio.run,
-                        channel.send_for_review(artifact, prev_agent, thread_id, options)
-                    ).result()
-            except RuntimeError:
-                result = asyncio.run(
-                    channel.send_for_review(artifact, prev_agent, thread_id, options)
-                )
+            # We're inside a thread-pool worker so there's no running event loop.
+            # asyncio.run() creates a fresh loop for the async HITL call.
+            result = asyncio.run(
+                channel.send_for_review(artifact, prev_agent, thread_id, options)
+            )
         else:
             result = {"decision": "approve", "edited": None, "feedback": None}
 
         decision = result.get("decision", "approve")
         if decision == "reject":
             break
+
         if decision == "edit" and result.get("edited"):
-            from antcrew.teams.base import InteractiveMixin
-            _mixin = InteractiveMixin()
-            _mixin._apply_edit(app_graph, config, prev_agent, result["edited"])
+            # Inline _apply_edit logic (avoids instantiating InteractiveMixin)
+            edited_json = result["edited"]
+            if state_key:
+                try:
+                    data = _json.loads(edited_json) if isinstance(edited_json, str) else edited_json
+                    if isinstance(data, list) and artifact_cls:
+                        app_graph.update_state(config, {state_key: [artifact_cls.model_validate(i) for i in data]})
+                    elif isinstance(data, dict) and artifact_cls:
+                        app_graph.update_state(config, {state_key: artifact_cls.model_validate(data)})
+                    else:
+                        app_graph.update_state(config, {state_key: data})
+                except Exception as exc:
+                    log.warning("_run_interactive_pipeline: edit apply failed (%s)", exc)
 
         app_graph.invoke(None, config=config)
 
@@ -862,8 +878,12 @@ async def dispatch_pipeline(
     workspace_id: Optional[int] = None,
     force_hitl: bool = False,
     model: str = "claude",
+    pipeline_id: Optional[str] = None,
 ) -> Optional[str]:
     """Dispatch a visual pipeline (from pipeline_def JSON) in the background.
+
+    pipeline_id is stored in Run.team as "pipeline:{pipeline_id}" so runs can
+    be filtered per-pipeline without a schema change.
 
     Fetches workspace Slack/Telegram credentials so per-node channel_type can be
     wired up in _run_pipeline_sync without a second async DB call.
@@ -936,6 +956,7 @@ async def dispatch_pipeline(
                 _run_pipeline_sync, definition, request, thread_id,
                 max_cost_usd, platform_channel, force_hitl, model,
                 _byok_api_key, _byok_base_url, _slack_creds, _telegram_creds,
+                pipeline_id,
             )
             result = await loop.run_in_executor(_executor, fn)
             await _store_result(result)

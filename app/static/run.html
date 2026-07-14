@@ -17,7 +17,7 @@
   <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
   <a href="/webhooks" class="text-sm text-gray-400 hover:text-white">Webhooks</a>
   <a href="/settings" class="text-sm text-gray-400 hover:text-white">Settings</a>
-  <template x-if="run && run.team === 'visual_pipeline'">
+  <template x-if="run && run.team?.startsWith('pipeline:')">
     <a href="/pipelines" class="text-sm text-indigo-400 hover:text-indigo-300 ml-2">← Pipelines</a>
   </template>
   <div class="ml-auto flex items-center gap-2 text-xs text-gray-500">
@@ -73,10 +73,10 @@
           <h1 class="text-lg font-semibold text-white" x-text="run.request"></h1>
           <div class="flex items-center gap-2 mt-1">
             <p class="text-sm text-indigo-300" x-text="run.team"></p>
-            <template x-if="run.team === 'visual_pipeline'">
-              <span class="text-xs bg-indigo-950 border border-indigo-800 text-indigo-300 px-2 py-0.5 rounded-full font-mono">
-                visual pipeline
-              </span>
+            <template x-if="run.team?.startsWith('pipeline:')">
+              <a :href="'/pipelines'" class="text-xs bg-indigo-950 border border-indigo-800 text-indigo-300 px-2 py-0.5 rounded-full font-mono hover:border-indigo-500 transition">
+                ↗ pipeline
+              </a>
             </template>
           </div>
         </div>
@@ -201,7 +201,7 @@
       </template>
 
       <!-- ── PIPELINE SIDEBAR ── -->
-      <template x-if="run && run.team === 'visual_pipeline'">
+      <template x-if="run && run.team?.startsWith('pipeline:')">
         <div class="space-y-5">
           <!-- Agent flow mini-view -->
           <div>
@@ -282,7 +282,7 @@
       </template>
 
       <!-- ── TEAM SIDEBAR ── -->
-      <template x-if="run && run.team !== 'engine' && run.team !== 'visual_pipeline'">
+      <template x-if="run && run.team !== 'engine' && !run.team?.startsWith('pipeline:')">
         <div class="space-y-5">
           <!-- Tickets -->
           <div>
@@ -386,7 +386,7 @@ function runDetail() {
       if (!this.runId) { this.runError = 'Invalid URL — no run ID found.'; this.loadingRun = false; return; }
 
       await Promise.all([this.loadRun(), this.loadEvents(), this.loadState()]);
-      if (this.run && this.run.team !== 'engine' && this.run.team !== 'visual_pipeline') await this.loadTickets();
+      if (this.run && this.run.team !== 'engine' && !this.run.team?.startsWith('pipeline:')) await this.loadTickets();
       this._deriveCapabilities();
       await this.loadPendingReview();
       this.connectWs();
@@ -523,7 +523,7 @@ function runDetail() {
         if (ev.type === 'pipeline.end') {
           const tasks = [this.loadRun(), this.loadState()];
           const t = this.run && this.run.team;
-          if (t && t !== 'engine' && t !== 'visual_pipeline') tasks.push(this.loadTickets());
+          if (t && t !== 'engine' && !t.startsWith('pipeline:')) tasks.push(this.loadTickets());
           Promise.all(tasks);
         }
         if (ev.type === 'hitl.review_required' && ev.run_id === this.runId) {
