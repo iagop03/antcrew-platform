@@ -11,7 +11,6 @@ import json
 import logging
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -24,7 +23,27 @@ log = logging.getLogger(__name__)
 
 DB_URL = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///./platform.db")
 
-engine = create_async_engine(DB_URL, echo=False)
+# create_async_engine requires an async driver prefix; normalize bare postgresql:// URLs.
+# asyncpg also doesn't understand the psycopg2-style sslmode= query param — strip it
+# and pass ssl=True via connect_args when sslmode is require/verify-ca/verify-full.
+_ssl = False
+if DB_URL.startswith("postgres://"):
+    DB_URL = "postgresql+asyncpg://" + DB_URL[len("postgres://"):]
+    _ssl = True
+elif DB_URL.startswith("postgresql://"):
+    DB_URL = "postgresql+asyncpg://" + DB_URL[len("postgresql://"):]
+    _ssl = True
+
+if "sslmode=" in DB_URL:
+    from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
+    _parsed = urlparse(DB_URL)
+    _params = parse_qs(_parsed.query, keep_blank_values=True)
+    _sslmode = _params.pop("sslmode", ["disable"])[0]
+    _ssl = _sslmode in ("require", "verify-ca", "verify-full")
+    DB_URL = urlunparse(_parsed._replace(query=urlencode({k: v[0] for k, v in _params.items()})))
+
+_connect_args: dict = {"ssl": True} if _ssl else {}
+engine = create_async_engine(DB_URL, echo=False, connect_args=_connect_args)
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent  # app/core/database.py → project root
 
@@ -41,7 +60,7 @@ async def _run_alembic_upgrade() -> None:
     result: subprocess.CompletedProcess = await loop.run_in_executor(
         None,
         lambda: subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            ["alembic", "upgrade", "head"],
             cwd=str(_PROJECT_ROOT),
             capture_output=True,
             text=True,
