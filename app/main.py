@@ -25,7 +25,7 @@ from app.core.listener import start_listening, stop_listening
 from app.core.auth import _hash, _key_prefix
 from app.core.byok import TRIAL_CREDIT_USD
 from app.models.run import Workspace, ApiKey
-from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, evals
+from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, workspaces_byok, workspaces_members, evals
 from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as pipelines_api
 
 _STATIC = Path(__file__).parent / "static"
@@ -580,6 +580,8 @@ app.include_router(api_keys.router)
 app.include_router(reviews.router)
 app.include_router(templates.router)
 app.include_router(workspaces.router)
+app.include_router(workspaces_byok.router)
+app.include_router(workspaces_members.router)
 app.include_router(evals.router)
 app.include_router(eval_schedules.router)
 app.include_router(engine.router)
