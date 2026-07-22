@@ -283,7 +283,10 @@ def _run_sync(
 
 
 async def _set_run_attribution(
-    run_id: str, created_by: Optional[str], workspace_id: Optional[int]
+    run_id: str,
+    created_by: Optional[str],
+    workspace_id: Optional[int],
+    client_label: Optional[str] = None,
 ) -> None:
     from sqlmodel import select
     from app.models.run import Run
@@ -296,6 +299,8 @@ async def _set_run_attribution(
                     run.created_by = created_by
                 if workspace_id is not None:
                     run.workspace_id = workspace_id
+                if client_label is not None:
+                    run.client_label = client_label
                 session.add(run)
                 await session.commit()
     except Exception as exc:
@@ -436,6 +441,7 @@ async def dispatch(
     force_hitl: bool = False,
     repo_url: Optional[str] = None,
     repo_token: Optional[str] = None,
+    client_label: Optional[str] = None,
 ) -> Optional[str]:
     """Start a team run in the background. Returns run_id once pipeline.start fires.
 
@@ -519,7 +525,7 @@ async def dispatch(
         if (created_by or workspace_id is not None) and run_id:
             # Await attribution before returning so workspace_id is set before the
             # 202 response reaches the client — eliminates the race on GET /runs/.
-            await _set_run_attribution(run_id, created_by, workspace_id)
+            await _set_run_attribution(run_id, created_by, workspace_id, client_label)
         return run_id
     except asyncio.TimeoutError:
         log.warning("runner: pipeline.start not received within %.0f s for %s", _DISPATCH_TIMEOUT, team_name)
@@ -607,6 +613,7 @@ async def dispatch_custom(
     workspace_id: Optional[int] = None,
     force_hitl: bool = False,
     model: str = "claude",
+    client_label: Optional[str] = None,
 ) -> Optional[str]:
     """Dispatch a custom pipeline defined by a list of TemplateAgent step configs."""
     try:
@@ -677,7 +684,7 @@ async def dispatch_custom(
     try:
         run_id = await asyncio.wait_for(asyncio.shield(run_id_future), timeout=_DISPATCH_TIMEOUT)
         if (created_by or workspace_id is not None) and run_id:
-            await _set_run_attribution(run_id, created_by, workspace_id)
+            await _set_run_attribution(run_id, created_by, workspace_id, client_label)
         return run_id
     except asyncio.TimeoutError:
         log.warning("runner: custom pipeline.start not received within %.0f s", _DISPATCH_TIMEOUT)
@@ -928,6 +935,7 @@ async def dispatch_pipeline(
     force_hitl: bool = False,
     model: str = "claude",
     pipeline_id: Optional[str] = None,
+    client_label: Optional[str] = None,
 ) -> Optional[str]:
     """Dispatch a visual pipeline (from pipeline_def JSON) in the background.
 
@@ -1023,7 +1031,7 @@ async def dispatch_pipeline(
     try:
         run_id = await asyncio.wait_for(asyncio.shield(run_id_future), timeout=_DISPATCH_TIMEOUT)
         if (created_by or workspace_id is not None) and run_id:
-            await _set_run_attribution(run_id, created_by, workspace_id)
+            await _set_run_attribution(run_id, created_by, workspace_id, client_label)
         return run_id
     except asyncio.TimeoutError:
         log.warning("runner: visual pipeline.start not received within %.0f s", _DISPATCH_TIMEOUT)

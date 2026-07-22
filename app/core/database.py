@@ -242,6 +242,18 @@ async def _migrate_llm_base_url(eng) -> None:
         pass  # PostgreSQL or table absent — skip
 
 
+async def _migrate_run_client_label(eng) -> None:
+    """Idempotent migration: add client_label column to run if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(run)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "client_label" not in col_names:
+                await conn.execute(text("ALTER TABLE run ADD COLUMN client_label TEXT"))
+    except Exception:
+        pass  # PostgreSQL or table absent — skip
+
+
 async def _migrate_pipeline_def(eng) -> None:
     """Idempotent migration: create pipeline_def table if absent."""
     try:
@@ -283,6 +295,7 @@ async def init_db() -> None:
     await _migrate_stripe_fields(engine)
     await _migrate_workspace_is_trial(engine)
     await _migrate_llm_base_url(engine)
+    await _migrate_run_client_label(engine)
     await _migrate_pipeline_def(engine)
 
 

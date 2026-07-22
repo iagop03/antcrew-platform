@@ -261,7 +261,13 @@ async def workspace_spend(
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ) -> dict:
-    """Return total spend and budget status for a workspace."""
+    """Return total spend, budget status, and per-client breakdown for a workspace.
+
+    The ``by_client`` list groups spend by the ``client_label`` field set on each
+    run (via ``POST /run/ {client_label: "acme"}``) — useful for consultancies that
+    manage multiple end-clients in one workspace. Runs with no label appear under
+    the key ``null``.
+    """
     if not ws_accessible(workspace_id, ctx):
         raise HTTPException(403, "This workspace is not accessible with the current API key")
 
@@ -273,13 +279,29 @@ async def workspace_spend(
     import warnings
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
-        run_count = (await session.execute(
-            sa_select(func.count()).select_from(Run).where(Run.workspace_id == workspace_id)
-        )).scalar() or 0
+        agg_rows = (await session.execute(
+            sa_select(
+                Run.client_label,
+                func.count(Run.id).label("run_count"),
+                func.coalesce(func.sum(Run.cost_usd), 0).label("spend_usd"),
+            )
+            .where(Run.workspace_id == workspace_id)
+            .group_by(Run.client_label)
+        )).fetchall()
 
     total_spend = round(ws.total_cost_usd, 6)
     budget = ws.max_cost_usd
     exhausted = budget is not None and total_spend >= budget
+
+    by_client = [
+        {
+            "client_label": row.client_label,
+            "run_count": row.run_count,
+            "spend_usd": round(float(row.spend_usd), 6),
+        }
+        for row in sorted(agg_rows, key=lambda r: -(r.spend_usd or 0))
+    ]
+
     return {
         "workspace_id": workspace_id,
         "slug": ws.slug,
@@ -287,7 +309,8 @@ async def workspace_spend(
         "budget_usd": budget,
         "remaining_usd": round(budget - total_spend, 6) if budget is not None else None,
         "exhausted": exhausted,
-        "run_count": run_count,
+        "run_count": sum(r["run_count"] for r in by_client),
+        "by_client": by_client,
     }
 
 
@@ -496,6 +519,58 @@ async def clear_slack_tokens(
     ws.slack_app_token_enc = None
     session.add(ws)
     await session.commit()
+
+
+@router.post("/{workspace_id}/slack/test", dependencies=[Depends(require_role("admin", "write"))])
+async def test_slack(
+    workspace_id: int,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Send a test message to the workspace's configured Slack channel.
+
+    Verifies that Slack tokens and channel_id are correctly set.
+    Returns ``{"ok": true}`` on success or a descriptive error on failure.
+    """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
+
+    result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
+    ws = result.first()
+    if not ws:
+        raise HTTPException(404, f"Workspace {workspace_id} not found")
+
+    from app.core.slack_hitl import _decrypt, send_hitl_to_slack
+    import os
+
+    bot_token = (
+        _decrypt(ws.slack_bot_token_enc) if ws.slack_bot_token_enc
+        else os.environ.get("SLACK_BOT_TOKEN")
+    )
+    channel_id = ws.slack_channel_id or os.environ.get("SLACK_CHANNEL_ID")
+
+    if not bot_token:
+        raise HTTPException(422, "No Slack bot token configured. Set via PATCH /slack-tokens or SLACK_BOT_TOKEN env var.")
+    if not channel_id:
+        raise HTTPException(422, "No Slack channel configured. Set via PATCH /slack or SLACK_CHANNEL_ID env var.")
+
+    try:
+        from slack_sdk.web.async_client import AsyncWebClient
+        client = AsyncWebClient(token=bot_token)
+        resp = await client.chat_postMessage(
+            channel=channel_id,
+            text="AntCrew Slack integration is working correctly.",
+            blocks=[{
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": "*AntCrew* Slack test successful.\nHITL notifications will appear here."},
+            }],
+        )
+        if not resp["ok"]:
+            raise HTTPException(502, f"Slack API error: {resp.get('error')}")
+    except Exception as exc:
+        raise HTTPException(502, f"Slack test failed: {exc}")
+
+    return {"ok": True, "channel": channel_id}
 
 
 @router.get("/{workspace_id}/webhooks", response_model=list[WebhookConfigOut])

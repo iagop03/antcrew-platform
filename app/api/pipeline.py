@@ -28,6 +28,7 @@ class RunRequest(BaseModel):
     hitl: bool = False  # if True, inject PlatformChannel into all agents for this run
     repo_url: Optional[str] = None  # public or private git repo to inject as context
     repo_token: Optional[str] = None  # PAT for private HTTPS repos (never stored)
+    client_label: Optional[str] = None  # cost-center / client tag for spend breakdown
 
     @field_validator("team")
     @classmethod
@@ -110,6 +111,7 @@ async def trigger_run(
             force_hitl=effective_hitl,
             repo_url=effective_repo_url,
             repo_token=body.repo_token,
+            client_label=body.client_label,
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc))

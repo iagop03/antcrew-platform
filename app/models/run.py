@@ -68,6 +68,7 @@ class Run(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
     finished_at: Optional[datetime] = Field(default=None)
     state: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    client_label: Optional[str] = Field(default=None, index=True)  # cost-center / client tag for spend breakdown
 
 
 class Ticket(SQLModel, table=True):
