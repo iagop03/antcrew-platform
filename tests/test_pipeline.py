@@ -74,7 +74,7 @@ async def test_post_run_passes_thread_id(client):
             "/run/",
             json={"team": "DevTeam", "request": "x", "thread_id": "my-thread"},
         )
-    mock_dispatch.assert_called_once_with("DevTeam", "x", "my-thread", max_cost_usd=None, created_by=None, workspace_id=None, force_hitl=False, repo_url=None, repo_token=None)
+    mock_dispatch.assert_called_once_with("DevTeam", "x", "my-thread", max_cost_usd=None, created_by=None, workspace_id=None, force_hitl=False, repo_url=None, repo_token=None, client_label=None)
 
 
 # ---------------------------------------------------------------------------
