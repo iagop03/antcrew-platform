@@ -556,6 +556,9 @@ app = FastAPI(
     version=_VERSION,
     description="Dashboard and API layer for antcrew pipelines",
     lifespan=lifespan,
+    docs_url="/docs" if APP_ENV == "dev" else None,
+    redoc_url="/redoc" if APP_ENV == "dev" else None,
+    openapi_url="/openapi.json" if APP_ENV == "dev" else None,
 )
 
 _cors_origins_raw = os.environ.get("CORS_ORIGINS", "").strip()
