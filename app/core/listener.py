@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import secrets
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
@@ -155,6 +156,7 @@ async def _persist_event(event: "Event") -> None:
                     if not (await session.exec(stmt)).first():
                         session.add(HitlReview(
                             review_id=review_id,
+                            client_token=secrets.token_urlsafe(32),
                             run_id=event.run_id,
                             agent_name=event.payload.get("agent_name", ""),
                             artifact_json=json.dumps(artifact),

@@ -125,6 +125,7 @@ class HitlReview(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     review_id: str = Field(index=True, unique=True)  # UUID from PlatformChannel
+    client_token: Optional[str] = Field(default=None, index=True, unique=True)  # public URL token for no-auth client reviews
     run_id: str = Field(index=True)
     agent_name: str
     artifact_json: str = Field(default="null")   # JSON-serialized artifact

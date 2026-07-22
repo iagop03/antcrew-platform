@@ -254,6 +254,22 @@ async def _migrate_run_client_label(eng) -> None:
         pass  # PostgreSQL or table absent — skip
 
 
+async def _migrate_hitl_client_token(eng) -> None:
+    """Idempotent migration: add client_token column to hitl_review if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(hitl_review)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "client_token" not in col_names:
+                await conn.execute(text("ALTER TABLE hitl_review ADD COLUMN client_token TEXT"))
+                await conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_hitl_review_client_token "
+                    "ON hitl_review(client_token)"
+                ))
+    except Exception:
+        pass  # PostgreSQL or table absent — skip
+
+
 async def _migrate_pipeline_def(eng) -> None:
     """Idempotent migration: create pipeline_def table if absent."""
     try:
@@ -296,6 +312,7 @@ async def init_db() -> None:
     await _migrate_workspace_is_trial(engine)
     await _migrate_llm_base_url(engine)
     await _migrate_run_client_label(engine)
+    await _migrate_hitl_client_token(engine)
     await _migrate_pipeline_def(engine)
 
 

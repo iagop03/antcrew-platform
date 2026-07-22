@@ -27,6 +27,7 @@ from app.core.byok import TRIAL_CREDIT_USD
 from app.models.run import Workspace, ApiKey
 from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, workspaces_byok, workspaces_members, evals
 from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as pipelines_api
+from app.api import client_review
 
 _STATIC = Path(__file__).parent / "static"
 _VERSION = "0.4.0"
@@ -591,6 +592,7 @@ app.include_router(engine.router)
 app.include_router(billing.router)
 app.include_router(webhook_mor.router)
 app.include_router(pipelines_api.router)
+app.include_router(client_review.router)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 

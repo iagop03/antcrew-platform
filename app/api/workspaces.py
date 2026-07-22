@@ -698,3 +698,87 @@ async def update_trial(
     await session.commit()
     await session.refresh(ws)
     return WorkspacePublic.model_validate(ws)
+
+
+# ---------------------------------------------------------------------------
+# HITL analytics
+# ---------------------------------------------------------------------------
+
+@router.get("/{workspace_id}/hitl/analytics",
+            dependencies=[Depends(require_role("admin", "write"))])
+async def hitl_analytics(
+    workspace_id: int,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Per-checkpoint and per-resolver HITL rejection analytics for a workspace.
+
+    Returns:
+      - total reviews, overall rejection rate
+      - by_agent: per-checkpoint breakdown (total, rejected, rejection_rate)
+      - by_resolver: who resolved reviews and how often (actor_label counts)
+    """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
+
+    from app.models.run import HitlAuditEntry
+
+    # Join HitlReview → Run so we can filter by workspace
+    rows = (await session.execute(
+        sa_select(
+            HitlReview.agent_name,
+            HitlReview.status,
+            HitlReview.assigned_to,
+        )
+        .join(Run, Run.run_id == HitlReview.run_id)
+        .where(Run.workspace_id == workspace_id)
+    )).fetchall()
+
+    total = len(rows)
+    resolved = [r for r in rows if r.status != "pending"]
+    rejected = [r for r in rows if r.status == "rejected"]
+    approved = [r for r in rows if r.status == "approved"]
+
+    # Per-checkpoint stats
+    by_agent: dict[str, dict] = {}
+    for r in rows:
+        key = r.agent_name or "unknown"
+        if key not in by_agent:
+            by_agent[key] = {"agent_name": key, "total": 0, "approved": 0, "rejected": 0, "pending": 0}
+        by_agent[key]["total"] += 1
+        if r.status == "approved":
+            by_agent[key]["approved"] += 1
+        elif r.status == "rejected":
+            by_agent[key]["rejected"] += 1
+        elif r.status == "pending":
+            by_agent[key]["pending"] += 1
+
+    for v in by_agent.values():
+        res = v["approved"] + v["rejected"]
+        v["rejection_rate"] = round(v["rejected"] / res, 3) if res else None
+
+    # Per-resolver stats from audit log
+    audit_rows = (await session.execute(
+        sa_select(HitlAuditEntry.actor_label, func.count(HitlAuditEntry.id).label("count"))
+        .join(HitlReview, HitlReview.review_id == HitlAuditEntry.review_id)
+        .join(Run, Run.run_id == HitlReview.run_id)
+        .where(Run.workspace_id == workspace_id)
+        .where(HitlAuditEntry.action.in_(["approved", "rejected"]))
+        .group_by(HitlAuditEntry.actor_label)
+        .order_by(func.count(HitlAuditEntry.id).desc())
+    )).fetchall()
+
+    by_resolver = [{"resolver": r.actor_label or "client", "decisions": r.count} for r in audit_rows]
+
+    overall_rejection_rate = round(len(rejected) / len(resolved), 3) if resolved else None
+
+    return {
+        "workspace_id": workspace_id,
+        "total_reviews": total,
+        "pending": total - len(resolved),
+        "approved": len(approved),
+        "rejected": len(rejected),
+        "overall_rejection_rate": overall_rejection_rate,
+        "by_agent": sorted(by_agent.values(), key=lambda x: -(x["rejected"])),
+        "by_resolver": by_resolver,
+    }

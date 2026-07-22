@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Any
@@ -183,6 +184,7 @@ async def create_review(
     primary = body.assignees[0] if body.assignees else None
     review = HitlReview(
         review_id=review_id,
+        client_token=secrets.token_urlsafe(32),
         run_id=body.run_id,
         agent_name=body.agent_name,
         artifact_json=body.artifact_json,
