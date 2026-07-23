@@ -5,8 +5,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "antcrew-platform"
 version = "0.4.0"
-description = "Commercial dashboard and API layer for antcrew pipelines"
+description = "Production backend for antcrew multi-agent pipelines: REST API, HITL review queue, evaluations, model diff, and dashboard"
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Iago Pueyo", email = "iago.pueyo99@gmail.com" }]
+keywords = ["ai", "agents", "llm", "multi-agent", "antcrew", "fastapi", "hitl", "evaluation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
