@@ -209,6 +209,18 @@ async def artifacts(
     output_dir = _engine_output_dir(run)
     if run.team == "engine":
         if output_dir is None:
+            # MemoryStore run: content is serialized into Run.state post-completion.
+            s = run.state or {}
+            if s.get("code_artifacts") or s.get("test_artifacts") or s.get("doc_artifacts"):
+                return {
+                    "run_id": run_id,
+                    "status": run.status,
+                    "engine": True,
+                    "code_artifacts":   s.get("code_artifacts")   or [],
+                    "test_artifacts":   s.get("test_artifacts")   or [],
+                    "doc_artifacts":    s.get("doc_artifacts")    or [],
+                    "devops_artifacts": [],
+                }
             return {"run_id": run_id, "status": run.status, "engine": True,
                     "artifacts": [], "note": "Run used in-memory store — files not persisted"}
         if not output_dir.exists():
@@ -258,8 +270,27 @@ async def artifacts_zip(
     output_dir = _engine_output_dir(run)
     if run.team == "engine":
         if output_dir is None:
-            raise HTTPException(
-                404, "Engine run used in-memory store — artifacts were not persisted to disk"
+            s = run.state or {}
+            all_state_arts = (
+                (s.get("code_artifacts") or [])
+                + (s.get("test_artifacts") or [])
+                + (s.get("doc_artifacts") or [])
+            )
+            if not all_state_arts:
+                raise HTTPException(
+                    404, "Engine run used in-memory store — artifacts were not persisted to disk"
+                )
+            with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                for art in all_state_arts:
+                    path = art.get("file_path") or ""
+                    content = art.get("content") or ""
+                    if path:
+                        zf.writestr(path.lstrip("/"), content)
+            buf.seek(0)
+            filename = f"antcrew-engine-{run_id[:12]}.zip"
+            return StreamingResponse(
+                buf, media_type="application/zip",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
             )
         if not output_dir.exists():
             raise HTTPException(404, f"output_dir not found on server: {output_dir}")

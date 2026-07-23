@@ -438,7 +438,9 @@ def _run_engine_sync(
         log.error("engine runner: run %s failed: %s", run_id, exc)
 
     cost_usd = round(llm.get_usage_summary()["total_cost_usd"], 6)
-    return success, cost_usd
+    satisfied_conditions = [str(e.condition_id) for e in event_log.events("condition_satisfied")]
+    expected_conditions = [str(c.id) for c in goal.desired_state.conditions]
+    return success, cost_usd, store, satisfied_conditions, expected_conditions
 
 
 # ---------------------------------------------------------------------------
@@ -565,6 +567,9 @@ async def dispatch_engine(
 
     async def _bg() -> None:
         success, cost_usd = False, 0.0
+        _store = None
+        _satisfied: list[str] = []
+        _expected: list[str] = []
         try:
             fn = functools.partial(
                 _run_engine_sync,
@@ -573,7 +578,7 @@ async def dispatch_engine(
                 max_cost_usd, capability_models, max_tasks, parallel_workers,
                 _byok_api_key, _byok_base_url,
             )
-            success, cost_usd = await loop.run_in_executor(_executor, fn)
+            success, cost_usd, _store, _satisfied, _expected = await loop.run_in_executor(_executor, fn)
         except Exception as exc:
             log.error("engine runner: background task for %s raised: %s", run_id, exc)
         finally:
@@ -589,8 +594,8 @@ async def dispatch_engine(
                 run_id=run_id,
                 thread_id="default",
             ))
-            # Persist compact state so /runs/{id}/artifacts can serve engine files.
-            await _store_engine_state(run_id, goal, output_dir)
+            # Persist state so /runs/{id}/artifacts and /engine/runs/{id}/progress can serve data.
+            await _store_engine_state(run_id, goal, output_dir, _store, _satisfied, _expected)
             # Update workspace budget totals (mirrors runner.dispatch behaviour).
             if workspace_id is not None:
                 from app.services.runner import _mark_workspace_budget_status
@@ -633,8 +638,18 @@ async def _store_engine_state(
     run_id: str,
     goal: str,
     output_dir: Optional[Path],
+    store=None,
+    satisfied_conditions: "list[str] | None" = None,
+    expected_conditions: "list[str] | None" = None,
 ) -> None:
-    """Persist a compact state dict to run.state so /artifacts endpoints can serve files."""
+    """Persist run state to Run.state so /artifacts and /engine/runs/{id}/progress can serve data.
+
+    For MemoryStore runs (no output_dir), artifact content is serialized into state so the
+    /artifacts endpoint can return it — mirroring how Layer 1 team runs work.
+    For FilesystemStore runs, artifacts are on disk and the endpoint reads them directly;
+    only conditions are saved here.
+    """
+    import json as _json
     from sqlmodel import select
     from sqlmodel.ext.asyncio.session import AsyncSession
     from app.core.database import engine as _db_engine
@@ -644,7 +659,28 @@ async def _store_engine_state(
         "engine": True,
         "goal": goal,
         "output_dir": str(output_dir) if output_dir else None,
+        "conditions_satisfied": satisfied_conditions or [],
+        "conditions_expected": expected_conditions or [],
     }
+
+    # For MemoryStore runs (no disk), serialize artifact content into Run.state.
+    # FilesystemStore runs skip this — the /artifacts endpoint reads from output_dir directly.
+    if store is not None and output_dir is None:
+        try:
+            from antcrew_engine.engine.artifact import ArtifactKind
+
+            def _to_entry(a) -> dict:
+                content = a.content
+                if isinstance(content, dict):
+                    content = _json.dumps(content, indent=2)
+                return {"file_path": str(a.id), "content": content or ""}
+
+            state["code_artifacts"] = [_to_entry(a) for a in store.list(ArtifactKind.SOURCE)]
+            state["test_artifacts"] = [_to_entry(a) for a in store.list(ArtifactKind.TEST)]
+            state["doc_artifacts"]  = [_to_entry(a) for a in store.list(ArtifactKind.DOCUMENTATION)]
+        except Exception as exc:
+            log.warning("engine runner: failed to serialize artifacts for %s: %s", run_id, exc)
+
     try:
         async with AsyncSession(_db_engine, expire_on_commit=False) as session:
             run = (await session.exec(select(Run).where(Run.run_id == run_id))).first()

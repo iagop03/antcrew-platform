@@ -21,6 +21,7 @@ from app.core.auth import require_api_key, get_workspace_context, WorkspaceConte
 from app.core.database import get_session
 from app.models.run import CompareRun, Run
 from app.services.runner import dispatch, AVAILABLE_TEAMS
+from app.services.engine_runner import dispatch_engine
 
 router = APIRouter(
     prefix="/run",
@@ -35,7 +36,8 @@ router = APIRouter(
 
 class CompareRequest(BaseModel):
     team: str
-    request: str
+    request: str = ""   # for team runs
+    goal: str = ""      # for engine runs (team="engine")
     model_a: str = "claude"
     model_b: str
     max_cost_usd: Optional[float] = None
@@ -56,27 +58,30 @@ class CompareCreated(BaseModel):
 
 def _extract_state_summary(state: dict | None) -> dict:
     if not state:
-        return {"tickets": [], "code_files": [], "prd_title": "", "review_verdict": ""}
+        return {
+            "tickets": [], "code_files": [], "doc_files": [], "test_files": [],
+            "prd_title": "", "review_verdict": "",
+        }
+
+    def _names(raw: list, key: str = "file_path") -> list[str]:
+        return [
+            a.get("filename", a.get(key, "")) if isinstance(a, dict) else str(a)
+            for a in (raw or [])
+        ]
 
     tickets_raw = state.get("tickets") or []
     ticket_titles = [t.get("title", "") if isinstance(t, dict) else str(t) for t in tickets_raw]
 
-    code_raw = state.get("code_artifacts") or []
-    code_files = [
-        a.get("filename", a.get("file_path", "")) if isinstance(a, dict) else str(a)
-        for a in code_raw
-    ]
-
     prd = state.get("prd") or {}
     prd_title = prd.get("title", "") if isinstance(prd, dict) else str(prd)[:80]
 
-    review_verdict = state.get("review_verdict", "")
-
     return {
-        "tickets": ticket_titles,
-        "code_files": code_files,
-        "prd_title": prd_title,
-        "review_verdict": review_verdict,
+        "tickets":        ticket_titles,
+        "code_files":     _names(state.get("code_artifacts") or []),
+        "doc_files":      _names(state.get("doc_artifacts")  or []),
+        "test_files":     _names(state.get("test_artifacts") or []),
+        "prd_title":      prd_title,
+        "review_verdict": state.get("review_verdict", ""),
     }
 
 
@@ -108,27 +113,54 @@ async def create_compare(
     Both runs execute in parallel. Each is a full pipeline run (visible in GET /runs/)
     and counted toward workspace budget.
     """
-    if body.team not in AVAILABLE_TEAMS:
-        raise HTTPException(422, f"Unknown team {body.team!r}. Available: {AVAILABLE_TEAMS}")
     if body.model_a == body.model_b:
         raise HTTPException(422, "model_a and model_b must be different to produce a meaningful diff")
 
-    compare_id = str(uuid.uuid4())
-    thread_a = f"cmp-{compare_id[:8]}-a"
-    thread_b = f"cmp-{compare_id[:8]}-b"
+    is_engine = body.team == "engine"
+    if is_engine:
+        if not body.goal:
+            raise HTTPException(422, "goal is required for engine compares (team='engine')")
+    elif body.team not in AVAILABLE_TEAMS:
+        raise HTTPException(422, f"Unknown team {body.team!r}. Available: {AVAILABLE_TEAMS}")
+    elif not body.request:
+        raise HTTPException(422, "request is required for team compares")
 
-    run_id_a, run_id_b = await asyncio.gather(
-        dispatch(
-            body.team, body.request, thread_id=thread_a,
-            model=body.model_a, max_cost_usd=body.max_cost_usd,
-            workspace_id=ctx.workspace_id, created_by=ctx.created_by,
-        ),
-        dispatch(
-            body.team, body.request, thread_id=thread_b,
-            model=body.model_b, max_cost_usd=body.max_cost_usd,
-            workspace_id=ctx.workspace_id, created_by=ctx.created_by,
-        ),
-    )
+    compare_id = str(uuid.uuid4())
+
+    if is_engine:
+        run_id_a, run_id_b = await asyncio.gather(
+            dispatch_engine(
+                goal=body.goal,
+                model=body.model_a,
+                max_cost_usd=body.max_cost_usd,
+                workspace_id=ctx.workspace_id,
+                created_by=ctx.created_by,
+            ),
+            dispatch_engine(
+                goal=body.goal,
+                model=body.model_b,
+                max_cost_usd=body.max_cost_usd,
+                workspace_id=ctx.workspace_id,
+                created_by=ctx.created_by,
+            ),
+        )
+        stored_request = body.goal
+    else:
+        thread_a = f"cmp-{compare_id[:8]}-a"
+        thread_b = f"cmp-{compare_id[:8]}-b"
+        run_id_a, run_id_b = await asyncio.gather(
+            dispatch(
+                body.team, body.request, thread_id=thread_a,
+                model=body.model_a, max_cost_usd=body.max_cost_usd,
+                workspace_id=ctx.workspace_id, created_by=ctx.created_by,
+            ),
+            dispatch(
+                body.team, body.request, thread_id=thread_b,
+                model=body.model_b, max_cost_usd=body.max_cost_usd,
+                workspace_id=ctx.workspace_id, created_by=ctx.created_by,
+            ),
+        )
+        stored_request = body.request
 
     if not run_id_a or not run_id_b:
         raise HTTPException(500, "Failed to dispatch one or both comparison runs. Check server logs.")
@@ -140,7 +172,7 @@ async def create_compare(
         model_a=body.model_a,
         model_b=body.model_b,
         team=body.team,
-        request=body.request,
+        request=stored_request,
         workspace_id=ctx.workspace_id,
     )
     session.add(row)
@@ -198,6 +230,8 @@ async def get_compare(
 
     code_diff = _set_diff(summary_a["code_files"], summary_b["code_files"])
     ticket_diff = _set_diff(summary_a["tickets"], summary_b["tickets"])
+    doc_diff = _set_diff(summary_a["doc_files"], summary_b["doc_files"])
+    test_diff = _set_diff(summary_a["test_files"], summary_b["test_files"])
 
     cost_a = run_a.cost_usd or 0.0
     cost_b = run_b.cost_usd or 0.0
@@ -233,6 +267,8 @@ async def get_compare(
         "diff": {
             "code_files": code_diff,
             "tickets": ticket_diff,
+            "doc_files": doc_diff,
+            "test_files": test_diff,
             "prd": {
                 "a": summary_a["prd_title"],
                 "b": summary_b["prd_title"],

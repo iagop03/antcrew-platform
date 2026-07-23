@@ -17,8 +17,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role
+from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible
+from app.core.database import get_session
+from app.models.run import Event, Run
 from app.services.engine_runner import AVAILABLE_ENGINE_CAPABILITIES
 
 router = APIRouter(
@@ -169,3 +173,80 @@ async def cancel_engine_run(run_id: str) -> dict:
 async def list_engine_capabilities() -> EngineCapabilitiesResponse:
     """List the capabilities available in the engine registry."""
     return EngineCapabilitiesResponse(capabilities=AVAILABLE_ENGINE_CAPABILITIES)
+
+
+@router.get("/runs/{run_id}/progress")
+async def get_engine_progress(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Condition satisfaction progress for an engine run.
+
+    Returns which goal conditions have been satisfied and which are still pending,
+    plus the capability execution history (name, duration, cost, produced artifacts).
+
+    This is the Layer 2 equivalent of checking agent statuses in a Layer 1 run:
+    instead of "BA done / PM done / Dev done", you see "requirements_exists ✓ /
+    architecture_exists ✓ / implementation_exists pending".
+
+    Conditions come from run.state (written by _store_engine_state after the run).
+    For in-flight runs, only conditions satisfied so far appear.
+    """
+    run = (await session.exec(select(Run).where(Run.run_id == run_id))).first()
+    if not run:
+        raise HTTPException(404, f"Run {run_id!r} not found")
+    if run.team != "engine":
+        raise HTTPException(422, f"Run {run_id!r} is not an engine run (team={run.team!r})")
+    if not ws_accessible(run.workspace_id, ctx):
+        raise HTTPException(403, "Not accessible with the current API key")
+
+    state = run.state or {}
+    satisfied = set(state.get("conditions_satisfied") or [])
+    expected = list(state.get("conditions_expected") or [])
+
+    conditions: dict[str, str] = {}
+    for cond in expected:
+        if cond in satisfied:
+            conditions[cond] = "satisfied"
+        elif run.status == "running":
+            conditions[cond] = "pending"
+        else:
+            conditions[cond] = "not_reached"
+    for cond in satisfied:
+        if cond not in conditions:
+            conditions[cond] = "satisfied"
+
+    # Capability execution history from the event bus (agent.start / agent.end in DB).
+    cap_events = (await session.exec(
+        select(Event)
+        .where(Event.run_id == run_id)
+        .where(Event.event_type.in_(["agent.start", "agent.end"]))
+        .order_by(Event.timestamp)
+    )).all()
+
+    capabilities = []
+    in_flight: dict[str, float] = {}
+    for ev in cap_events:
+        p = ev.payload
+        name = p.get("agent_name", "")
+        if ev.event_type == "agent.start":
+            in_flight[name] = ev.timestamp
+        elif ev.event_type == "agent.end":
+            in_flight.pop(name, None)
+            capabilities.append({
+                "name": name,
+                "duration_s": p.get("duration_s"),
+                "cost_usd": p.get("cost_usd"),
+                "produced": p.get("produced_keys", []),
+            })
+
+    return {
+        "run_id": run_id,
+        "status": run.status,
+        "goal": state.get("goal", run.request),
+        "conditions": conditions,
+        "total_conditions": len(conditions),
+        "satisfied_count": len(satisfied),
+        "capabilities_executed": capabilities,
+    }
