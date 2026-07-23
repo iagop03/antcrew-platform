@@ -179,6 +179,7 @@ async def upload_eval_report(
 async def list_evals(
     status: Optional[str] = Query(None, description="Filter by status (running, done, error)"),
     team: Optional[str] = None,
+    regression_id: Optional[str] = Query(None, description="Filter by regression batch ID"),
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
@@ -192,9 +193,187 @@ async def list_evals(
         q = q.where(EvalRun.status == status)
     if team:
         q = q.where(EvalRun.team == team)
+    if regression_id:
+        q = q.where(EvalRun.regression_id == regression_id)
     q = ws_filter(q, EvalRun.workspace_id, ctx)
     result = await session.exec(q)
     return result.all()
+
+
+class RegressionRequest(BaseModel):
+    """Re-run a set of historical pipeline runs with the current prompts to detect regressions.
+
+    For each run_id, the original request is replayed with the current pipeline configuration
+    and the output is scored against what the baseline run produced. This is "CI for your
+    own agents": change a capability prompt, run regression, see what drifted.
+    """
+    run_ids: list[str]
+    team: str = ""        # override the team; defaults to each run's original team
+    model: str = ""       # optional model override
+    judge_model: str = ""
+
+
+@router.post("/regression", status_code=202)
+async def start_regression(
+    body: RegressionRequest,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Re-run historical runs against current prompts and detect quality regression.
+
+    Returns regression_id + one eval_id per input run. Poll GET /evals/regression/{regression_id}
+    to get aggregate status. Each eval can also be queried individually via GET /evals/{eval_id}.
+
+    Scoring thresholds:
+    - expect_min_tickets = floor(original_count * 0.8)  — 20% tolerance on ticket count
+    - expect_min_code_files = floor(original_count * 0.8)
+    - expect_review_verdict = original verdict (if any)
+    """
+    from sqlmodel import select as _sel
+    from app.models.run import Run as _Run
+
+    if not body.run_ids:
+        raise HTTPException(422, "run_ids must not be empty")
+    if len(body.run_ids) > 20:
+        raise HTTPException(422, "Maximum 20 run_ids per regression batch")
+
+    regression_id = str(uuid.uuid4())
+    cases = []
+    loop = asyncio.get_running_loop()
+
+    for run_id in body.run_ids:
+        baseline = (await session.exec(_sel(_Run).where(_Run.run_id == run_id))).first()
+        if not baseline:
+            raise HTTPException(404, f"Run {run_id!r} not found")
+        if not ws_accessible(baseline.workspace_id, ctx):
+            raise HTTPException(403, f"Run {run_id!r} is not accessible with the current API key")
+
+        state = baseline.state or {}
+        tickets_count = len(state.get("tickets") or [])
+        code_count = len(state.get("code_artifacts") or [])
+        review_verdict = state.get("review_verdict", "")
+
+        team = body.team or baseline.team
+        if team not in AVAILABLE_TEAMS:
+            raise HTTPException(
+                422,
+                f"Team {team!r} (from run {run_id!r}) not available. Available: {AVAILABLE_TEAMS}",
+            )
+
+        eval_id = str(uuid.uuid4())
+        new_run_id = str(uuid.uuid4())
+        name = f"[reg:{regression_id[:8]}] {baseline.request[:50]}"
+
+        run_stub = Run(
+            run_id=new_run_id,
+            thread_id="regression",
+            team=team,
+            request=baseline.request,
+            status="running",
+            workspace_id=ctx.workspace_id,
+            created_by=ctx.created_by,
+        )
+        session.add(run_stub)
+
+        row = EvalRun(
+            eval_id=eval_id,
+            run_id=new_run_id,
+            team=team,
+            request=baseline.request,
+            name=name,
+            model=body.model,
+            judge_model=body.judge_model,
+            status="running",
+            workspace_id=ctx.workspace_id,
+            regression_id=regression_id,
+        )
+        session.add(row)
+
+        cfg = EvalRunConfig(
+            team=team,
+            request=baseline.request,
+            name=name,
+            model=body.model,
+            judge_model=body.judge_model,
+            expect_min_tickets=int(tickets_count * 0.8),
+            expect_min_code_files=int(code_count * 0.8),
+            expect_review_verdict=review_verdict,
+        )
+        loop.run_in_executor(_executor, functools.partial(run_eval_sync, eval_id, cfg, loop))
+
+        cases.append({
+            "eval_id": eval_id,
+            "baseline_run_id": run_id,
+            "team": team,
+            "request_preview": baseline.request[:80],
+            "baseline": {
+                "tickets": tickets_count,
+                "code_files": code_count,
+                "review_verdict": review_verdict,
+            },
+        })
+
+    await session.commit()
+    return {
+        "regression_id": regression_id,
+        "baseline_count": len(body.run_ids),
+        "cases": cases,
+        "hint": f"Poll GET /evals/regression/{regression_id} for aggregate status and pass rate",
+    }
+
+
+@router.get("/regression/{regression_id}")
+async def get_regression(
+    regression_id: str,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Get the aggregate status and results for a regression batch.
+
+    regression_rate is the fraction of evals that failed their baseline thresholds.
+    A regression_rate > 0 means at least one run degraded after the prompt change.
+    """
+    rows = (await session.exec(
+        select(EvalRun).where(EvalRun.regression_id == regression_id)
+    )).all()
+    if not rows:
+        raise HTTPException(404, f"Regression {regression_id!r} not found")
+    for row in rows:
+        if not ws_accessible(row.workspace_id, ctx):
+            raise HTTPException(403, "Not accessible with the current API key")
+
+    total = len(rows)
+    done = sum(1 for r in rows if r.status == "done")
+    errors = sum(1 for r in rows if r.status == "error")
+    running = total - done - errors
+
+    scored = [r for r in rows if r.status == "done" and r.report]
+    passed = sum(1 for r in scored if r.report.get("passed", False))
+    regression_rate = round(1 - (passed / len(scored)), 4) if scored else None
+
+    return {
+        "regression_id": regression_id,
+        "status": "running" if running > 0 else ("done" if done > 0 else "error"),
+        "total": total,
+        "done": done,
+        "running": running,
+        "errors": errors,
+        "passed": passed,
+        "failed": len(scored) - passed,
+        "regression_rate": regression_rate,
+        "cases": [
+            {
+                "eval_id": r.eval_id,
+                "name": r.name,
+                "status": r.status,
+                "passed": r.report.get("passed", False) if r.report else None,
+                "overall_score": r.report.get("overall_score") if r.report else None,
+                "cost_usd": r.cost_usd,
+                "elapsed_ms": r.elapsed_ms,
+            }
+            for r in rows
+        ],
+    }
 
 
 @router.get("/compare")

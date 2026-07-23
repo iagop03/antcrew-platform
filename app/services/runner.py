@@ -255,13 +255,14 @@ def _run_sync(
     force_hitl: bool,
     byok_api_key: Optional[str] = None,
     byok_base_url: Optional[str] = None,
+    model: str = "",
 ):
     """Run a team synchronously in the executor thread.
 
     When force_hitl=True all agents get the platform channel and run_interactive is used.
     Otherwise only agents already marked approval_required=True get the channel.
     """
-    team = _make_team(team_name, max_cost_usd=max_cost_usd, byok_api_key=byok_api_key, byok_base_url=byok_base_url)
+    team = _make_team(team_name, max_cost_usd=max_cost_usd, model=model, byok_api_key=byok_api_key, byok_base_url=byok_base_url)
     all_agents = list(getattr(team, "_agents", {}).values())
 
     if force_hitl:
@@ -435,6 +436,7 @@ async def dispatch(
     request: str,
     thread_id: str = "default",
     *,
+    model: str = "",
     max_cost_usd: Optional[float] = None,
     created_by: Optional[str] = None,
     workspace_id: Optional[int] = None,
@@ -503,7 +505,7 @@ async def dispatch(
         try:
             fn = functools.partial(
                 _run_sync, team_name, effective_request, thread_id,
-                max_cost_usd, platform_channel, force_hitl, _byok_api_key, _byok_base_url,
+                max_cost_usd, platform_channel, force_hitl, _byok_api_key, _byok_base_url, model,
             )
             result = await loop.run_in_executor(_executor, fn)
             await _store_result(result)

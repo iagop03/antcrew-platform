@@ -174,6 +174,26 @@ class EvalRun(SQLModel, table=True):
     cost_usd: float = Field(default=0.0)
     elapsed_ms: float = Field(default=0.0)
     workspace_id: Optional[int] = Field(default=None)
+    regression_id: Optional[str] = Field(default=None, index=True)  # batch ID when created via POST /evals/regression
+    created_at: datetime = Field(default_factory=_utcnow)
+    finished_at: Optional[datetime] = Field(default=None)
+
+
+class CompareRun(SQLModel, table=True):
+    """Side-by-side comparison of the same request run against two LLM backends."""
+
+    __tablename__ = "compare_run"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    compare_id: str = Field(index=True, unique=True)
+    run_id_a: str = Field(index=True)
+    run_id_b: str = Field(index=True)
+    model_a: str
+    model_b: str
+    team: str
+    request: str
+    status: str = Field(default="running")  # running | done | error
+    workspace_id: Optional[int] = Field(default=None)
     created_at: datetime = Field(default_factory=_utcnow)
     finished_at: Optional[datetime] = Field(default=None)
 

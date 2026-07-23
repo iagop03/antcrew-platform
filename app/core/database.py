@@ -270,6 +270,60 @@ async def _migrate_hitl_client_token(eng) -> None:
         pass  # PostgreSQL or table absent — skip
 
 
+async def _migrate_compare_run(eng) -> None:
+    """Idempotent migration: create compare_run table if absent."""
+    try:
+        async with eng.begin() as conn:
+            tables = (await conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table' AND name='compare_run'")
+            )).fetchall()
+            if not tables:
+                await conn.execute(text(
+                    "CREATE TABLE compare_run ("
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "compare_id TEXT NOT NULL, "
+                    "run_id_a TEXT NOT NULL, "
+                    "run_id_b TEXT NOT NULL, "
+                    "model_a TEXT NOT NULL, "
+                    "model_b TEXT NOT NULL, "
+                    "team TEXT NOT NULL, "
+                    "request TEXT NOT NULL, "
+                    "status TEXT NOT NULL DEFAULT 'running', "
+                    "workspace_id INTEGER, "
+                    "created_at DATETIME, "
+                    "finished_at DATETIME"
+                    ")"
+                ))
+                await conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_compare_run_compare_id "
+                    "ON compare_run(compare_id)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_compare_run_run_id_a ON compare_run(run_id_a)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_compare_run_run_id_b ON compare_run(run_id_b)"
+                ))
+    except Exception:
+        pass  # PostgreSQL handled by Alembic or create_all
+
+
+async def _migrate_eval_regression_id(eng) -> None:
+    """Idempotent migration: add regression_id column to eval_run if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(eval_run)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "regression_id" not in col_names:
+                await conn.execute(text("ALTER TABLE eval_run ADD COLUMN regression_id TEXT"))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_eval_run_regression_id "
+                    "ON eval_run(regression_id)"
+                ))
+    except Exception:
+        pass  # PostgreSQL or table absent — skip
+
+
 async def _migrate_pipeline_def(eng) -> None:
     """Idempotent migration: create pipeline_def table if absent."""
     try:
@@ -314,6 +368,8 @@ async def init_db() -> None:
     await _migrate_run_client_label(engine)
     await _migrate_hitl_client_token(engine)
     await _migrate_pipeline_def(engine)
+    await _migrate_compare_run(engine)
+    await _migrate_eval_regression_id(engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
