@@ -96,12 +96,56 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Step 3: deploy ─────────────────────────────────────────────────────────
-  # The "prod" GitHub Environment requires a manual approval — configure this
-  # under Settings → Environments → prod → Required reviewers.
+  # ── Step 3: gate — verify UAT passed before allowing prod ──────────────────
+  # Queries the GitHub Deployments API for the 'uat' environment.
+  # GitHub Actions automatically records a deployment + status for each job
+  # that uses `environment:`, so this reflects real deploy outcomes.
+  gate-prod:
+    name: Gate — verify UAT deployed successfully
+    needs: build
+    if: needs.build.outputs.env_name == 'prod'
+    runs-on: ubuntu-latest
+    permissions:
+      deployments: read
+    steps:
+      - name: Check latest UAT deployment is successful
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DEPLOYMENT_ID=$(gh api \
+            "repos/${{ github.repository }}/deployments?environment=uat&per_page=1" \
+            --jq '.[0].id')
+
+          if [ -z "$DEPLOYMENT_ID" ] || [ "$DEPLOYMENT_ID" = "null" ]; then
+            echo "::error::No UAT deployment found. Deploy to UAT first before promoting to prod."
+            exit 1
+          fi
+
+          STATUS=$(gh api \
+            "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses?per_page=1" \
+            --jq '.[0].state')
+
+          echo "Latest UAT deployment ID: $DEPLOYMENT_ID, status: $STATUS"
+
+          if [ "$STATUS" != "success" ]; then
+            echo "::error::Latest UAT deployment is not successful (status: $STATUS). Promote UAT first."
+            exit 1
+          fi
+
+          echo "UAT gate passed — latest UAT deployment is successful."
+
+  # ── Step 4: deploy ──────────────────────────────────────────────────────────
+  # prod requires:
+  #   a) gate-prod to pass (UAT was deployed successfully)
+  #   b) manual approval in the 'prod' GitHub Environment
+  #      (configure under Settings → Environments → prod → Required reviewers)
   deploy:
     name: Deploy to ${{ needs.build.outputs.env_name }}
-    needs: build
+    needs: [build, gate-prod]
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.gate-prod.result == 'success' || needs.gate-prod.result == 'skipped')
     runs-on: ubuntu-latest
     environment: ${{ needs.build.outputs.env_name }}
 
