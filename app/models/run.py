@@ -308,6 +308,32 @@ class HitlAuditEntry(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
 
 
+class WorkspaceContractSchema(SQLModel, table=True):
+    """Per-workspace JSON Schema for the custom_fields extension point of an artifact contract.
+
+    Stores a JSON Schema that describes what keys are expected in the PRD.custom_fields
+    (or any other extendable contract) for a specific workspace.  Purely informational
+    in Phase 1 — operators ignore custom_fields; the schema is used for documentation
+    and future prompt-injection.
+
+    contract_name must match an entry in EXTENDABLE_CONTRACTS (e.g. "PRD").
+    json_schema is any valid JSON Schema object.
+    """
+
+    __tablename__ = "workspace_contract_schema"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "contract_name", name="uq_contract_schema_ws_contract"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(foreign_key="workspace.id", index=True)
+    contract_name: str  # e.g. "PRD"
+    json_schema: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    description: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
 class LLMProviderKey(SQLModel, table=True):
     """Per-workspace, per-provider LLM API key for BYOK mode.
 
