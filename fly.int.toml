@@ -17,6 +17,7 @@ primary_region = 'ams'
   ANTCREW_SANDBOX = "required"
   ANTCREW_REQUIRE_AUTH = "true"
   LOG_LEVEL = "INFO"
+  CORS_ORIGINS = "https://antcrew-int.fly.dev"
 
 [http_service]
   internal_port = 8000
