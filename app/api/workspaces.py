@@ -7,6 +7,7 @@ from typing import Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.exceptions import WorkspaceNotFoundError
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -228,7 +229,7 @@ async def get_workspace(workspace_id: int, session: AsyncSession = Depends(get_s
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     return ws
 
 
@@ -247,7 +248,7 @@ async def set_budget(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     ws.max_cost_usd = body.max_cost_usd
     session.add(ws)
     await session.commit()
@@ -274,7 +275,7 @@ async def workspace_spend(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
 
     import warnings
     with warnings.catch_warnings():
@@ -330,7 +331,7 @@ async def set_default_repo(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     ws.default_repo_url = body.default_repo_url
     session.add(ws)
     await session.commit()
@@ -353,7 +354,7 @@ async def set_hitl_default(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     ws.hitl_default = body.hitl_default
     session.add(ws)
     await session.commit()
@@ -376,7 +377,7 @@ async def set_hitl_timeout(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     if body.hitl_timeout_s is not None and body.hitl_timeout_s <= 0:
         raise HTTPException(422, "hitl_timeout_s must be positive")
     ws.hitl_timeout_s = body.hitl_timeout_s
@@ -400,7 +401,7 @@ async def workspace_reviews(
     """
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     if not result.first():
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
 
     stmt = (
         select(HitlReview)
@@ -429,7 +430,7 @@ async def set_slack_webhook(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     ws.slack_webhook_url = body.slack_webhook_url
     if body.slack_channel_id is not None:
         ws.slack_channel_id = body.slack_channel_id
@@ -490,7 +491,7 @@ async def set_slack_tokens(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     from app.core.slack_hitl import _encrypt
     ws.slack_bot_token_enc = _encrypt(body.bot_token)
     if body.app_token is not None:
@@ -514,7 +515,7 @@ async def clear_slack_tokens(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     ws.slack_bot_token_enc = None
     ws.slack_app_token_enc = None
     session.add(ws)
@@ -538,7 +539,7 @@ async def test_slack(
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
 
     from app.core.slack_hitl import _decrypt, send_hitl_to_slack
     import os
@@ -581,7 +582,7 @@ async def list_webhook_configs(
     """List registered webhooks for a workspace, including their subscribed event types."""
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     if not result.first():
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     return await _hooks_with_events(session, workspace_id)
 
 
@@ -600,7 +601,7 @@ async def create_webhook_config(
     """
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     if not result.first():
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     try:
         validate_external_url(body.url, allow_http=True)
     except ValueError as exc:
@@ -655,7 +656,7 @@ async def delete_workspace(workspace_id: int, session: AsyncSession = Depends(ge
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     await session.delete(ws)
     await session.commit()
 
@@ -687,7 +688,7 @@ async def update_trial(
         raise HTTPException(403, "This workspace is not accessible with the current API key")
     ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
 
     ws.is_trial = body.is_trial
     if body.additional_credit_usd is not None and body.additional_credit_usd > 0:

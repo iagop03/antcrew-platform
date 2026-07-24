@@ -8,6 +8,7 @@ import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from app.core.exceptions import WorkspaceNotFoundError
 from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -143,7 +144,7 @@ async def get_workspace_billing(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     return BillingOut(
         workspace_id=ws.id,  # type: ignore[arg-type]
         slug=ws.slug,
@@ -175,7 +176,7 @@ async def attach_stripe(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     ws.stripe_customer_id = body.stripe_customer_id
     ws.billing_provider = "stripe"
     if body.stripe_subscription_id is not None:
@@ -219,7 +220,7 @@ async def create_stripe_customer(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     if ws.stripe_customer_id:
         raise HTTPException(
             422,
@@ -269,7 +270,7 @@ async def detach_stripe(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     ws.stripe_customer_id = None
     ws.stripe_subscription_id = None
     ws.subscription_status = None
@@ -314,7 +315,7 @@ async def create_checkout_session(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
 
     # Ensure there's a Stripe Customer to attach the subscription to
     if not ws.stripe_customer_id:

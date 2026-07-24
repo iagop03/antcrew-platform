@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import WorkspaceNotFoundError
 from pydantic import BaseModel, ConfigDict
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -42,7 +43,7 @@ async def list_members(
     """List API keys that have membership access to this workspace."""
     ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     memberships = (await session.exec(
         select(WorkspaceMembership).where(WorkspaceMembership.workspace_id == workspace_id)
     )).all()
@@ -79,7 +80,7 @@ async def add_member(
     """
     ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     key = (await session.exec(select(ApiKey).where(ApiKey.id == body.api_key_id))).first()
     if not key:
         raise HTTPException(404, f"ApiKey {body.api_key_id} not found")

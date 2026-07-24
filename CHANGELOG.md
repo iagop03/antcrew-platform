@@ -1,5 +1,149 @@
 # Changelog — antcrew-platform
 
+## v0.4.1 (2026-07-24)
+
+### Added
+- **`POST /engine/runs/{id}/publish`** — push engine run artifacts to GitHub and open a PR with a TraceLog explainability comment; reads `code_artifacts`, `test_artifacts`, and `doc_artifacts` from `Run.state`; derives condition satisfaction from `conditions_satisfied` / `conditions_expected`; accepts `github_token` in request body or `GITHUB_TOKEN` env var
+- **Exception hierarchy (`app/core/exceptions.py`)** — 9 domain exception classes (`RunNotFoundError`, `RunNotAccessibleError`, `RunNotRunningError`, `StateNotAvailableError`, `ReviewNotFoundError`, `WorkspaceNotFoundError`, `BudgetExceededError`, `InvalidTeamError`, `CompareNotFoundError`); all subclass `HTTPException` for transparent FastAPI handling; replace inline string-based error raises across `runs.py`, `engine.py`, `compare.py`, `reviews.py`
+- **`py.typed` marker** declared in `antcrew-engine` — mypy/pyright now recognize type information when antcrew-platform imports from `antcrew_engine.*` directly (PEP 561)
+
+### Tests
+- 7 new tests for `POST /engine/runs/{id}/publish` (404 run not found, 422 non-engine run, 409 not complete, 422 missing token, 404 no artifacts, 200 success, 502 GitHub error)
+- 14 new tests for `GitHubIntegration.create_engine_pr()` and `_build_engine_summary_comment()` in antcrew repo
+
+---
+
+## v0.4.0 (2026-07-20)
+
+### Ola 1 — Client attribution + PR explainability
+
+**Client label and per-workspace budget cap**
+- `Run.client_label` — optional cost-center tag per run; accepted by `POST /run/` and `POST /engine/run`
+- `GET /runs/?client_label=<str>` — filter runs by cost-center tag
+- `Workspace.max_cost_usd` — hard budget cap; runs that would exceed it are rejected with 402
+- `GET /workspaces/{id}/budget` — returns `total_cost_usd`, `max_cost_usd`, `remaining_usd`, `pct_used`
+
+**GitHub PR explainability comment**
+- Every PR created by `GitHubIntegration` auto-posts a structured comment: tickets resolved, code files changed, review verdict, PRD title, per-agent cost breakdown
+- Comment is edited (not re-created) on re-run; idempotent
+
+**Slack connectivity smoke-test**
+- `POST /slack/test` — verify the Slack bot token can post a message without triggering a full run
+
+---
+
+### Ola 2 — Client reviewer role + HITL analytics
+
+**Client reviewer role**
+- New API key role: `reviewer` — read access to runs, tickets, and artifacts + HITL review actions; no write, no admin
+- `GET /reviews/mine` — list reviews assigned to the authenticated reviewer
+- `GET /reviews/token/{token}` — public review link via one-time token (no API key needed) for external stakeholders
+- Per-review Slack DM routing based on `assignee` field in the review request
+
+**HITL analytics**
+- `GET /reviews/analytics` — aggregate metrics: pending count, overdue count, median and p95 resolution time, per-workspace breakdown
+- `Review.resolved_at` timestamp set on approval/rejection for latency tracking
+- `Review.overdue` computed property in list responses
+
+---
+
+### Ola 3 — Model diff, regression testing, and full engine visibility
+
+**Model diff (`POST /run/compare`)**
+- Run the same request against two LLM backends in parallel (e.g. `claude` vs `gpt-4o`)
+- `GET /run/compare/{id}` — typed diff: `code_files`, `tickets`, `doc_files`, `test_files` each with `only_in_a / only_in_b / shared` sets; `summary.winner` on cost and latency
+- `GET /run/compare` — paginated list of recent comparisons
+- Engine support: `team: "engine"` + `goal: "..."` dispatches two `EngineLoop` runs and diffs their `ArtifactStore` output
+- `CompareRun` DB row stores `team`, `request`/`goal`, model names, and run IDs for audit
+
+**Prompt regression (`POST /evals/regression`)**
+- Replay a list of historical run IDs with current prompts to detect quality regression before merging a prompt change
+- Scores each replayed run against 80% tolerance thresholds (ticket count, code file count, review verdict similarity)
+- `GET /evals/regression/{id}` — aggregate pass rate, `regression_rate`, per-run detail
+- Regression runs are tagged with `regression_id` and surfaced in `GET /evals/`
+
+**Engine artifact visibility**
+- `_store_engine_state()` now serializes the full `ArtifactStore` content into `Run.state` for MemoryStore runs (previously all engine artifacts were discarded after each run)
+- `GET /runs/{id}/artifacts` returns embedded `code_artifacts`, `test_artifacts`, `doc_artifacts` with full file content for MemoryStore engine runs
+- `GET /runs/{id}/artifacts.zip` streams a ZIP from state-embedded artifacts for MemoryStore engine runs
+- FilesystemStore runs (with `output_dir`) continue to serve artifacts from disk unchanged
+
+**Engine condition progress (`GET /engine/runs/{id}/progress`)**
+- New endpoint: condition satisfaction per engine run — `satisfied / pending / not_reached` for each goal condition
+- Capability execution history: name, duration, cost, and produced artifact kinds per executed capability
+- Unsatisfied conditions show `pending` while the run is in-flight; `not_reached` after completion
+
+---
+
+## v0.3.3 (2026-07-12)
+
+### Visual pipeline builder
+- Interactive SVG canvas for building custom pipelines (per-node model, HITL gate, Slack channel, max cost)
+- `GET /pipelines/`, `POST /pipelines/`, `GET /pipelines/{id}`, `PUT /pipelines/{id}`, `DELETE /pipelines/{id}`
+- `POST /pipelines/{id}/run` — trigger a run from a saved canvas definition
+- Canvas state persisted to DB; zoom/pan preserved across sessions; run history sidebar per pipeline
+- Dashboard badge showing the last pipeline run status
+- `pipeline_id` field on `Run` rows dispatched via the builder
+
+### Free trial credit
+- New workspaces receive a configurable free trial credit (default: $5 USD) on creation
+- `Workspace.trial_credit_usd`, `Workspace.trial_expires_at` — trial state tracked in DB
+- Trial runs multiplied by a configurable markup factor before budget deduction
+- `GET /workspaces/{id}/budget` includes `trial_balance_usd` separately from paid balance
+- Trial management UI in workspace settings
+
+### Multi-environment CI/CD
+- Three Fly.io targets: `fly.int.toml`, `fly.uat.toml`, `fly.prod.toml`
+- GitHub Actions gate: PROD deploy requires UAT integration test suite to pass first
+- Alembic `migrate` step runs on every deploy via Fly.io release command
+- `/docs` (Swagger UI) and `/redoc` disabled outside `APP_ENV=dev`
+
+---
+
+## v0.3.2 (2026-07-09)
+
+### BYOK (Bring Your Own Key)
+- Per-workspace LLM API key management: Anthropic, OpenAI, Groq, Gemini, Ollama, or any OpenAI-compatible endpoint
+- Keys encrypted at rest with Fernet (`BYOK_ENCRYPTION_KEY` env var)
+- `POST /workspaces/{id}/byok` — store or update a provider key
+- `DELETE /workspaces/{id}/byok/{provider}` — remove a key
+- `GET /workspaces/{id}/byok` — list configured providers (no key values returned)
+- Runner picks up the workspace BYOK key automatically; falls back to server-level env vars
+- IDOR fix: BYOK endpoints verify workspace membership before any key access
+
+### Stripe / Lemon Squeezy billing
+- Dual-lane MoR: Lemon Squeezy (EU/global) + Stripe (US)
+- `POST /billing/stripe/webhook` and `POST /billing/lemonsqueezy/webhook` — signed webhook handlers
+- `Workspace.plan` field (`free | trial | pro | enterprise`); budget caps enforced per plan
+- `billing` optional dependency group: `pip install antcrew-platform[billing]`
+
+### Landing page + settings
+- Public landing page at `/`; dashboard moved to `/dashboard`
+- `/settings` — workspace settings SPA: General, Reviewer config, LLM mode (BYOK vs server key)
+- Pricing comparison widget: BYOK vs managed key cost per token per provider
+- Multi-step onboarding wizard for new workspaces: name → LLM mode → first run
+
+---
+
+## v0.3.1 (2026-07-07)
+
+### Security
+- IDOR fix: BYOK endpoints now check workspace membership before any key access
+- Timing-safe token comparison in WebSocket auth to prevent oracle attacks
+- SSRF blocklist: outbound webhook delivery blocks RFC 1918 ranges (10.x, 172.16.x, 192.168.x) and loopback
+- Startup warning: logs a prominent error when running in open mode (no API key configured)
+
+### Engine improvements
+- `engine_runner.py` updated to `antcrew-engine` v0.3.x API: `EngineLoop` constructor uses `max_tasks` and `parallel_workers` params
+- `edit` verdict now correctly propagates the reviewer's modified content back into the engine's `ArtifactStore` before the loop continues
+- Prompt caching enabled by default for engine runs (Anthropic beta header)
+
+### Infrastructure
+- PostgreSQL URL normalization: `postgresql://` rewritten to `postgresql+asyncpg://` on startup; `sslmode` stripped for Fly.io Postgres compatibility
+- `POST /api-keys/` accessible in open mode to allow bootstrapping the first key
+
+---
+
 ## v0.3.0 (2026-07-05)
 
 ### Data model

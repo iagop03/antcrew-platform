@@ -13,6 +13,7 @@ from sqlmodel import select, col, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible, ws_filter
+from app.core.exceptions import ReviewNotFoundError
 from app.core.channel import resolve_review
 from app.core.database import get_session
 from app.models.run import HitlReview, HitlReviewAssignee, HitlAuditEntry, ApiKey, Run
@@ -269,7 +270,7 @@ async def get_review(
     result = await session.exec(select(HitlReview).where(HitlReview.review_id == review_id))
     review = result.first()
     if not review:
-        raise HTTPException(404, f"Review {review_id!r} not found")
+        raise ReviewNotFoundError(review_id)
     if ctx.workspace_ids is not None:
         run_result = await session.exec(select(Run).where(Run.run_id == review.run_id))
         run = run_result.first()
@@ -329,7 +330,7 @@ async def get_review_audit(
         select(HitlReview).where(HitlReview.review_id == review_id)
     )).first()
     if not review:
-        raise HTTPException(404, f"Review {review_id!r} not found")
+        raise ReviewNotFoundError(review_id)
     if ctx.workspace_ids is not None:
         run = (await session.exec(select(Run).where(Run.run_id == review.run_id))).first()
         if run and not ws_accessible(run.workspace_id, ctx):
@@ -357,7 +358,7 @@ async def assign_review(
     result = await session.exec(select(HitlReview).where(HitlReview.review_id == review_id))
     review = result.first()
     if not review:
-        raise HTTPException(404, f"Review {review_id!r} not found")
+        raise ReviewNotFoundError(review_id)
     if review.status != "pending":
         raise HTTPException(409, f"Review {review_id!r} already resolved (status: {review.status!r})")
     if ctx.workspace_ids is not None:
@@ -413,7 +414,7 @@ async def submit_review(
     )
     review = result.first()
     if not review:
-        raise HTTPException(404, f"Review {review_id!r} not found")
+        raise ReviewNotFoundError(review_id)
     if review.status != "pending":
         raise HTTPException(409, f"Review {review_id!r} already resolved (status: {review.status!r})")
 

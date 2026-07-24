@@ -14,6 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, ws_filter, ws_accessible
 from app.core.database import get_session
+from app.core.exceptions import RunNotFoundError, EvalNotFoundError
 from app.models.run import EvalRun, Run
 from app.services.runner import AVAILABLE_TEAMS
 from app.services.eval_runner import EvalRunConfig, run_eval_sync, _executor
@@ -244,7 +245,7 @@ async def start_regression(
     for run_id in body.run_ids:
         baseline = (await session.exec(_sel(_Run).where(_Run.run_id == run_id))).first()
         if not baseline:
-            raise HTTPException(404, f"Run {run_id!r} not found")
+            raise RunNotFoundError(run_id)
         if not ws_accessible(baseline.workspace_id, ctx):
             raise HTTPException(403, f"Run {run_id!r} is not accessible with the current API key")
 
@@ -451,7 +452,7 @@ async def get_eval(
     result = await session.exec(select(EvalRun).where(EvalRun.eval_id == eval_id))
     row = result.first()
     if not row:
-        raise HTTPException(404, f"Eval {eval_id!r} not found")
+        raise EvalNotFoundError(eval_id)
     if not ws_accessible(row.workspace_id, ctx):
         raise HTTPException(403, "This eval is not accessible with the current API key")
     return row

@@ -1,4 +1,5 @@
-"""Tests for engine artifact visibility, condition progress, and engine model diff.
+"""Tests for engine artifact visibility, condition progress, engine model diff,
+and the POST /engine/runs/{id}/publish GitHub PR endpoint.
 
 Covers:
 - GET /runs/{id}/artifacts for engine MemoryStore runs (state-embedded content)
@@ -426,3 +427,142 @@ async def test_team_compare_still_requires_request(client: AsyncClient):
     })
     assert r.status_code == 422
     assert "request" in r.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
+# POST /engine/runs/{run_id}/publish
+# ---------------------------------------------------------------------------
+
+def _engine_run_with_artifacts(run_id: str, status: str = "success") -> Run:
+    return Run(
+        run_id=run_id,
+        team="engine",
+        request="Build a REST API",
+        status=status,
+        state={
+            "engine": True,
+            "goal": "Build a REST API",
+            "output_dir": None,
+            "conditions_expected": ["requirements_exists", "implementation_exists", "tests_pass"],
+            "conditions_satisfied": ["requirements_exists", "implementation_exists"],
+            "code_artifacts": [
+                {"file_path": "src/main.py", "content": "def main(): pass"},
+            ],
+            "test_artifacts": [
+                {"file_path": "tests/test_main.py", "content": "def test_main(): pass"},
+            ],
+            "doc_artifacts": [],
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_publish_run_not_found(client: AsyncClient):
+    r = await client.post("/engine/runs/no-such-run/publish", json={
+        "repo": "org/repo",
+        "github_token": "ghp_test",
+    })
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_publish_not_engine_run(client: AsyncClient, session: AsyncSession):
+    run_id = str(uuid.uuid4())
+    session.add(Run(run_id=run_id, team="DevTeam", request="x", status="success"))
+    await session.commit()
+
+    r = await client.post(f"/engine/runs/{run_id}/publish", json={
+        "repo": "org/repo",
+        "github_token": "ghp_test",
+    })
+    assert r.status_code == 422
+    assert "engine" in r.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_publish_run_not_success(client: AsyncClient, session: AsyncSession):
+    run_id = str(uuid.uuid4())
+    session.add(_engine_run_with_artifacts(run_id, status="running"))
+    await session.commit()
+
+    r = await client.post(f"/engine/runs/{run_id}/publish", json={
+        "repo": "org/repo",
+        "github_token": "ghp_test",
+    })
+    assert r.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_publish_missing_token(client: AsyncClient, session: AsyncSession):
+    run_id = str(uuid.uuid4())
+    session.add(_engine_run_with_artifacts(run_id))
+    await session.commit()
+
+    r = await client.post(f"/engine/runs/{run_id}/publish", json={"repo": "org/repo"})
+    assert r.status_code == 422
+    assert "github_token" in r.json()["detail"].lower() or "token" in r.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_publish_no_artifacts(client: AsyncClient, session: AsyncSession):
+    run_id = str(uuid.uuid4())
+    session.add(Run(
+        run_id=run_id,
+        team="engine",
+        request="x",
+        status="success",
+        state={"engine": True, "goal": "x", "output_dir": None},
+    ))
+    await session.commit()
+
+    r = await client.post(f"/engine/runs/{run_id}/publish", json={
+        "repo": "org/repo",
+        "github_token": "ghp_test",
+    })
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_publish_success(client: AsyncClient, session: AsyncSession):
+    """Successful publish returns pr_url and artifacts_committed."""
+    run_id = str(uuid.uuid4())
+    session.add(_engine_run_with_artifacts(run_id))
+    await session.commit()
+
+    with patch("antcrew.integrations.github.GitHubIntegration") as MockGH:
+        mock_instance = MockGH.return_value
+        mock_instance.create_engine_pr.return_value = "https://github.com/org/repo/pull/99"
+
+        r = await client.post(f"/engine/runs/{run_id}/publish", json={
+            "repo": "org/repo",
+            "github_token": "ghp_test",
+        })
+
+    assert r.status_code == 200
+    data = r.json()
+    assert data["pr_url"] == "https://github.com/org/repo/pull/99"
+    assert data["artifacts_committed"] == 2  # code + test artifacts
+    assert data["run_id"] == run_id
+
+    # Conditions were correctly derived from state
+    call_kwargs = mock_instance.create_engine_pr.call_args.kwargs
+    assert call_kwargs["conditions"]["requirements_exists"] == "satisfied"
+    assert call_kwargs["conditions"]["tests_pass"] == "not_reached"
+
+
+@pytest.mark.asyncio
+async def test_publish_github_error_returns_502(client: AsyncClient, session: AsyncSession):
+    run_id = str(uuid.uuid4())
+    session.add(_engine_run_with_artifacts(run_id))
+    await session.commit()
+
+    with patch("antcrew.integrations.github.GitHubIntegration") as MockGH:
+        MockGH.return_value.create_engine_pr.side_effect = RuntimeError("API rate limit")
+
+        r = await client.post(f"/engine/runs/{run_id}/publish", json={
+            "repo": "org/repo",
+            "github_token": "ghp_test",
+        })
+
+    assert r.status_code == 502
+    assert "rate limit" in r.json()["detail"].lower()

@@ -15,6 +15,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role
 from app.core.database import get_session
+from app.core.exceptions import (
+    RunNotFoundError, RunNotAccessibleError, RunNotRunningError, StateNotAvailableError,
+)
 from app.models.run import Run, Event as DBEvent
 from app.services.runs import cancel_run, get_run, get_run_events, get_run_tickets, get_run_stats, list_runs
 
@@ -39,7 +42,7 @@ def _assert_run_access(run: Run, ctx: WorkspaceContext) -> None:
     """Raise 403 if the API key is workspace-scoped and doesn't own this run."""
     from app.core.auth import ws_accessible
     if ctx.workspace_ids is not None and not ws_accessible(run.workspace_id, ctx):
-        raise HTTPException(403, "This run is not accessible with the current API key")
+        raise RunNotAccessibleError()
 
 
 @router.post("/upload", status_code=201, response_model=Run,
@@ -121,7 +124,7 @@ async def detail(
 ):
     run = await get_run(session, run_id)
     if not run:
-        raise HTTPException(404, f"Run {run_id!r} not found")
+        raise RunNotFoundError(run_id)
     _assert_run_access(run, ctx)
     return run
 
@@ -137,11 +140,11 @@ async def cancel(
     naturally — this only updates the DB status immediately."""
     existing = await get_run(session, run_id)
     if not existing:
-        raise HTTPException(404, f"Run {run_id!r} not found")
+        raise RunNotFoundError(run_id)
     _assert_run_access(existing, ctx)
     run = await cancel_run(session, run_id)
     if run is None:
-        raise HTTPException(409, f"Run {run_id!r} is not running (status: {existing.status!r})")
+        raise RunNotRunningError(run_id, existing.status)
     return run
 
 
@@ -154,13 +157,10 @@ async def state(
     """Return the full serialized RunResult state for a completed run."""
     run = await get_run(session, run_id)
     if not run:
-        raise HTTPException(404, f"Run {run_id!r} not found")
+        raise RunNotFoundError(run_id)
     _assert_run_access(run, ctx)
     if run.state is None:
-        raise HTTPException(
-            404,
-            f"State not available yet — run {run_id!r} is still {run.status!r}",
-        )
+        raise StateNotAvailableError(run_id, run.status)
     return run.state
 
 
@@ -173,7 +173,7 @@ async def tickets(
     """Return tickets produced by a specific run."""
     run = await get_run(session, run_id)
     if not run:
-        raise HTTPException(404, f"Run {run_id!r} not found")
+        raise RunNotFoundError(run_id)
     _assert_run_access(run, ctx)
     return await get_run_tickets(session, run_id)
 
@@ -202,7 +202,7 @@ async def artifacts(
     """
     run = await get_run(session, run_id)
     if not run:
-        raise HTTPException(404, f"Run {run_id!r} not found")
+        raise RunNotFoundError(run_id)
     _assert_run_access(run, ctx)
 
     # Engine run path
@@ -236,7 +236,7 @@ async def artifacts(
 
     # Team run path (original behaviour)
     if run.state is None:
-        raise HTTPException(404, f"State not available — run {run_id!r} is still {run.status!r}")
+        raise StateNotAvailableError(run_id, run.status)
     s = run.state
     return {
         "run_id": run_id,
@@ -261,7 +261,7 @@ async def artifacts_zip(
     """
     run = await get_run(session, run_id)
     if not run:
-        raise HTTPException(404, f"Run {run_id!r} not found")
+        raise RunNotFoundError(run_id)
     _assert_run_access(run, ctx)
 
     buf = io.BytesIO()
@@ -307,7 +307,7 @@ async def artifacts_zip(
 
     # Team run path (original behaviour)
     if run.state is None:
-        raise HTTPException(404, f"State not available — run {run_id!r} is still {run.status!r}")
+        raise StateNotAvailableError(run_id, run.status)
     s = run.state
     all_artifacts = (
         (s.get("code_artifacts") or [])
@@ -341,6 +341,6 @@ async def events(
 ):
     run = await get_run(session, run_id)
     if not run:
-        raise HTTPException(404, f"Run {run_id!r} not found")
+        raise RunNotFoundError(run_id)
     _assert_run_access(run, ctx)
     return await get_run_events(session, run_id)

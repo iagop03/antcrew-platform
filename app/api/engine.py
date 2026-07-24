@@ -22,6 +22,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible
 from app.core.database import get_session
+from app.core.exceptions import RunNotFoundError, NotAccessibleError
 from app.models.run import Event, Run
 from app.services.engine_runner import AVAILABLE_ENGINE_CAPABILITIES
 
@@ -175,6 +176,93 @@ async def list_engine_capabilities() -> EngineCapabilitiesResponse:
     return EngineCapabilitiesResponse(capabilities=AVAILABLE_ENGINE_CAPABILITIES)
 
 
+class EnginePublishRequest(BaseModel):
+    repo: str
+    github_token: str = ""
+    branch_prefix: str = "antcrew-engine/"
+
+
+class EnginePublishResponse(BaseModel):
+    pr_url: str
+    artifacts_committed: int
+    run_id: str
+
+
+@router.post(
+    "/runs/{run_id}/publish",
+    status_code=200,
+    response_model=EnginePublishResponse,
+    dependencies=[Depends(require_role("admin", "write"))],
+)
+async def publish_engine_run(
+    run_id: str,
+    body: EnginePublishRequest,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> EnginePublishResponse:
+    """Push engine run artifacts to GitHub and open a PR with a TraceLog comment.
+
+    Reads ``code_artifacts``, ``test_artifacts``, and ``doc_artifacts`` from the
+    run's state (stored there by ``_store_engine_state()`` for MemoryStore runs,
+    or from the FilesystemStore manifest). Posts a structured comment listing which
+    goal conditions were satisfied and which capabilities were executed.
+
+    ``github_token`` may be omitted if the ``GITHUB_TOKEN`` environment variable is set.
+    ``repo`` must be ``"owner/repo"`` format.
+    """
+    import os
+
+    run = (await session.exec(select(Run).where(Run.run_id == run_id))).first()
+    if not run:
+        raise RunNotFoundError(run_id)
+    if run.team != "engine":
+        raise HTTPException(422, f"Run {run_id!r} is not an engine run (team={run.team!r})")
+    if not ws_accessible(run.workspace_id, ctx):
+        raise NotAccessibleError()
+    if run.status != "success":
+        raise HTTPException(409, f"Run {run_id!r} has not completed successfully (status={run.status!r})")
+
+    token = body.github_token or os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        raise HTTPException(422, "github_token is required (or set GITHUB_TOKEN env var)")
+
+    state = run.state or {}
+    all_artifacts = (
+        (state.get("code_artifacts") or [])
+        + (state.get("test_artifacts") or [])
+        + (state.get("doc_artifacts") or [])
+    )
+    if not all_artifacts:
+        raise HTTPException(404, "Run has no artifacts to publish — run may have used FilesystemStore with no disk artifacts in state")
+
+    conditions: dict = {}
+    satisfied = set(state.get("conditions_satisfied") or [])
+    expected  = list(state.get("conditions_expected") or [])
+    for cond in expected:
+        conditions[cond] = "satisfied" if cond in satisfied else "not_reached"
+    for cond in satisfied:
+        if cond not in conditions:
+            conditions[cond] = "satisfied"
+
+    try:
+        from antcrew.integrations.github import GitHubIntegration
+        gh = GitHubIntegration(token=token, repo=body.repo)
+        pr_url = gh.create_engine_pr(
+            goal=state.get("goal") or run.request,
+            artifacts=all_artifacts,
+            conditions=conditions or None,
+            branch_prefix=body.branch_prefix,
+        )
+    except Exception as exc:
+        raise HTTPException(502, f"GitHub API error: {exc}") from exc
+
+    return EnginePublishResponse(
+        pr_url=pr_url,
+        artifacts_committed=len(all_artifacts),
+        run_id=run_id,
+    )
+
+
 @router.get("/runs/{run_id}/progress")
 async def get_engine_progress(
     run_id: str,
@@ -195,11 +283,11 @@ async def get_engine_progress(
     """
     run = (await session.exec(select(Run).where(Run.run_id == run_id))).first()
     if not run:
-        raise HTTPException(404, f"Run {run_id!r} not found")
+        raise RunNotFoundError(run_id)
     if run.team != "engine":
         raise HTTPException(422, f"Run {run_id!r} is not an engine run (team={run.team!r})")
     if not ws_accessible(run.workspace_id, ctx):
-        raise HTTPException(403, "Not accessible with the current API key")
+        raise NotAccessibleError()
 
     state = run.state or {}
     satisfied = set(state.get("conditions_satisfied") or [])

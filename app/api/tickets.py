@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.exceptions import TicketNotFoundError
 from pydantic import BaseModel, field_validator
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -59,7 +60,7 @@ async def update_status(
     result = await session.exec(select(Ticket).where(Ticket.ticket_id == ticket_id))
     ticket = result.first()
     if not ticket:
-        raise HTTPException(404, f"Ticket {ticket_id!r} not found")
+        raise TicketNotFoundError(ticket_id)
     if ctx.workspace_ids is not None:
         from app.models.run import Run
         run_result = await session.exec(select(Run).where(Run.run_id == ticket.run_id))
@@ -85,7 +86,7 @@ async def export_ticket(
     result = await session.exec(select(Ticket).where(Ticket.ticket_id == ticket_id))
     ticket = result.first()
     if not ticket:
-        raise HTTPException(404, f"Ticket {ticket_id!r} not found")
+        raise TicketNotFoundError(ticket_id)
     if ctx.workspace_ids is not None:
         from app.models.run import Run
         run_result = await session.exec(select(Run).where(Run.run_id == ticket.run_id))

@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from app.core.exceptions import WorkspaceNotFoundError
 from pydantic import BaseModel, field_validator, model_validator
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -83,7 +84,7 @@ async def set_llm_mode(
         raise HTTPException(403, "This workspace is not accessible with the current API key")
     ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
     if not ws:
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
 
     if body.mode == "byok":
         existing = (await session.exec(
@@ -113,7 +114,7 @@ async def list_llm_keys(
     if not ws_accessible(workspace_id, ctx):
         raise HTTPException(403, "This workspace is not accessible with the current API key")
     if not (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first():
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
     rows = (await session.exec(
         select(LLMProviderKey).where(LLMProviderKey.workspace_id == workspace_id)
     )).all()
@@ -138,7 +139,7 @@ async def store_llm_key(
     if not ws_accessible(workspace_id, ctx):
         raise HTTPException(403, "This workspace is not accessible with the current API key")
     if not (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first():
-        raise HTTPException(404, f"Workspace {workspace_id} not found")
+        raise WorkspaceNotFoundError(workspace_id)
 
     existing = (await session.exec(
         select(LLMProviderKey)

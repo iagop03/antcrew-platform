@@ -19,6 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, ws_accessible
 from app.core.database import get_session
+from app.core.exceptions import CompareNotFoundError, NotAccessibleError
 from app.models.run import CompareRun, Run
 from app.services.runner import dispatch, AVAILABLE_TEAMS
 from app.services.engine_runner import dispatch_engine
@@ -205,9 +206,9 @@ async def get_compare(
     """
     row = (await session.exec(select(CompareRun).where(CompareRun.compare_id == compare_id))).first()
     if not row:
-        raise HTTPException(404, f"Comparison {compare_id!r} not found")
+        raise CompareNotFoundError(compare_id)
     if not ws_accessible(row.workspace_id, ctx):
-        raise HTTPException(403, "Not accessible with the current API key")
+        raise NotAccessibleError()
 
     run_a = (await session.exec(select(Run).where(Run.run_id == row.run_id_a))).first()
     run_b = (await session.exec(select(Run).where(Run.run_id == row.run_id_b))).first()
