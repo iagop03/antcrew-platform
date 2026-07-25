@@ -19,7 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from antcrew.core.events import bus
 from app.core.database import engine
-from app.models.run import Run, Event as DBEvent, HitlReview, WebhookDelivery, Workspace, WebhookConfig, WebhookEvent
+from app.models.run import Run, Event as DBEvent, HitlReview, WebhookDelivery, Workspace, WebhookConfig, WebhookEvent, ApiKey
 from app.services.webhook import notify_new_delivery
 
 if TYPE_CHECKING:
@@ -236,6 +236,57 @@ async def _persist_event(event: "Event") -> None:
                             ),
                         ))
                         notify_new_delivery()
+
+                    # ── Per-reviewer notifications (email, Slack DM, Telegram) ──
+                    if review_id and ws_for_hitl:
+                        reviewer_keys = (await session.exec(
+                            select(ApiKey).where(
+                                ApiKey.workspace_id == ws_for_hitl.id,
+                                ApiKey.role == "reviewer",
+                                ApiKey.revoked_at == None,  # noqa: E711
+                            )
+                        )).all()
+                        _agent_name = event.payload.get("agent_name", "")
+                        _run_id = event.run_id
+                        _base_url = os.environ.get("PLATFORM_BASE_URL", "")
+                        _artifact_json = json.dumps(artifact)
+                        _options = event.payload.get("options", ["approve", "reject"])
+
+                        for rkey in reviewer_keys:
+                            # Email
+                            if rkey.email:
+                                from app.services.email import send_review_assigned as _send_email
+                                asyncio.ensure_future(_send_email(
+                                    to_email=rkey.email,
+                                    assignee_label=rkey.label,
+                                    review_id=review_id,
+                                    agent_name=_agent_name,
+                                    run_id=_run_id,
+                                    base_url=_base_url,
+                                ))
+
+                            # Slack DM
+                            if rkey.slack_user_id and effective_bot:
+                                from app.core.slack_hitl import send_hitl_dm as _send_dm
+                                asyncio.ensure_future(_send_dm(
+                                    bot_token=effective_bot,
+                                    slack_user_id=rkey.slack_user_id,
+                                    review_id=review_id,
+                                    agent_name=_agent_name,
+                                    artifact_json=_artifact_json,
+                                    options=_options,
+                                ))
+
+                            # Telegram
+                            if rkey.telegram_chat_id:
+                                from app.services.telegram import send_review_assigned as _send_tg
+                                asyncio.ensure_future(_send_tg(
+                                    chat_id=rkey.telegram_chat_id,
+                                    review_id=review_id,
+                                    agent_name=_agent_name,
+                                    run_id=_run_id,
+                                    base_url=_base_url,
+                                ))
 
             await session.commit()
     except Exception as exc:

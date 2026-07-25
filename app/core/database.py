@@ -388,6 +388,20 @@ async def _migrate_apikey_user_id(eng) -> None:
         pass  # PostgreSQL handled by Alembic; note: a new Alembic revision is needed for PostgreSQL
 
 
+async def _migrate_apikey_notification_fields(eng) -> None:
+    """Idempotent migration: add slack_user_id and telegram_chat_id to api_key."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(api_key)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "slack_user_id" not in col_names:
+                await conn.execute(text("ALTER TABLE api_key ADD COLUMN slack_user_id TEXT"))
+            if "telegram_chat_id" not in col_names:
+                await conn.execute(text("ALTER TABLE api_key ADD COLUMN telegram_chat_id TEXT"))
+    except Exception:
+        pass  # PostgreSQL handled by Alembic
+
+
 async def _migrate_pipeline_def(eng) -> None:
     """Idempotent migration: create pipeline_def table if absent."""
     try:
@@ -437,6 +451,7 @@ async def init_db() -> None:
     await _migrate_user_table(engine)
     await _migrate_user_session_table(engine)
     await _migrate_apikey_user_id(engine)
+    await _migrate_apikey_notification_fields(engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

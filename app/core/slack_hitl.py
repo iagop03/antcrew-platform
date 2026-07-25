@@ -199,6 +199,42 @@ async def send_hitl_to_slack(
         log.warning("slack_hitl: chat.postMessage failed: %s", exc)
 
 
+async def send_hitl_dm(
+    *,
+    bot_token: str,
+    slack_user_id: str,
+    review_id: str,
+    agent_name: str,
+    artifact_json: str,
+    options: list[str],
+) -> None:
+    """Send an interactive HITL review card as a Slack DM to a specific user.
+
+    Opens a DM channel with the user (conversations.open) then posts the same
+    Block Kit card used for channel notifications.
+    """
+    try:
+        from slack_sdk.web.async_client import AsyncWebClient
+    except ImportError:
+        log.warning("slack_hitl: slack-sdk not installed — pip install 'antcrew[slack]'")
+        return
+
+    excerpt = _extract_excerpt(artifact_json)
+    blocks = _build_review_blocks(agent_name, review_id, excerpt, options)
+    client = AsyncWebClient(token=bot_token)
+    try:
+        dm = await client.conversations_open(users=slack_user_id)
+        channel = dm["channel"]["id"]
+        await client.chat_postMessage(
+            channel=channel,
+            blocks=blocks,
+            text=f"antcrew — {agent_name} needs review",
+        )
+        log.info("slack_hitl: sent DM review %s to user %s", review_id, slack_user_id)
+    except Exception as exc:
+        log.warning("slack_hitl: DM to %s failed: %s", slack_user_id, exc)
+
+
 # ---------------------------------------------------------------------------
 # Sync DB resolution (called from the Bolt thread — not in asyncio context)
 # ---------------------------------------------------------------------------

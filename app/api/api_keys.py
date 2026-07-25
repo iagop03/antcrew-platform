@@ -31,7 +31,9 @@ class CreateKeyRequest(BaseModel):
     label: str
     workspace_id: Optional[int] = None
     role: str = "write"
-    email: Optional[str] = None  # used for HITL assignment email notifications
+    email: Optional[str] = None
+    slack_user_id: Optional[str] = None      # Slack member ID for DM notifications
+    telegram_chat_id: Optional[str] = None   # Telegram chat ID for bot notifications
 
     @field_validator("role")
     @classmethod
@@ -44,6 +46,8 @@ class CreateKeyRequest(BaseModel):
 class UpdateKeyRequest(BaseModel):
     email: Optional[str] = None
     role: Optional[str] = None
+    slack_user_id: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
 
     @field_validator("role")
     @classmethod
@@ -77,6 +81,8 @@ async def create_key(body: CreateKeyRequest, session: AsyncSession = Depends(get
         workspace_id=body.workspace_id,
         role=body.role,
         email=body.email,
+        slack_user_id=body.slack_user_id,
+        telegram_chat_id=body.telegram_chat_id,
     ))
     await session.commit()
     return {
@@ -99,6 +105,8 @@ async def list_keys(session: AsyncSession = Depends(get_session)):
             "role": k.role,
             "workspace_id": k.workspace_id,
             "email": k.email,
+            "slack_user_id": k.slack_user_id,
+            "telegram_chat_id": k.telegram_chat_id,
             "created_at": k.created_at,
         }
         for k in result.all()
@@ -118,9 +126,19 @@ async def update_key(label: str, body: UpdateKeyRequest, session: AsyncSession =
         key.email = body.email
     if body.role is not None:
         key.role = body.role
+    if body.slack_user_id is not None:
+        key.slack_user_id = body.slack_user_id or None
+    if body.telegram_chat_id is not None:
+        key.telegram_chat_id = body.telegram_chat_id or None
     session.add(key)
     await session.commit()
-    return {"label": key.label, "role": key.role, "email": key.email}
+    return {
+        "label": key.label,
+        "role": key.role,
+        "email": key.email,
+        "slack_user_id": key.slack_user_id,
+        "telegram_chat_id": key.telegram_chat_id,
+    }
 
 
 @router.delete("/{label}", status_code=204, dependencies=[Depends(require_role("admin"))])

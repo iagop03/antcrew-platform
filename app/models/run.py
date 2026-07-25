@@ -114,6 +114,8 @@ class ApiKey(SQLModel, table=True):
     workspace_id: Optional[int] = Field(default=None)
     role: str = Field(default="write")  # admin | write | read | reviewer
     email: Optional[str] = Field(default=None)  # for HITL assignment notifications
+    slack_user_id: Optional[str] = Field(default=None)      # Slack member ID (U…) for DM notifications
+    telegram_chat_id: Optional[str] = Field(default=None)   # Telegram chat ID for bot notifications
     user_id: Optional[int] = Field(default=None, index=True)  # FK → user.id (set on register)
     created_at: datetime = Field(default_factory=_utcnow)
     revoked_at: Optional[datetime] = Field(default=None)
