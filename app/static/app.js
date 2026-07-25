@@ -149,7 +149,8 @@ function initNav() {
   const nav = document.getElementById('nav-links');
   if (!nav) return;
   const links = [
-    { href: '/', key: 'nav.runs' },
+    { href: '/', key: 'nav.dashboard' },
+    { href: '/runs', key: 'nav.runs' },
     { href: '/reviews', key: 'nav.reviews' },
     { href: '/evals', key: 'nav.evals' },
     { href: '/tickets', key: 'nav.tickets' },

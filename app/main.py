@@ -837,6 +837,11 @@ async def pipelines_page():
     return FileResponse(_STATIC / "pipelines.html")
 
 
+@app.get("/runs")
+async def runs_page():
+    return FileResponse(_STATIC / "runs.html")
+
+
 @app.get("/compare")
 async def compare_page():
     return FileResponse(_STATIC / "compare.html")
