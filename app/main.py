@@ -746,13 +746,14 @@ async def trial_register(
 
     # ── Create admin API key ─────────────────────────────────────────────────
     raw = secrets.token_urlsafe(32)
-    label = re.sub(r"[^a-z0-9-]", "-", email.split("@")[0])[:50]
-    # Ensure label uniqueness
-    base_label = label
-    lsuffix = 1
-    while (await session.exec(select(ApiKey).where(ApiKey.label == label))).first():
-        label = f"{base_label}-{lsuffix}"
-        lsuffix += 1
+    base_label = re.sub(r"[^a-z0-9-]", "-", email.split("@")[0])[:48] or "user"
+    label = base_label
+    for _attempt in range(20):
+        if not (await session.exec(select(ApiKey).where(ApiKey.label == label))).first():
+            break
+        label = f"{base_label}-{secrets.token_hex(3)}"
+    else:
+        label = f"user-{secrets.token_hex(6)}"
 
     key = ApiKey(
         label=label,
@@ -763,7 +764,13 @@ async def trial_register(
         email=email,
     )
     session.add(key)
-    await session.commit()
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        key.label = f"user-{secrets.token_hex(6)}"
+        session.add(key)
+        await session.commit()
 
     timestamps.append(now)
 

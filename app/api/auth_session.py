@@ -190,13 +190,16 @@ async def register(
         raw_key = secrets.token_urlsafe(32)
         from app.core.auth import _hash as _hash_key, _key_prefix
 
-        # Derive a unique label from the email
-        label_base = re.sub(r"[^a-z0-9-]", "-", email.split("@")[0])[:50] or "user"
+        # Derive a unique label from the email — append random suffix on collision
+        label_base = re.sub(r"[^a-z0-9-]", "-", email.split("@")[0])[:48] or "user"
         label = label_base
-        suffix = 1
-        while (await session.exec(select(ApiKey).where(ApiKey.label == label))).first():
-            label = f"{label_base}-{suffix}"
-            suffix += 1
+        for _attempt in range(20):
+            exists = (await session.exec(select(ApiKey).where(ApiKey.label == label))).first()
+            if not exists:
+                break
+            label = f"{label_base}-{secrets.token_hex(3)}"
+        else:
+            label = f"user-{secrets.token_hex(6)}"
 
         api_key = ApiKey(
             label=label,
@@ -209,7 +212,14 @@ async def register(
             created_at=_utcnow(),
         )
         session.add(api_key)
-        await session.flush()
+        try:
+            await session.flush()
+        except Exception:
+            # Race condition: another request inserted the same label between check and flush
+            await session.rollback()
+            api_key.label = f"user-{secrets.token_hex(6)}"
+            session.add(api_key)
+            await session.flush()
 
         # Create session
         token = _make_token()
