@@ -1,5 +1,13 @@
 # Changelog — antcrew-platform
 
+## v0.4.3 (2026-07-26)
+
+### Security
+- **Stored XSS on public client review page (`/r/{token}`)** — `html.escape()` applied to every user-controlled value interpolated into the HTML response in `client_review.py`: artifact title, summary, description, comment, file_path, verdict, generic k/v pairs, ticket id/title, agent_name, and run.request. The page is deliberately unauthenticated (shared with external clients) making XSS especially dangerous — an attacker could steal the client token or forge the approval UI. Defined `_e = html.escape` as an explicit shorthand to make future additions hard to miss.
+- **CSRF coverage completed** — 9 previously unprotected routers now have `dependencies=_csrf`: pipeline, runs, tickets, templates, evals, eval_schedules, compare, contract_schemas. Notably `POST /run/compare` (double-spend vector) and `POST /runs/upload` are now protected.
+
+---
+
 ## v0.4.2 (2026-07-26)
 
 ### Security

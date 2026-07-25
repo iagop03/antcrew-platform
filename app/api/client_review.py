@@ -13,9 +13,12 @@ Flow:
 """
 from __future__ import annotations
 
+import html
 import json
 from datetime import datetime, timezone
 from typing import Optional
+
+_e = html.escape  # shorthand — every user-controlled value must go through this before HTML interpolation
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -40,39 +43,39 @@ def _render_artifact(artifact: object, agent_name: str) -> str:
     if isinstance(artifact, dict):
         # PRD
         if "title" in artifact and "summary" in artifact:
-            lines.append(f"<h3>{artifact['title']}</h3>")
-            lines.append(f"<p>{artifact['summary']}</p>")
+            lines.append(f"<h3>{_e(artifact['title'])}</h3>")
+            lines.append(f"<p>{_e(artifact['summary'])}</p>")
         # Code artifact (single)
         elif "file_path" in artifact:
-            lines.append(f"<p><strong>File:</strong> <code>{artifact['file_path']}</code></p>")
+            lines.append(f"<p><strong>File:</strong> <code>{_e(artifact['file_path'])}</code></p>")
             if artifact.get("description"):
-                lines.append(f"<p>{artifact['description']}</p>")
+                lines.append(f"<p>{_e(artifact['description'])}</p>")
         # Code review
         elif "verdict" in artifact:
             verdict = artifact.get("verdict", "")
             color = "#2d6a4f" if verdict == "approve" else "#c62828"
-            lines.append(f"<p><strong>Verdict:</strong> <span style='color:{color};font-weight:bold'>{verdict.upper()}</span></p>")
+            lines.append(f"<p><strong>Verdict:</strong> <span style='color:{color};font-weight:bold'>{_e(verdict.upper())}</span></p>")
             if artifact.get("comment"):
-                lines.append(f"<blockquote>{artifact['comment']}</blockquote>")
+                lines.append(f"<blockquote>{_e(artifact['comment'])}</blockquote>")
         else:
             for k, v in list(artifact.items())[:6]:
                 if v and k not in ("_type",):
-                    label = k.replace("_", " ").title()
-                    lines.append(f"<p><strong>{label}:</strong> {v}</p>")
+                    label = _e(k.replace("_", " ").title())
+                    lines.append(f"<p><strong>{label}:</strong> {_e(str(v))}</p>")
 
     elif isinstance(artifact, list):
         if artifact and isinstance(artifact[0], dict):
             if "file_path" in artifact[0]:
                 lines.append(f"<p><strong>{len(artifact)} file(s) generated:</strong></p><ul>")
                 for item in artifact[:10]:
-                    fp = item.get("file_path", "")
-                    desc = item.get("description", "")
+                    fp = _e(item.get("file_path", ""))
+                    desc = _e(item.get("description", ""))
                     lines.append(f"<li><code>{fp}</code>{' — ' + desc if desc else ''}</li>")
                 lines.append("</ul>")
             elif "id" in artifact[0] and "title" in artifact[0]:
                 lines.append(f"<p><strong>{len(artifact)} ticket(s):</strong></p><ul>")
                 for item in artifact[:10]:
-                    lines.append(f"<li><strong>{item.get('id','')}</strong> {item.get('title','')}</li>")
+                    lines.append(f"<li><strong>{_e(str(item.get('id', '')))}</strong> {_e(item.get('title', ''))}</li>")
                 lines.append("</ul>")
         else:
             lines.append(f"<p>{len(artifact)} item(s) to review.</p>")
@@ -104,8 +107,8 @@ def _render_page(
     if not client_options:
         client_options = ["approve", "reject"]
 
-    agent_label = review.agent_name.replace("_", " ").title()
-    request_text = run.request[:400] if run else ""
+    agent_label = _e(review.agent_name.replace("_", " ").title())
+    request_text = _e(run.request[:400]) if run else ""
 
     artifact_html = _render_artifact(artifact_obj, review.agent_name)
 
