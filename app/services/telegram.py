@@ -38,28 +38,18 @@ async def send_review_assigned(
         f"[Ver revisión]({review_url})"
     )
     try:
-        import urllib.request
         import json as _json
+        import httpx
 
         url = _API_BASE.format(token=_TOKEN)
-        payload = _json.dumps({
+        payload = {
             "chat_id": chat_id,
             "text": text,
             "parse_mode": "Markdown",
             "disable_web_page_preview": True,
-        }).encode()
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: urllib.request.urlopen(
-                urllib.request.Request(
-                    url,
-                    data=payload,
-                    headers={"Content-Type": "application/json"},
-                ),
-                timeout=10,
-            ),
-        )
+        }
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(url, json=payload)
         log.debug("telegram: sent review notification to chat %s", chat_id)
     except Exception as exc:
         log.warning("telegram: failed to notify chat %s for review %s: %s", chat_id, review_id, exc)

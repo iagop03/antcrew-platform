@@ -245,6 +245,12 @@ async def get_workspace_context(
     except Exception as exc:
         log.error("auth: DB error during authentication: %s", exc)
         raise HTTPException(503, "Authentication service temporarily unavailable")
+
+    # When PLATFORM_API_KEY is set, open mode (no DB keys configured) is not allowed —
+    # _authenticate returns created_by=None for open mode; reject it here.
+    if env_key and ctx.created_by is None:
+        raise HTTPException(401, "Invalid or missing X-Api-Key header")
+
     await rate_limit.check(request, ctx.workspace_id, ctx.created_by)
     return ctx
 
