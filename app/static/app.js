@@ -53,12 +53,26 @@ function setApiKey(key) {
   else localStorage.removeItem('antcrew_api_key');
 }
 
+// ── CSRF ─────────────────────────────────────────────────────────────────────
+
+function getCsrfToken() {
+  const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
 // ── API helpers ──────────────────────────────────────────────────────────────
+
+const _CSRF_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 async function apiFetch(path, opts = {}) {
   const key = getApiKey();
-  const headers = { 'Content-Type': 'application/json', ...( opts.headers || {}) };
-  if (key) headers['X-Api-Key'] = key;
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (key) {
+    headers['X-Api-Key'] = key;
+  } else if (_CSRF_METHODS.has((opts.method || 'GET').toUpperCase())) {
+    const csrf = getCsrfToken();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+  }
   const r = await fetch(path, { ...opts, headers });
   if (!r.ok) {
     let detail = `HTTP ${r.status}`;
@@ -324,7 +338,7 @@ async function _initSessionNav() {
       logoutBtn.onclick = async () => {
         logoutBtn.disabled = true;
         try {
-          await fetch('/auth/token', { method: 'DELETE', credentials: 'same-origin' });
+          await apiFetch('/auth/token', { method: 'DELETE' });
         } catch {}
         window.location.href = '/login';
       };

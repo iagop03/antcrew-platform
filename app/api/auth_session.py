@@ -139,6 +139,7 @@ class _TokenRequest(BaseModel):
 @router.post("/register", status_code=201)
 async def register(
     body: _RegisterRequest,
+    request: Request,
     response: Response,
     session=Depends(get_session),
 ):
@@ -147,7 +148,11 @@ async def register(
     Returns the raw API key in the 201 body (only time it is visible — save it).
     Idempotent-on-error: any DB writes are rolled back if a step fails.
     """
+    from app.core import rate_limit
+    from app.core.csrf import generate as _csrf_gen, set_cookie as _csrf_set
     from app.models.run import User, ApiKey, Workspace
+
+    await rate_limit.check(request, None, None)
 
     email = body.email.strip().lower()
     if not email or "@" not in email:
@@ -251,7 +256,9 @@ async def register(
         await session.rollback()
         raise HTTPException(500, f"Registration failed: {exc}") from exc
 
+    csrf_token = _csrf_gen()
     _set_session_cookie(response, token)
+    _csrf_set(response, csrf_token, secure=_is_secure())
     return {
         "email": email,
         "workspace_id": workspace.id,
@@ -263,11 +270,16 @@ async def register(
 @router.post("/login")
 async def login(
     body: _LoginRequest,
+    request: Request,
     response: Response,
     session=Depends(get_session),
 ):
     """Validate email+password; issue a new session cookie."""
+    from app.core import rate_limit
+    from app.core.csrf import generate as _csrf_gen, set_cookie as _csrf_set
     from app.models.run import User, ApiKey
+
+    await rate_limit.check(request, None, None)
 
     email = body.email.strip().lower()
 
@@ -290,7 +302,9 @@ async def login(
         raise HTTPException(401, "No active API key for this account")
 
     token = await _create_session(user.id, api_key.id, session)
+    csrf_token = _csrf_gen()
     _set_session_cookie(response, token)
+    _csrf_set(response, csrf_token, secure=_is_secure())
 
     return {
         "email": email,
@@ -349,8 +363,11 @@ async def exchange_api_key_for_session(
     if matched is None:
         raise HTTPException(401, "Invalid API key")
 
+    from app.core.csrf import generate as _csrf_gen, set_cookie as _csrf_set
     token = await _create_session(matched.user_id, matched.id, session)
+    csrf_token = _csrf_gen()
     _set_session_cookie(response, token)
+    _csrf_set(response, csrf_token, secure=_is_secure())
 
     return {
         "workspace_id": matched.workspace_id,
@@ -392,7 +409,9 @@ async def revoke_session(
             session.add(user_session)
             await session.commit()
 
+    from app.core.csrf import clear_cookie as _csrf_clear
     _clear_session_cookie(response)
+    _csrf_clear(response, secure=_is_secure())
     return None
 
 
