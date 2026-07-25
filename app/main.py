@@ -582,25 +582,25 @@ from app.core.csrf import require_csrf as _require_csrf
 _csrf = [Depends(_require_csrf)]
 
 app.include_router(auth_session_api.router)
-app.include_router(pipeline.router)
-app.include_router(runs.router)
-app.include_router(tickets.router)
-app.include_router(stream.router)
+app.include_router(pipeline.router,            dependencies=_csrf)
+app.include_router(runs.router,                dependencies=_csrf)
+app.include_router(tickets.router,             dependencies=_csrf)
+app.include_router(stream.router)                              # SSE/WebSocket — GET only, no mutations
 app.include_router(api_keys.router,            dependencies=_csrf)
 app.include_router(reviews.router,             dependencies=_csrf)
-app.include_router(templates.router)
+app.include_router(templates.router,           dependencies=_csrf)
 app.include_router(workspaces.router,          dependencies=_csrf)
 app.include_router(workspaces_byok.router,     dependencies=_csrf)
 app.include_router(workspaces_members.router,  dependencies=_csrf)
-app.include_router(evals.router)
-app.include_router(eval_schedules.router)
+app.include_router(evals.router,               dependencies=_csrf)
+app.include_router(eval_schedules.router,      dependencies=_csrf)
 app.include_router(engine.router,              dependencies=_csrf)
 app.include_router(billing.router,             dependencies=_csrf)
-app.include_router(webhook_mor.router)
+app.include_router(webhook_mor.router)                         # server-to-server, HMAC-signed body
 app.include_router(pipelines_api.router,       dependencies=_csrf)
 app.include_router(client_review.router,       dependencies=_csrf)
-app.include_router(compare_api.router)
-app.include_router(contract_schemas_api.router)
+app.include_router(compare_api.router,         dependencies=_csrf)
+app.include_router(contract_schemas_api.router, dependencies=_csrf)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
