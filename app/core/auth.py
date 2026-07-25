@@ -217,13 +217,13 @@ async def get_workspace_context(
 
     env_key = os.environ.get("PLATFORM_API_KEY")
 
-    # 1. PLATFORM_API_KEY matches header — immediate admin grant
+    # 1. PLATFORM_API_KEY matches header — immediate admin grant (no DB hit)
     if env_key and x_api_key and hmac.compare_digest(x_api_key, env_key):
         ctx = WorkspaceContext(workspace_id=None, created_by="env_key", role="admin")
         await rate_limit.check(request, ctx.workspace_id, ctx.created_by)
         return ctx
 
-    # 2. Session cookie — works whether or not PLATFORM_API_KEY is set
+    # 2. Session cookie — browser users authenticated via /login
     session_token = request.cookies.get("antcrew_session")
     if session_token:
         try:
@@ -236,11 +236,8 @@ async def get_workspace_context(
         except Exception as exc:
             log.warning("auth: session cookie lookup failed: %s", exc)
 
-    # 3. X-Api-Key header against DB keys (skipped when PLATFORM_API_KEY is set
-    #    and the header doesn't match it — avoids leaking DB key auth as a bypass)
-    if env_key:
-        raise HTTPException(401, "Invalid or missing X-Api-Key header")
-
+    # 3. X-Api-Key header against DB keys — always tried regardless of PLATFORM_API_KEY
+    #    (PLATFORM_API_KEY is a super-admin shortcut, not an exclusion of DB keys)
     try:
         ctx = await _authenticate(x_api_key, session)
     except HTTPException:
