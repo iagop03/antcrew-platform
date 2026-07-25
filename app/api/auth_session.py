@@ -172,19 +172,28 @@ async def register(
         session.add(user)
         await session.flush()  # get user.id without full commit
 
-        # Get or create first workspace
-        workspace = (await session.exec(select(Workspace).limit(1))).first()
-        if workspace is None:
-            from app.core.byok import TRIAL_CREDIT_USD
-            slug_base = re.sub(r"[^a-z0-9]+", "-", email.split("@")[0])[:40] or "workspace"
-            workspace = Workspace(
-                name=email,
-                slug=slug_base,
-                is_trial=True,
-                max_cost_usd=TRIAL_CREDIT_USD,
-            )
-            session.add(workspace)
-            await session.flush()
+        # Always create a NEW workspace for this user — never attach to an existing one
+        from app.core.byok import TRIAL_CREDIT_USD
+        slug_base = re.sub(r"[^a-z0-9]+", "-", email.split("@")[0])[:40] or "workspace"
+        slug = slug_base
+        for _attempt in range(20):
+            slug_exists = (await session.exec(
+                select(Workspace).where(Workspace.slug == slug)
+            )).first()
+            if not slug_exists:
+                break
+            slug = f"{slug_base}-{secrets.token_hex(3)}"
+        else:
+            slug = f"workspace-{secrets.token_hex(6)}"
+        workspace = Workspace(
+            name=email,
+            slug=slug,
+            is_trial=True,
+            max_cost_usd=TRIAL_CREDIT_USD,
+            owner_user_id=user.id,
+        )
+        session.add(workspace)
+        await session.flush()
 
         # Create admin API key for this user
         raw_key = secrets.token_urlsafe(32)

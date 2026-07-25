@@ -136,7 +136,7 @@ async def _authenticate(raw_key: Optional[str], session) -> WorkspaceContext:
             return WorkspaceContext(
                 workspace_id=workspace_id,
                 created_by=label,
-                role=role if role in _VALID_ROLES else "write",
+                role=role if role in _VALID_ROLES else "read",
                 membership_ids=[m.workspace_id for m in memberships],
             )
 
@@ -196,7 +196,7 @@ async def _session_context(token: str, session) -> Optional[WorkspaceContext]:
     return WorkspaceContext(
         workspace_id=key.workspace_id,
         created_by=key.label,
-        role=key.role if key.role in _VALID_ROLES else "write",
+        role=key.role if key.role in _VALID_ROLES else "read",
         membership_ids=[m.workspace_id for m in memberships],
     )
 

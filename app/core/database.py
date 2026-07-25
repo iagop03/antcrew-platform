@@ -402,6 +402,22 @@ async def _migrate_apikey_notification_fields(eng) -> None:
         pass  # PostgreSQL handled by Alembic
 
 
+async def _migrate_workspace_owner_user_id(eng) -> None:
+    """Idempotent migration: add owner_user_id column to workspace if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(workspace)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "owner_user_id" not in col_names:
+                await conn.execute(text("ALTER TABLE workspace ADD COLUMN owner_user_id INTEGER"))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_workspace_owner_user_id "
+                    "ON workspace(owner_user_id)"
+                ))
+    except Exception:
+        pass  # PostgreSQL handled by Alembic
+
+
 async def _migrate_pipeline_def(eng) -> None:
     """Idempotent migration: create pipeline_def table if absent."""
     try:
@@ -452,6 +468,7 @@ async def init_db() -> None:
     await _migrate_user_session_table(engine)
     await _migrate_apikey_user_id(engine)
     await _migrate_apikey_notification_fields(engine)
+    await _migrate_workspace_owner_user_id(engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

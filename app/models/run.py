@@ -35,6 +35,7 @@ class Workspace(SQLModel, table=True):
     mor_subscription_id: Optional[str] = Field(default=None)              # Lemon Squeezy subscription ID
     llm_key_mode: str = Field(default="managed")  # managed | byok
     is_trial: bool = Field(default=True)  # workspace is on the free-trial credit; costs at TRIAL_MULTIPLIER
+    owner_user_id: Optional[int] = Field(default=None, index=True)  # user.id of the registering user
     created_at: datetime = Field(default_factory=_utcnow)
 
 
