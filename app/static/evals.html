@@ -222,6 +222,96 @@
   </div>
 </div>
 
+<!-- Regression section -->
+<div class="px-6 mb-8">
+  <div class="flex items-center justify-between mb-3">
+    <button @click="regOpen = !regOpen"
+      class="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition">
+      <span x-text="regOpen ? '▾' : '▸'" class="text-gray-500"></span>
+      Regression Tests
+      <span class="text-xs text-gray-500 font-normal">(prompt drift detection)</span>
+    </button>
+  </div>
+
+  <div x-show="regOpen" x-cloak>
+    <div class="grid grid-cols-2 gap-4">
+      <!-- Form -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <h3 class="text-sm font-medium text-gray-300 mb-3">New Regression Batch</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1">Run IDs (one per line)</label>
+            <textarea x-model="regRunIds" rows="4" placeholder="run_id_1&#10;run_id_2&#10;run_id_3"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono text-gray-200 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1">Team override</label>
+              <input x-model="regTeam" placeholder="e.g. DevTeam"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1">Model override</label>
+              <input x-model="regModel" placeholder="e.g. claude"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+          <div x-show="regError" x-cloak class="text-xs text-red-400" x-text="regError"></div>
+          <button @click="submitRegression()"
+            :disabled="regSubmitting || !regRunIds.trim()"
+            class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium px-3 py-2 rounded-lg transition">
+            <span x-show="!regSubmitting">Run Regression</span>
+            <span x-show="regSubmitting" x-cloak>Launching…</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Result panel -->
+      <div x-show="!currentReg" class="bg-gray-900 border border-dashed border-gray-700 rounded-xl p-4 flex items-center justify-center">
+        <p class="text-gray-600 text-sm text-center">Results appear here after a regression run.</p>
+      </div>
+      <template x-if="currentReg">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+          <!-- Status + rate -->
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono text-gray-500" x-text="currentReg.regression_id?.slice(0,8)"></span>
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                :class="{
+                  'bg-yellow-900/50 text-yellow-300': currentReg.status === 'running',
+                  'bg-green-900/50 text-green-300': currentReg.status === 'done',
+                  'bg-red-900/50 text-red-300': currentReg.status === 'error',
+                }"
+                x-text="currentReg.status"></span>
+            </div>
+            <template x-if="currentReg.regression_rate != null">
+              <div class="text-right">
+                <div class="text-xl font-bold font-mono"
+                  :class="currentReg.regression_rate > 0 ? 'text-red-400' : 'text-green-400'"
+                  x-text="(currentReg.regression_rate * 100).toFixed(0) + '% regression'"></div>
+                <div class="text-xs text-gray-500"
+                  x-text="currentReg.passed + ' passed / ' + currentReg.failed + ' failed'"></div>
+              </div>
+            </template>
+          </div>
+          <!-- Cases -->
+          <div class="space-y-1.5 max-h-52 overflow-y-auto">
+            <template x-for="c in (currentReg.cases || [])" :key="c.eval_id">
+              <div class="flex items-center gap-2 text-xs py-1 border-b border-gray-800/50">
+                <span class="w-2 h-2 rounded-full shrink-0"
+                  :class="c.status === 'running' ? 'bg-yellow-400 animate-pulse' : c.passed ? 'bg-green-500' : 'bg-red-500'"></span>
+                <span class="text-gray-300 flex-1 truncate" x-text="c.name || c.eval_id.slice(0,16)"></span>
+                <span x-show="c.overall_score != null" class="font-mono text-gray-500"
+                  x-text="c.overall_score != null ? (c.overall_score * 100).toFixed(0) + '%' : ''"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
 <!-- New Eval Modal -->
 <div x-show="showModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
   <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
@@ -434,6 +524,16 @@ function evalsPage() {
     schedError: '',
     schedForm: { name: '', team: 'DevTeam', request: '', interval_hours: 24, expect_min_tickets: 0, expect_min_code_files: 0 },
 
+    // Regression
+    regOpen: false,
+    regRunIds: '',
+    regTeam: '',
+    regModel: '',
+    regSubmitting: false,
+    regError: '',
+    currentReg: null,
+    _regPollTimer: null,
+
     apiHeaders(extra = {}) {
       const k = localStorage.getItem('antcrew_api_key');
       const h = { 'Content-Type': 'application/json', ...extra };
@@ -627,6 +727,35 @@ function evalsPage() {
       if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
       if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
       return Math.floor(diff / 86400) + 'd ago';
+    },
+
+    async submitRegression() {
+      this.regError = '';
+      const ids = this.regRunIds.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+      if (!ids.length) { this.regError = 'Enter at least one run ID.'; return; }
+      this.regSubmitting = true;
+      try {
+        const body = { run_ids: ids };
+        if (this.regTeam) body.team = this.regTeam;
+        if (this.regModel) body.model = this.regModel;
+        const r = await fetch('/evals/regression', { method: 'POST', headers: this.apiHeaders(), body: JSON.stringify(body) });
+        if (!r.ok) { this.regError = `Error ${r.status}`; return; }
+        const data = await r.json();
+        this.currentReg = data;
+        if (data.status === 'running') this._startRegPoll(data.regression_id);
+      } catch (e) { this.regError = String(e); }
+      finally { this.regSubmitting = false; }
+    },
+
+    _startRegPoll(id) {
+      if (this._regPollTimer) clearInterval(this._regPollTimer);
+      this._regPollTimer = setInterval(async () => {
+        const r = await fetch(`/evals/regression/${id}`, { headers: this.apiHeaders() });
+        if (!r.ok) return;
+        const data = await r.json();
+        this.currentReg = data;
+        if (data.status !== 'running') { clearInterval(this._regPollTimer); this._regPollTimer = null; }
+      }, 3000);
     },
   };
 }

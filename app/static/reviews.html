@@ -65,11 +65,99 @@
         class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-600 text-gray-200 text-xs font-bold"
         x-text="allCount"></span>
     </button>
+    <button @click="setTab('analytics')"
+      :class="activeTab === 'analytics'
+        ? 'bg-gray-800 text-white'
+        : 'text-gray-400 hover:text-gray-200'"
+      class="px-4 py-1.5 rounded-md text-sm font-medium transition">
+      Analytics
+    </button>
   </div>
 </div>
 
+<!-- Analytics panel -->
+<div x-show="activeTab === 'analytics'" x-cloak class="px-6 pb-8">
+  <template x-if="analyticsLoading">
+    <div class="space-y-3 mt-2">
+      <div class="h-24 bg-gray-900 border border-gray-800 rounded-xl animate-pulse"></div>
+      <div class="h-40 bg-gray-900 border border-gray-800 rounded-xl animate-pulse"></div>
+    </div>
+  </template>
+  <template x-if="!analyticsLoading && !analytics">
+    <p class="text-gray-500 text-sm mt-4">No review data yet for this workspace.</p>
+  </template>
+  <template x-if="analytics">
+    <div class="space-y-4 mt-2">
+      <!-- Summary cards -->
+      <div class="grid grid-cols-4 gap-3">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Reviews</div>
+          <div class="text-2xl font-semibold font-mono" x-text="analytics.total_reviews"></div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Pending</div>
+          <div class="text-2xl font-semibold font-mono text-amber-400" x-text="analytics.pending"></div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Rejected</div>
+          <div class="text-2xl font-semibold font-mono text-red-400" x-text="analytics.rejected"></div>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
+          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Rejection Rate</div>
+          <div class="text-2xl font-semibold font-mono"
+            :class="analytics.overall_rejection_rate > 0.3 ? 'text-red-400' : analytics.overall_rejection_rate > 0.1 ? 'text-yellow-400' : 'text-green-400'"
+            x-text="analytics.overall_rejection_rate != null ? (analytics.overall_rejection_rate * 100).toFixed(1) + '%' : '—'"></div>
+        </div>
+      </div>
+
+      <!-- By checkpoint -->
+      <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-gray-800">
+          <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Rejection rate by checkpoint</span>
+        </div>
+        <div class="divide-y divide-gray-800/50">
+          <template x-if="analytics.by_agent.length === 0">
+            <div class="px-4 py-3 text-sm text-gray-500">No data</div>
+          </template>
+          <template x-for="a in analytics.by_agent" :key="a.agent_name">
+            <div class="px-4 py-3 flex items-center gap-4">
+              <span class="text-sm text-gray-300 w-40 truncate font-mono" x-text="a.agent_name"></span>
+              <div class="flex-1 bg-gray-800 rounded-full h-2 overflow-hidden">
+                <div class="h-2 rounded-full transition-all"
+                  :style="'width:' + (a.rejection_rate != null ? (a.rejection_rate * 100).toFixed(0) : 0) + '%'"
+                  :class="a.rejection_rate > 0.3 ? 'bg-red-500' : a.rejection_rate > 0.1 ? 'bg-yellow-500' : 'bg-green-500'"></div>
+              </div>
+              <span class="text-xs font-mono w-12 text-right"
+                :class="a.rejection_rate > 0.3 ? 'text-red-400' : a.rejection_rate > 0.1 ? 'text-yellow-400' : 'text-gray-400'"
+                x-text="a.rejection_rate != null ? (a.rejection_rate * 100).toFixed(0) + '%' : '—'"></span>
+              <span class="text-xs text-gray-600 w-16 text-right" x-text="a.total + ' total'"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- By resolver -->
+      <template x-if="analytics.by_resolver.length > 0">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-gray-800">
+            <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Decisions by resolver</span>
+          </div>
+          <div class="divide-y divide-gray-800/50">
+            <template x-for="r in analytics.by_resolver" :key="r.resolver">
+              <div class="px-4 py-2.5 flex items-center justify-between">
+                <span class="text-sm text-gray-300 font-mono" x-text="r.resolver || 'client'"></span>
+                <span class="text-sm font-mono text-indigo-400" x-text="r.decisions + ' decisions'"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+</div>
+
 <!-- Loading -->
-<template x-if="loading">
+<template x-if="loading && activeTab !== 'analytics'">
   <div class="px-6 space-y-4">
     <template x-for="i in [1,2]" :key="i">
       <div class="bg-gray-900 rounded-xl border border-gray-800 p-5 animate-pulse">
@@ -85,7 +173,7 @@
 </template>
 
 <!-- Empty state -->
-<template x-if="!loading && reviews.length === 0">
+<template x-if="!loading && reviews.length === 0 && activeTab !== 'analytics'">
   <div class="px-6">
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
       <div class="text-4xl mb-3">✓</div>
@@ -101,7 +189,7 @@
 </template>
 
 <!-- Review cards -->
-<div class="px-6 space-y-5" x-show="!loading && reviews.length > 0">
+<div class="px-6 space-y-5" x-show="!loading && reviews.length > 0 && activeTab !== 'analytics'">
   <template x-for="review in reviews" :key="review.review_id">
     <div class="bg-gray-900 border border-amber-800/50 rounded-xl overflow-hidden">
 
@@ -329,6 +417,8 @@ function reviewQueue() {
     activeTab: 'all',
     allCount: 0,
     mineCount: 0,
+    analytics: null,
+    analyticsLoading: false,
     feedbacks: {},
     resolving: {},
     resolveErrors: {},
@@ -347,7 +437,26 @@ function reviewQueue() {
 
     setTab(tab) {
       this.activeTab = tab;
-      this.loadReviews();
+      if (tab === 'analytics') {
+        this.loadAnalytics();
+      } else {
+        this.loadReviews();
+      }
+    },
+
+    async loadAnalytics() {
+      this.analyticsLoading = true;
+      try {
+        // Get workspace_id from the workspaces list (first accessible workspace)
+        const wsr = await fetch('/workspaces/', { headers: this.apiHeaders() });
+        if (!wsr.ok) return;
+        const workspaces = await wsr.json();
+        if (!workspaces.length) return;
+        const wsId = workspaces[0].id;
+        const r = await fetch(`/workspaces/${wsId}/hitl/analytics`, { headers: this.apiHeaders() });
+        if (r.ok) this.analytics = await r.json();
+      } catch {}
+      this.analyticsLoading = false;
     },
 
     apiHeaders(extra = {}) {

@@ -82,6 +82,15 @@
         </div>
         <div class="text-right text-sm text-gray-400 space-y-1">
           <div x-text="run.cost_usd ? '$' + run.cost_usd.toFixed(4) : '—'"></div>
+          <template x-if="budget && budget.budget_usd != null">
+            <div class="text-xs flex items-center justify-end gap-1">
+              <span :class="budget.exhausted ? 'text-red-400' : (budget.remaining_usd / budget.budget_usd < 0.15 ? 'text-yellow-400' : 'text-gray-500')">
+                <span x-show="budget.exhausted">Budget exhausted</span>
+                <span x-show="!budget.exhausted" x-text="'$' + budget.remaining_usd.toFixed(2) + ' left'"></span>
+              </span>
+              <span class="text-gray-700 font-mono" x-text="'/ $' + budget.budget_usd.toFixed(2)"></span>
+            </div>
+          </template>
           <div class="text-xs" x-text="run.duration_s ? run.duration_s.toFixed(0) + 's' : ''"></div>
           <template x-if="totalCacheRead + totalCacheWrite > 0">
             <div class="text-xs text-blue-400"
@@ -379,6 +388,7 @@ function runDetail() {
     hitlFeedback: '',
     hitlEditedJson: '',
     hitlSubmitting: false,
+    budget: null,
 
     async init() {
       const match = location.pathname.match(/^\/run\/(.+?)\/?$/);
@@ -386,6 +396,7 @@ function runDetail() {
       if (!this.runId) { this.runError = 'Invalid URL — no run ID found.'; this.loadingRun = false; return; }
 
       await Promise.all([this.loadRun(), this.loadEvents(), this.loadState()]);
+      if (this.run?.workspace_id) this.loadBudget();
       if (this.run && this.run.team !== 'engine' && !this.run.team?.startsWith('pipeline:')) await this.loadTickets();
       this._deriveCapabilities();
       await this.loadPendingReview();
@@ -421,6 +432,14 @@ function runDetail() {
       } finally {
         this.loadingRun = false;
       }
+    },
+
+    async loadBudget() {
+      if (!this.run?.workspace_id) return;
+      try {
+        const r = await fetch(`/workspaces/${this.run.workspace_id}/spend`, { headers: this.apiHeaders() });
+        if (r.ok) this.budget = await r.json();
+      } catch {}
     },
 
     async loadEvents() {
