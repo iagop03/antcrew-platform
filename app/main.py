@@ -25,6 +25,7 @@ from app.core.listener import start_listening, stop_listening
 from app.core.auth import _hash, _key_prefix
 from app.core.byok import TRIAL_CREDIT_USD
 from app.models.run import Workspace, ApiKey
+from app.api import auth_session as auth_session_api
 from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, workspaces_byok, workspaces_members, evals
 from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as pipelines_api
 from app.api import client_review, compare as compare_api, contract_schemas as contract_schemas_api
@@ -576,6 +577,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_session_api.router)
 app.include_router(pipeline.router)
 app.include_router(runs.router)
 app.include_router(tickets.router)
@@ -773,6 +775,11 @@ async def trial_register(
         "admin_label": label,
         "key": raw,
     }
+
+
+@app.get("/login")
+async def login_page():
+    return FileResponse(_STATIC / "login.html")
 
 
 @app.get("/trial")

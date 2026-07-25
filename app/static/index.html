@@ -38,11 +38,12 @@
 <!-- Header -->
 <div class="px-6 py-5 flex items-center justify-between">
   <div>
-    <h1 class="text-xl font-semibold">Pipeline Runs</h1>
-    <p class="text-gray-400 text-sm mt-0.5">Live updates via WebSocket</p>
+    <h1 class="text-xl font-semibold" data-i18n="runs.title">Pipeline Runs</h1>
+    <p class="text-gray-400 text-sm mt-0.5" data-i18n="runs.subtitle">Live updates via WebSocket</p>
   </div>
   <button @click="showModal = true"
-    class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+    class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+    data-i18n="runs.new">
     + New Run
   </button>
 </div>
@@ -77,7 +78,7 @@
 <div class="px-6">
   <!-- Filter chips -->
   <div class="flex items-center gap-2 mb-3">
-    <span class="text-xs text-gray-500">Filtrar:</span>
+    <span class="text-xs text-gray-500" data-i18n="runs.filter.label">Filtrar:</span>
     <template x-for="[label, val] in [['Todos', ''], ['Teams', 'teams'], ['Pipelines', 'pipelines'], ['Engine', 'engine']]" :key="val">
       <button @click="setFilter(val)"
         class="px-2.5 py-1 rounded-full text-xs font-medium border transition"
@@ -92,13 +93,13 @@
     <table class="w-full text-sm">
       <thead class="border-b border-gray-800">
         <tr class="text-gray-400 text-xs uppercase tracking-wide">
-          <th class="px-4 py-3 text-left">Run ID</th>
-          <th class="px-4 py-3 text-left">Team</th>
-          <th class="px-4 py-3 text-left">Request</th>
-          <th class="px-4 py-3 text-left">Status</th>
-          <th class="px-4 py-3 text-right">Cost</th>
-          <th class="px-4 py-3 text-right">Duration</th>
-          <th class="px-4 py-3 text-right">Started</th>
+          <th class="px-4 py-3 text-left" data-i18n="runs.col.run_id">Run ID</th>
+          <th class="px-4 py-3 text-left" data-i18n="runs.col.team">Team</th>
+          <th class="px-4 py-3 text-left" data-i18n="runs.col.request">Request</th>
+          <th class="px-4 py-3 text-left" data-i18n="runs.col.status">Status</th>
+          <th class="px-4 py-3 text-right" data-i18n="runs.col.cost">Cost</th>
+          <th class="px-4 py-3 text-right" data-i18n="runs.col.duration">Duration</th>
+          <th class="px-4 py-3 text-right" data-i18n="runs.col.started">Started</th>
         </tr>
       </thead>
       <tbody>

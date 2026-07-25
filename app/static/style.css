@@ -305,3 +305,22 @@ textarea { resize: vertical; min-height: 80px; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Bridge tokens (Tailwind page aliases) ── */
+/* Alpine/Tailwind pages reference these via var() in custom inline styles;
+   Tailwind utility classes are unaffected — they carry their own values. */
+:root {
+  --tw-gray-950: #030712;
+  --tw-gray-900: #111827;
+  --tw-gray-800: #1f2937;
+  --tw-gray-700: #374151;
+  --tw-gray-600: #4b5563;
+  --tw-gray-400: #9ca3af;
+  --tw-gray-300: #d1d5db;
+  --tw-indigo-400: #818cf8;
+  --tw-indigo-600: #4f46e5;
+  --tw-green-400:  #4ade80;
+  --tw-red-400:    #f87171;
+  --tw-yellow-400: #facc15;
+  --tw-amber-500:  #f59e0b;
+}

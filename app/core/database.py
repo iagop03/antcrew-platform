@@ -324,6 +324,70 @@ async def _migrate_eval_regression_id(eng) -> None:
         pass  # PostgreSQL or table absent — skip
 
 
+async def _migrate_user_table(eng) -> None:
+    """Idempotent migration: create user table if absent."""
+    try:
+        async with eng.begin() as conn:
+            tables = (await conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table' AND name='user'")
+            )).fetchall()
+            if not tables:
+                await conn.execute(text(
+                    "CREATE TABLE user ("
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "email TEXT NOT NULL UNIQUE, "
+                    "password_hash TEXT NOT NULL, "
+                    "created_at DATETIME"
+                    ")"
+                ))
+                await conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_email ON user(email)"
+                ))
+    except Exception:
+        pass  # PostgreSQL handled by Alembic; note: a new Alembic revision is needed for PostgreSQL
+
+
+async def _migrate_user_session_table(eng) -> None:
+    """Idempotent migration: create user_session table if absent."""
+    try:
+        async with eng.begin() as conn:
+            tables = (await conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table' AND name='user_session'")
+            )).fetchall()
+            if not tables:
+                await conn.execute(text(
+                    "CREATE TABLE user_session ("
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "token TEXT NOT NULL UNIQUE, "
+                    "user_id INTEGER, "
+                    "api_key_id INTEGER, "
+                    "created_at DATETIME, "
+                    "expires_at DATETIME NOT NULL, "
+                    "revoked BOOLEAN NOT NULL DEFAULT 0"
+                    ")"
+                ))
+                await conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_session_token ON user_session(token)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_user_session_user_id ON user_session(user_id)"
+                ))
+    except Exception:
+        pass  # PostgreSQL handled by Alembic; note: a new Alembic revision is needed for PostgreSQL
+
+
+async def _migrate_apikey_user_id(eng) -> None:
+    """Idempotent migration: add user_id FK column to api_key if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(api_key)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "user_id" not in col_names:
+                await conn.execute(text("ALTER TABLE api_key ADD COLUMN user_id INTEGER"))
+    except Exception:
+        pass  # PostgreSQL handled by Alembic; note: a new Alembic revision is needed for PostgreSQL
+
+
 async def _migrate_pipeline_def(eng) -> None:
     """Idempotent migration: create pipeline_def table if absent."""
     try:
@@ -370,6 +434,9 @@ async def init_db() -> None:
     await _migrate_pipeline_def(engine)
     await _migrate_compare_run(engine)
     await _migrate_eval_regression_id(engine)
+    await _migrate_user_table(engine)
+    await _migrate_user_session_table(engine)
+    await _migrate_apikey_user_id(engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

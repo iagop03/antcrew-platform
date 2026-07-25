@@ -13,8 +13,7 @@
 <!-- Nav -->
 <nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
   <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
-  <a href="/dashboard" class="text-sm text-gray-400 hover:text-white">Runs</a>
-  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
   <a href="/reviews" class="text-sm text-white font-medium flex items-center gap-1.5">
     Reviews
     <span x-show="allCount > 0"
@@ -22,6 +21,9 @@
       x-text="allCount"></span>
   </a>
   <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
+  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/compare" class="text-sm text-gray-400 hover:text-white">Compare</a>
+  <a href="/pipelines" class="text-sm text-gray-400 hover:text-white">Pipelines</a>
   <a href="/webhooks" class="text-sm text-gray-400 hover:text-white">Webhooks</a>
   <a href="/settings" class="text-sm text-gray-400 hover:text-white">Settings</a>
   <div class="ml-auto flex items-center gap-2">
@@ -34,8 +36,8 @@
 <div class="px-6 py-5">
   <div class="flex items-start justify-between mb-4">
     <div>
-      <h1 class="text-xl font-semibold">HITL Review Queue</h1>
-      <p class="text-gray-400 text-sm mt-0.5">Approve or reject agent output — the pipeline resumes immediately.</p>
+      <h1 class="text-xl font-semibold" data-i18n="reviews.title">HITL Review Queue</h1>
+      <p class="text-gray-400 text-sm mt-0.5" data-i18n="reviews.subtitle">Approve or reject agent output — the pipeline resumes immediately.</p>
     </div>
     <div class="text-sm text-gray-500" x-show="myLabel">
       <span class="text-gray-600">Signed in as </span>
@@ -50,7 +52,7 @@
         ? 'bg-gray-800 text-white'
         : 'text-gray-400 hover:text-gray-200'"
       class="px-4 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-2">
-      Mi cola
+      <span data-i18n="reviews.tab.mine">Mi cola</span>
       <span x-show="mineCount > 0"
         class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"
         x-text="mineCount"></span>
@@ -60,7 +62,7 @@
         ? 'bg-gray-800 text-white'
         : 'text-gray-400 hover:text-gray-200'"
       class="px-4 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-2">
-      Todas
+      <span data-i18n="reviews.tab.all">Todas</span>
       <span x-show="allCount > 0"
         class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-600 text-gray-200 text-xs font-bold"
         x-text="allCount"></span>
@@ -70,7 +72,7 @@
         ? 'bg-gray-800 text-white'
         : 'text-gray-400 hover:text-gray-200'"
       class="px-4 py-1.5 rounded-md text-sm font-medium transition">
-      Analytics
+      <span data-i18n="reviews.tab.analytics">Analytics</span>
     </button>
   </div>
 </div>
@@ -91,19 +93,19 @@
       <!-- Summary cards -->
       <div class="grid grid-cols-4 gap-3">
         <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
-          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Reviews</div>
+          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1" data-i18n="reviews.analytics.total">Total Reviews</div>
           <div class="text-2xl font-semibold font-mono" x-text="analytics.total_reviews"></div>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
-          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Pending</div>
+          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1" data-i18n="reviews.analytics.pending">Pending</div>
           <div class="text-2xl font-semibold font-mono text-amber-400" x-text="analytics.pending"></div>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
-          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Rejected</div>
+          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1" data-i18n="reviews.analytics.rejected">Rejected</div>
           <div class="text-2xl font-semibold font-mono text-red-400" x-text="analytics.rejected"></div>
         </div>
         <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
-          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Rejection Rate</div>
+          <div class="text-xs text-gray-500 uppercase tracking-wide mb-1" data-i18n="reviews.analytics.rejection_rate">Rejection Rate</div>
           <div class="text-2xl font-semibold font-mono"
             :class="analytics.overall_rejection_rate > 0.3 ? 'text-red-400' : analytics.overall_rejection_rate > 0.1 ? 'text-yellow-400' : 'text-green-400'"
             x-text="analytics.overall_rejection_rate != null ? (analytics.overall_rejection_rate * 100).toFixed(1) + '%' : '—'"></div>
@@ -588,8 +590,11 @@ function reviewQueue() {
     connectWs() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const k = localStorage.getItem('antcrew_api_key') || '';
-      this.ws = new WebSocket(`${proto}://${location.host}/ws/events${k ? '?api_key=' + encodeURIComponent(k) : ''}`);
-      this.ws.onopen = () => { this.wsConnected = true; this._wsBackoff = 1000; };
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/events`);
+      this.ws.onopen = () => {
+        this.wsConnected = true; this._wsBackoff = 1000;
+        if (k) this.ws.send(JSON.stringify({ auth: k }));
+      };
       this.ws.onmessage = (e) => {
         const ev = JSON.parse(e.data);
         if (ev.type === 'ping') return;

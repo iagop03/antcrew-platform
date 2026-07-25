@@ -1,5 +1,48 @@
 /* antcrew-platform shared dashboard utilities */
 
+// ── i18n ──────────────────────────────────────────────────────────────────────
+
+const _i18nCache = {};
+let _i18nLang = localStorage.getItem('antcrew_lang') ||
+  (navigator.language || 'en').split('-')[0];
+if (!['en', 'es'].includes(_i18nLang)) _i18nLang = 'en';
+
+async function _loadI18n(lang) {
+  if (_i18nCache[lang]) return _i18nCache[lang];
+  try {
+    const r = await fetch(`/static/i18n/${lang}.json`);
+    if (r.ok) { _i18nCache[lang] = await r.json(); return _i18nCache[lang]; }
+  } catch {}
+  return {};
+}
+
+function $t(key, params = {}) {
+  const dict = _i18nCache[_i18nLang] || _i18nCache['en'] || {};
+  let val = dict[key] ?? key;
+  for (const [k, v] of Object.entries(params)) val = val.replace(`{${k}}`, v);
+  return val;
+}
+
+async function setLang(lang) {
+  _i18nLang = lang;
+  localStorage.setItem('antcrew_lang', lang);
+  await _loadI18n(lang);
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    el.textContent = $t(key);
+  });
+  // Trigger Alpine.js re-render for components that use $t()
+  document.querySelectorAll('[x-data]').forEach(el => {
+    if (window.Alpine) {
+      try { Alpine.nextTick(() => {}); } catch {}
+    }
+  });
+}
+
+// Load on startup — before DOMContentLoaded fires
+_loadI18n(_i18nLang);
+_loadI18n('en'); // preload fallback
+
 // ── API key storage ──────────────────────────────────────────────────────────
 
 function getApiKey() {
@@ -106,20 +149,24 @@ function initNav() {
   const nav = document.getElementById('nav-links');
   if (!nav) return;
   const links = [
-    { href: '/', label: 'Runs' },
-    { href: '/reviews', label: 'Reviews' },
-    { href: '/evals', label: 'Evals' },
-    { href: '/tickets', label: 'Tickets' },
-    { href: '/webhooks', label: 'Webhooks' },
+    { href: '/', key: 'nav.runs' },
+    { href: '/reviews', key: 'nav.reviews' },
+    { href: '/evals', key: 'nav.evals' },
+    { href: '/tickets', key: 'nav.tickets' },
+    { href: '/compare', key: 'nav.compare' },
+    { href: '/pipelines', key: 'nav.pipelines' },
+    { href: '/webhooks', key: 'nav.webhooks' },
   ];
   nav.innerHTML = links.map(l =>
-    `<a href="${l.href}" class="${path === l.href ? 'active' : ''}">${l.label}</a>`
+    `<a href="${l.href}" class="${path === l.href ? 'active' : ''}" data-i18n="${l.key}">${$t(l.key)}</a>`
   ).join('');
   // Key setup button
   const btn = document.getElementById('key-btn');
   if (btn) btn.onclick = openKeyModal;
   // Show key banner if no key set and not open mode
   if (!getApiKey()) _maybeShowKeyBanner();
+  // Populate auth button (Login / Logout) from session state
+  _initSessionNav();
 }
 
 async function _maybeShowKeyBanner() {
@@ -161,12 +208,19 @@ let _ws = null;
 function connectWs(onEvent, runId = null) {
   const dot = document.getElementById('ws-dot');
   const key = getApiKey();
-  let url = `ws://${location.host}/ws/events?api_key=${encodeURIComponent(key)}`;
-  if (runId) url += `&run_id=${encodeURIComponent(runId)}`;
+  // Key-free URL — authenticate via first message to keep key out of access logs / browser history
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${proto}://${location.host}/ws/events`;
 
   function connect() {
     _ws = new WebSocket(url);
-    _ws.onopen = () => { if (dot) dot.className = 'ws-dot connected'; };
+    _ws.onopen = () => {
+      if (dot) dot.className = 'ws-dot connected';
+      // Send auth + optional run_id as first message (backend waits up to 10 s)
+      const msg = { auth: key };
+      if (runId) msg.run_id = runId;
+      _ws.send(JSON.stringify(msg));
+    };
     _ws.onclose = () => {
       if (dot) dot.className = 'ws-dot error';
       setTimeout(connect, 3000);
@@ -203,18 +257,18 @@ function injectKeyModal() {
   el.innerHTML = `
 <div id="key-modal" class="modal-overlay" onclick="if(event.target===this)closeKeyModal()">
   <div class="modal-box">
-    <h3>Platform API Key</h3>
+    <h3 data-i18n="key_modal.title">${$t('key_modal.title')}</h3>
     <div class="form-group">
       <label>X-Api-Key</label>
       <input type="password" id="key-input" placeholder="sk-…" autocomplete="off">
     </div>
-    <p style="color:var(--text-muted);font-size:12px;margin-bottom:12px">
-      Stored in browser localStorage. Leave blank if auth is disabled (open mode).
+    <p style="color:var(--text-muted);font-size:12px;margin-bottom:12px" data-i18n="key_modal.stored">
+      ${$t('key_modal.stored')}
     </p>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="setApiKey('');closeKeyModal();location.reload()">Clear</button>
-      <button class="btn btn-ghost" onclick="closeKeyModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveKeyModal()">Save</button>
+      <button class="btn btn-ghost" data-i18n="key_modal.clear" onclick="setApiKey('');closeKeyModal();location.reload()">${$t('key_modal.clear')}</button>
+      <button class="btn btn-ghost" data-i18n="key_modal.cancel" onclick="closeKeyModal()">${$t('key_modal.cancel')}</button>
+      <button class="btn btn-primary" data-i18n="key_modal.save" onclick="saveKeyModal()">${$t('key_modal.save')}</button>
     </div>
   </div>
 </div>`;
@@ -227,15 +281,74 @@ function injectNav() {
   el.innerHTML = `
     <a class="brand" href="/"><span>ant</span>crew</a>
     <div class="nav-links" id="nav-links"></div>
-    <div class="nav-right">
+    <div class="nav-right" id="nav-right">
       <div class="ws-dot" id="ws-dot" title="WebSocket connection"></div>
+      <span id="auth-nav-btn"></span>
       <button class="btn btn-ghost" id="key-btn" style="padding:4px 10px;font-size:12px">🔑 Key</button>
     </div>`;
   document.body.prepend(el);
+
+  // Language toggle — cycles en ↔ es
+  const navRight = el.querySelector('#nav-right');
+  const langBtn = document.createElement('button');
+  langBtn.className = 'btn btn-ghost';
+  langBtn.style.cssText = 'padding:3px 8px;font-size:11px';
+  langBtn.textContent = _i18nLang === 'es' ? 'EN' : 'ES';
+  langBtn.title = _i18nLang === 'es' ? 'Switch to English' : 'Cambiar a Español';
+  langBtn.onclick = async () => {
+    const next = _i18nLang === 'es' ? 'en' : 'es';
+    await setLang(next);
+    langBtn.textContent = next === 'es' ? 'EN' : 'ES';
+    langBtn.title = next === 'es' ? 'Switch to English' : 'Cambiar a Español';
+  };
+  navRight.prepend(langBtn);
+}
+
+// ── Session-aware auth button ─────────────────────────────────────────────────
+
+async function _initSessionNav() {
+  const slot = document.getElementById('auth-nav-btn');
+  if (!slot) return;
+  try {
+    const r = await fetch('/auth/me', { credentials: 'same-origin' });
+    if (r.ok) {
+      const data = await r.json();
+      const email = data.email || '';
+      // Show email label + Logout button
+      const logoutBtn = document.createElement('button');
+      logoutBtn.className = 'btn btn-ghost';
+      logoutBtn.style.cssText = 'padding:4px 10px;font-size:12px';
+      logoutBtn.title = email;
+      logoutBtn.textContent = email ? email.split('@')[0] + ' · Logout' : 'Logout';
+      logoutBtn.onclick = async () => {
+        logoutBtn.disabled = true;
+        try {
+          await fetch('/auth/token', { method: 'DELETE', credentials: 'same-origin' });
+        } catch {}
+        window.location.href = '/login';
+      };
+      slot.appendChild(logoutBtn);
+    } else {
+      // No valid session — show Login link
+      const loginLink = document.createElement('a');
+      loginLink.className = 'btn btn-ghost';
+      loginLink.style.cssText = 'padding:4px 10px;font-size:12px';
+      loginLink.href = '/login';
+      loginLink.textContent = 'Login';
+      slot.appendChild(loginLink);
+    }
+  } catch {
+    // Network error or /auth/me doesn't exist — silently skip
+  }
 }
 
 // Call on every page
 document.addEventListener('DOMContentLoaded', () => {
+  window.$t = $t;
+  // Register as Alpine magic if Alpine is present
+  if (window.Alpine) {
+    Alpine.magic('t', () => (key, params) => $t(key, params));
+  }
   injectNav();
   injectKeyModal();
   initNav();

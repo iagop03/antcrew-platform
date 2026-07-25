@@ -114,6 +114,7 @@ class ApiKey(SQLModel, table=True):
     workspace_id: Optional[int] = Field(default=None)
     role: str = Field(default="write")  # admin | write | read | reviewer
     email: Optional[str] = Field(default=None)  # for HITL assignment notifications
+    user_id: Optional[int] = Field(default=None, index=True)  # FK → user.id (set on register)
     created_at: datetime = Field(default_factory=_utcnow)
     revoked_at: Optional[datetime] = Field(default=None)
 
@@ -350,3 +351,28 @@ class LLMProviderKey(SQLModel, table=True):
     key_enc: str   # Fernet-encrypted or plaintext (dev mode without BYOK_ENCRYPTION_KEY); empty for keyless providers
     base_url: Optional[str] = Field(default=None)  # required for ollama / custom OpenAI-compat endpoints
     created_at: datetime = Field(default_factory=_utcnow)
+
+
+class User(SQLModel, table=True):
+    """Platform user with email+password credentials."""
+
+    __tablename__ = "user"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    password_hash: str
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class UserSession(SQLModel, table=True):
+    """Browser session backed by a UUID4 token stored in an HttpOnly cookie."""
+
+    __tablename__ = "user_session"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)   # UUID4 — this IS the cookie value
+    user_id: Optional[int] = Field(default=None, index=True)
+    api_key_id: Optional[int] = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    expires_at: datetime
+    revoked: bool = Field(default=False)

@@ -156,14 +156,66 @@ async def _authenticate(raw_key: Optional[str], session) -> WorkspaceContext:
         raise HTTPException(401, "X-Api-Key header required")
 
 
+async def _session_context(token: str, session) -> Optional[WorkspaceContext]:
+    """Resolve a session cookie token to a WorkspaceContext.
+
+    Returns None when the token is not found, expired, or revoked (caller may
+    fall back to X-Api-Key).  Raises HTTPException only on genuine errors.
+    Uses lazy imports to avoid circular dependencies.
+    """
+    from datetime import datetime, timezone
+    from sqlmodel import select
+    from app.models.run import UserSession, ApiKey, WorkspaceMembership  # lazy — avoids circular
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    user_session = (await session.exec(
+        select(UserSession).where(
+            UserSession.token == token,
+            UserSession.revoked == False,  # noqa: E712
+            UserSession.expires_at > now,
+        )
+    )).first()
+
+    if user_session is None or user_session.api_key_id is None:
+        return None
+
+    key = (await session.exec(
+        select(ApiKey).where(
+            ApiKey.id == user_session.api_key_id,
+            ApiKey.revoked_at == None,  # noqa: E711
+        )
+    )).first()
+
+    if key is None:
+        return None
+
+    memberships = (await session.exec(
+        select(WorkspaceMembership).where(WorkspaceMembership.api_key_id == key.id)
+    )).all()
+
+    return WorkspaceContext(
+        workspace_id=key.workspace_id,
+        created_by=key.label,
+        role=key.role if key.role in _VALID_ROLES else "write",
+        membership_ids=[m.workspace_id for m in memberships],
+    )
+
+
 async def get_workspace_context(
     request: Request,
     x_api_key: str | None = Security(_KEY_HEADER),
     session=Depends(get_session),
 ) -> WorkspaceContext:
-    """FastAPI dependency: authenticate, rate-limit, and return workspace context."""
+    """FastAPI dependency: authenticate, rate-limit, and return workspace context.
+
+    Priority (highest → lowest):
+      1. PLATFORM_API_KEY env var   — single-key admin override
+      2. antcrew_session cookie     — browser session (email+password or token exchange)
+      3. X-Api-Key header           — programmatic API key access
+    """
     from app.core import rate_limit
 
+    # 1. PLATFORM_API_KEY — highest priority (admin override)
     env_key = os.environ.get("PLATFORM_API_KEY")
     if env_key:
         if not hmac.compare_digest(x_api_key or "", env_key):
@@ -171,6 +223,21 @@ async def get_workspace_context(
         ctx = WorkspaceContext(workspace_id=None, created_by="env_key", role="admin")
         await rate_limit.check(request, ctx.workspace_id, ctx.created_by)
         return ctx
+
+    # 2. Session cookie
+    session_token = request.cookies.get("antcrew_session")
+    if session_token:
+        try:
+            ctx = await _session_context(session_token, session)
+            if ctx is not None:
+                await rate_limit.check(request, ctx.workspace_id, ctx.created_by)
+                return ctx
+        except HTTPException:
+            raise
+        except Exception as exc:
+            log.warning("auth: session cookie lookup failed: %s", exc)
+
+    # 3. X-Api-Key header
     try:
         ctx = await _authenticate(x_api_key, session)
     except HTTPException:
@@ -217,6 +284,37 @@ def ws_accessible(workspace_id: Optional[int], ctx: WorkspaceContext) -> bool:
     if ids is None:
         return True
     return workspace_id in ids
+
+
+async def check_ws_session_token(token: str) -> bool:
+    """Validate an antcrew_session cookie token for WebSocket connections (no DI)."""
+    try:
+        from datetime import datetime, timezone
+        from sqlmodel import select
+        from sqlmodel.ext.asyncio.session import AsyncSession
+        from app.core.database import engine
+        from app.models.run import UserSession, ApiKey
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        async with AsyncSession(engine, expire_on_commit=False) as session:
+            user_session = (await session.exec(
+                select(UserSession).where(
+                    UserSession.token == token,
+                    UserSession.revoked == False,  # noqa: E712
+                    UserSession.expires_at > now,
+                )
+            )).first()
+            if user_session is None or user_session.api_key_id is None:
+                return False
+            key = (await session.exec(
+                select(ApiKey).where(
+                    ApiKey.id == user_session.api_key_id,
+                    ApiKey.revoked_at == None,  # noqa: E711
+                )
+            )).first()
+            return key is not None
+    except Exception:
+        return False  # fail closed
 
 
 async def check_ws_api_key(api_key: str | None) -> bool:

@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from antcrew.core.events import bus, Event
-from app.core.auth import check_ws_api_key
+from app.core.auth import check_ws_api_key, check_ws_session_token
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +86,33 @@ async def events_stream(
                 run_id = run_id or msg.get("run_id")
         except (asyncio.TimeoutError, json.JSONDecodeError, Exception):
             pass  # no first-message auth — proceed to key check (will reject if required)
+
+    # Also accept antcrew_session cookie (parsed from the Upgrade request headers)
+    if resolved_key is None:
+        cookie_header = ws.headers.get("cookie", "")
+        for part in cookie_header.split(";"):
+            part = part.strip()
+            if part.startswith("antcrew_session="):
+                session_token = part[len("antcrew_session="):]
+                if await check_ws_session_token(session_token):
+                    conn = _Connection(ws, run_id=run_id)
+
+                    def _session_handler(event: Event) -> None:
+                        conn.enqueue(event)
+
+                    bus.subscribe("*", _session_handler)
+                    ping_task = asyncio.create_task(_ping_loop(ws))
+                    try:
+                        await conn.send_loop()
+                    except (WebSocketDisconnect, RuntimeError):
+                        pass
+                    finally:
+                        ping_task.cancel()
+                        bus.unsubscribe("*", _session_handler)
+                        log.debug("WS session client disconnected (run_id=%s)", run_id)
+                    return
+                break
+        # Fall through to api-key check if cookie not found or invalid
 
     if not await check_ws_api_key(resolved_key):
         await ws.close(code=4001, reason="Unauthorized")

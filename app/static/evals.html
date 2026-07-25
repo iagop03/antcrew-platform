@@ -13,10 +13,12 @@
 <!-- Nav -->
 <nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
   <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
-  <a href="/dashboard" class="text-sm text-gray-400 hover:text-white">Runs</a>
-  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/" class="text-sm text-gray-400 hover:text-white">Runs</a>
   <a href="/reviews" class="text-sm text-gray-400 hover:text-white">Reviews</a>
   <a href="/evals" class="text-sm text-white font-medium">Evals</a>
+  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
+  <a href="/compare" class="text-sm text-gray-400 hover:text-white">Compare</a>
+  <a href="/pipelines" class="text-sm text-gray-400 hover:text-white">Pipelines</a>
   <a href="/webhooks" class="text-sm text-gray-400 hover:text-white">Webhooks</a>
   <a href="/settings" class="text-sm text-gray-400 hover:text-white">Settings</a>
   <div class="ml-auto flex items-center gap-2">
@@ -28,8 +30,8 @@
 <!-- Header -->
 <div class="px-6 py-5 flex items-center justify-between">
   <div>
-    <h1 class="text-xl font-semibold">Pipeline Evals</h1>
-    <p class="text-gray-400 text-sm mt-0.5">Run quality checks against your teams without manual review.</p>
+    <h1 class="text-xl font-semibold" data-i18n="evals.title">Pipeline Evals</h1>
+    <p class="text-gray-400 text-sm mt-0.5" data-i18n="evals.subtitle">Run quality checks against your teams without manual review.</p>
   </div>
   <div class="flex items-center gap-3">
     <button x-show="compareIds.length === 2" @click="openCompare()"
@@ -37,7 +39,8 @@
       Compare 2 selected
     </button>
     <button @click="showModal = true"
-      class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+      class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+      data-i18n="evals.new">
       + New Eval
     </button>
   </div>
@@ -52,13 +55,13 @@
           <th class="px-3 py-3 text-left w-8">
             <span class="text-gray-600 text-xs">cmp</span>
           </th>
-          <th class="px-4 py-3 text-left">Name / Request</th>
-          <th class="px-4 py-3 text-left">Team</th>
-          <th class="px-4 py-3 text-left">Status</th>
-          <th class="px-4 py-3 text-right">Score</th>
-          <th class="px-4 py-3 text-right">Cost</th>
-          <th class="px-4 py-3 text-right">Time</th>
-          <th class="px-4 py-3 text-right">Started</th>
+          <th class="px-4 py-3 text-left" data-i18n="evals.col.name">Name / Request</th>
+          <th class="px-4 py-3 text-left" data-i18n="evals.col.team">Team</th>
+          <th class="px-4 py-3 text-left" data-i18n="evals.col.status">Status</th>
+          <th class="px-4 py-3 text-right" data-i18n="evals.col.score">Score</th>
+          <th class="px-4 py-3 text-right" data-i18n="evals.col.cost">Cost</th>
+          <th class="px-4 py-3 text-right" data-i18n="evals.col.time">Time</th>
+          <th class="px-4 py-3 text-right" data-i18n="evals.col.started">Started</th>
         </tr>
       </thead>
       <tbody>
@@ -166,7 +169,7 @@
   <div class="flex items-center justify-between mb-3">
     <button @click="schedOpen = !schedOpen" class="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition">
       <span x-text="schedOpen ? '▾' : '▸'" class="text-gray-500"></span>
-      Recurring Schedules
+      <span data-i18n="evals.schedules.title">Recurring Schedules</span>
       <span class="text-xs text-gray-500 font-normal" x-text="`(${schedules.length})`"></span>
     </button>
     <button x-show="schedOpen" @click="showSchedModal = true"
@@ -549,8 +552,11 @@ function evalsPage() {
     connectWs() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const k = localStorage.getItem('antcrew_api_key') || '';
-      this.ws = new WebSocket(`${proto}://${location.host}/ws/events${k ? '?api_key=' + encodeURIComponent(k) : ''}`);
-      this.ws.onopen = () => { this.wsConnected = true; this._wsBackoff = 1000; };
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/events`);
+      this.ws.onopen = () => {
+        this.wsConnected = true; this._wsBackoff = 1000;
+        if (k) this.ws.send(JSON.stringify({ auth: k }));
+      };
       this.ws.onmessage = (e) => {
         const ev = JSON.parse(e.data);
         if (ev.type === 'ping') return;
