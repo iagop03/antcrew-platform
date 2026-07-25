@@ -828,3 +828,13 @@ async def settings_page():
 @app.get("/pipelines")
 async def pipelines_page():
     return FileResponse(_STATIC / "pipelines.html")
+
+
+@app.get("/compare")
+async def compare_page():
+    return FileResponse(_STATIC / "compare.html")
+
+
+@app.get("/compare/{compare_id}")
+async def compare_detail_page(compare_id: str):
+    return FileResponse(_STATIC / "compare.html")
