@@ -1,5 +1,28 @@
 # Changelog — antcrew-platform
 
+## v0.4.2 (2026-07-26)
+
+### Security
+- **#16 CRITICAL — workspace isolation on register**: `POST /auth/register` now always creates a fresh workspace per user; previously any registrant was attached to the first existing workspace with admin role
+- **#3 — role fallback hardened**: invalid role value in DB now falls back to `"read"` instead of `"write"` in both `_authenticate()` and `_session_context()`
+- **CSRF double-submit cookie**: new `app/core/csrf.py`; `csrf_token` cookie (non-HttpOnly, `SameSite=Strict`) set alongside session on login/register/token-exchange and cleared on logout; `require_csrf` dependency wired to high-impact routers (api_keys, workspaces, billing, engine, reviews, pipelines, client_review, workspaces_members); `apiFetch()` in app.js reads cookie and sends `X-CSRF-Token` header on all state-changing requests
+- **Rate limiting on `/auth/login` and `/auth/register`**: both endpoints now enforce the existing `rate_limit.check()` sliding window (IP-based), blocking brute-force and trial-credit farming
+
+### Fixed
+- **#1 — duplicate `serve` command** removed (audit finding; canonical impl in `cli/serve_cmd.py`)
+- **Workspace slug uniqueness on register**: random hex suffix loop prevents `IntegrityError` on concurrent registrations with the same email prefix
+
+### Added
+- **`owner_user_id`** column on `Workspace` model + Alembic migration `024_workspace_owner` + SQLite inline migration
+- **Per-reviewer HITL notifications**: email (SMTP), Slack DM (`conversations.open` + `chat.postMessage`), Telegram Bot API; reviewer `ApiKey` rows carry `slack_user_id` / `telegram_chat_id` fields; Alembic migration `023_apikey_notifications`
+- **User auth tables**: Alembic migration `022_user_auth` (`user`, `user_session`, `api_key.user_id`)
+- **`WebFetchTool`** available as a platform-side tool via antcrew library upgrade (SSRF-guarded)
+
+### CI
+- **CHANGELOG version check** on every push/PR in all three repos
+
+---
+
 ## v0.4.1 (2026-07-24)
 
 ### Added
