@@ -332,14 +332,38 @@ async def login(
 
     if api_key is None:
         # User has no active API key (e.g. they revoked it from settings).
-        # Auto-create a new one for their workspace so they can log back in.
+        # Recover: find or create workspace, then create a new admin API key.
         from app.models.run import Workspace
+        from app.core.auth import _hash as _hash_key, _key_prefix
+        from app.core.byok import TRIAL_CREDIT_USD
+
         workspace = (await session.exec(
             select(Workspace).where(Workspace.owner_user_id == user.id)
         )).first()
+
         if workspace is None:
-            raise HTTPException(401, "No active API key for this account")
-        from app.core.auth import _hash as _hash_key, _key_prefix
+            # No workspace at all — create one (e.g. registration was incomplete)
+            slug_base = re.sub(r"[^a-z0-9]+", "-", email.split("@")[0])[:40] or "workspace"
+            slug = slug_base
+            for _attempt in range(20):
+                slug_exists = (await session.exec(
+                    select(Workspace).where(Workspace.slug == slug)
+                )).first()
+                if not slug_exists:
+                    break
+                slug = f"{slug_base}-{secrets.token_hex(3)}"
+            else:
+                slug = f"workspace-{secrets.token_hex(6)}"
+            workspace = Workspace(
+                name=email,
+                slug=slug,
+                is_trial=True,
+                max_cost_usd=TRIAL_CREDIT_USD,
+                owner_user_id=user.id,
+            )
+            session.add(workspace)
+            await session.flush()
+
         raw_key = secrets.token_urlsafe(32)
         label_base = re.sub(r"[^a-z0-9-]", "-", email.split("@")[0])[:48] or "user"
         label = label_base
