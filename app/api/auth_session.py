@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 import re
 import secrets
-import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -64,7 +63,7 @@ def _verify_password(password: str, stored_hash: str) -> bool:
 
 
 def _make_token() -> str:
-    return str(uuid.uuid4())
+    return secrets.token_urlsafe(32)
 
 
 async def _create_session(user_id: Optional[int], api_key_id: Optional[int], session) -> str:

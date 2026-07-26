@@ -36,6 +36,11 @@ def _ident(request: Request, workspace_id: Optional[int], created_by: Optional[s
         return f"ws:{workspace_id}"
     if created_by:
         return f"key:{created_by}"
+    # NOTE (Fly.io deployments): request.client.host is the Fly edge IP when the app runs
+    # behind Fly's proxy, not the real client IP — all users in the same region share one
+    # bucket, and an attacker can evade the limit by routing requests across regions.
+    # If this matters, read the real IP from X-Forwarded-For (first entry) after configuring
+    # Fly to set trusted_proxies or using a middleware that replaces request.client.
     host = request.client.host if request.client else "unknown"
     return f"ip:{host}"
 
