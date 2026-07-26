@@ -30,9 +30,10 @@ from app.api import runs, tickets, stream, pipeline, api_keys, reviews, template
 from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as pipelines_api
 from app.api import client_review, compare as compare_api, contract_schemas as contract_schemas_api
 from app.api import security_audit as security_audit_api
+from app.api import invites as invites_api
 
 _STATIC = Path(__file__).parent / "static"
-_VERSION = "0.4.7"
+_VERSION = "0.4.9"
 
 # ---------------------------------------------------------------------------
 # Environment — read once at import time so guards can reference it.
@@ -607,6 +608,7 @@ app.include_router(compare_api.router,         dependencies=_csrf)
 app.include_router(contract_schemas_api.router, dependencies=_csrf)
 app.include_router(security_audit_api.router,         dependencies=_csrf)
 app.include_router(security_audit_api.webhook_router)          # HMAC-signed, no CSRF
+app.include_router(invites_api.router,                dependencies=_csrf)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 

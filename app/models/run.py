@@ -372,6 +372,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     password_hash: str
+    email_verified_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -449,6 +450,51 @@ class SecurityAuditRun(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
     started_at: Optional[datetime] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
+
+
+class EmailVerification(SQLModel, table=True):
+    """6-digit email verification code; invalidated on resend or successful use."""
+
+    __tablename__ = "email_verification"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    code: str                              # 6-digit string
+    expires_at: datetime
+    used: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class WorkspaceInvite(SQLModel, table=True):
+    """Invite link that grants a specific email access to a workspace."""
+
+    __tablename__ = "workspace_invite"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)   # secrets.token_urlsafe(32)
+    workspace_id: int = Field(index=True)
+    invitee_email: str = Field(index=True)
+    inviter_email: str
+    role: str = Field(default="write")             # admin | write | read | reviewer
+    status: str = Field(default="pending")          # pending | accepted | expired | revoked
+    expires_at: datetime
+    created_at: datetime = Field(default_factory=_utcnow)
+    accepted_at: Optional[datetime] = Field(default=None)
+
+
+class WorkspaceJoinRequest(SQLModel, table=True):
+    """Request from an authenticated user to join a workspace they found by slug."""
+
+    __tablename__ = "workspace_join_request"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)    # for approve/reject one-click URL
+    workspace_id: int = Field(index=True)
+    requester_email: str = Field(index=True)
+    requested_role: str = Field(default="write")
+    status: str = Field(default="pending")          # pending | approved | rejected
+    created_at: datetime = Field(default_factory=_utcnow)
+    resolved_at: Optional[datetime] = Field(default=None)
 
 
 class AuditFinding(SQLModel, table=True):

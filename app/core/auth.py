@@ -274,6 +274,47 @@ def require_role(*roles: str):
     return _check
 
 
+def require_verified_session():
+    """FastAPI dependency: require email verification for browser-session users.
+
+    API-key callers and open-mode requests pass through unconditionally — verification
+    only applies to users who authenticated via email+password (session cookie).
+    """
+    from fastapi import Depends as _Depends
+
+    async def _check(request: Request, session=_Depends(get_session)):
+        from datetime import datetime, timezone
+        from sqlmodel import select as _select
+        from app.models.run import UserSession, User
+
+        cookie = request.cookies.get("antcrew_session")
+        if not cookie:
+            return  # API-key or open-mode — no restriction
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        user_session = (await session.exec(
+            _select(UserSession).where(
+                UserSession.token == cookie,
+                UserSession.revoked == False,  # noqa: E712
+                UserSession.expires_at > now,
+            )
+        )).first()
+        if user_session is None or user_session.user_id is None:
+            return  # not a user session
+
+        user = (await session.exec(
+            _select(User).where(User.id == user_session.user_id)
+        )).first()
+        if user is not None and user.email_verified_at is None:
+            raise HTTPException(
+                403,
+                "Email verification required. "
+                "Check your inbox and use POST /auth/verify-email with your 6-digit code.",
+            )
+
+    return _check
+
+
 def ws_filter(stmt: Any, column: Any, ctx: WorkspaceContext) -> Any:
     """Apply workspace scoping to a SQLModel select statement."""
     ids = ctx.workspace_ids

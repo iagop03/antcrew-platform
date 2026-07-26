@@ -1,5 +1,18 @@
 # Changelog — antcrew-platform
 
+## v0.4.9 (2026-07-26)
+
+### Added
+- **Email verification** — `POST /auth/register` now creates a 6-digit `EmailVerification` code and sends it via `send_verification_code`. Users verify with `POST /auth/verify-email {code}` or request a new code via `POST /auth/resend-code`. `User.email_verified_at` tracks when verification occurred.
+- **Workspace invites** — admins send email invites via `POST /workspaces/{id}/invites {email, role}`. Recipients with an active session accept via `POST /auth/accept-invite {token}`, which creates a `WorkspaceMembership` and emails a confirmation. Invites expire after 7 days.
+- **Join requests** — authenticated users can request access to a workspace by slug: `POST /workspaces/join-request {workspace_slug, requested_role}`. The workspace admin receives an approve/reject email with one-click URLs backed by `POST /join-requests/{token}/approve` and `/reject`.
+- **`require_verified_session`** — FastAPI dependency that blocks unverified session-cookie users (API-key callers pass through). Applied to invite-send and join-request endpoints.
+- **Email templates** (`app/services/email.py`): `send_verification_code`, `send_workspace_invite`, `send_join_request`, `send_join_approved`, `send_join_rejected`, `_dispatch` (centralised SMTP boilerplate).
+- **XSS fix** — `send_review_assigned` now escapes `assignee_label`, `agent_name`, `run_id`, and `review_id` through `html.escape()` before interpolating into the HTML body.
+- Migration 028: adds `email_verification`, `workspace_invite`, `workspace_join_request` tables and `user.email_verified_at` column.
+
+---
+
 ## v0.4.8 (2026-07-26)
 
 ### Added

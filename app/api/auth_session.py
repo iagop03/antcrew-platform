@@ -1,11 +1,15 @@
 """Email+password platform authentication — session cookies backed by UserSession rows."""
 from __future__ import annotations
 
+import logging
 import os
 import re
 import secrets
+import string
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+log = logging.getLogger(__name__)
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -64,6 +68,10 @@ def _verify_password(password: str, stored_hash: str) -> bool:
 
 def _make_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def _make_verification_code() -> str:
+    return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
 async def _create_session(user_id: Optional[int], api_key_id: Optional[int], session) -> str:
@@ -257,6 +265,28 @@ async def register(
         await session.rollback()
         raise HTTPException(500, f"Registration failed: {exc}") from exc
 
+    # Send email verification code (fire-and-forget; don't fail registration on SMTP error)
+    import asyncio as _asyncio
+    from app.models.run import EmailVerification
+    from app.services.email import send_verification_code as _send_code
+
+    try:
+        code = _make_verification_code()
+        verification = EmailVerification(
+            user_id=user.id,
+            code=code,
+            expires_at=_utcnow() + timedelta(minutes=15),
+        )
+        # Use a fresh mini-session so errors don't touch the committed data
+        from sqlmodel.ext.asyncio.session import AsyncSession as _AsyncSession
+        from app.core.database import engine as _engine
+        async with _AsyncSession(_engine, expire_on_commit=False) as vs:
+            vs.add(verification)
+            await vs.commit()
+        _asyncio.create_task(_send_code(email, code))
+    except Exception as _exc:
+        log.warning("register: could not create verification code for %s: %s", email, _exc)
+
     csrf_token = _csrf_gen()
     _set_session_cookie(response, token)
     _csrf_set(response, csrf_token, secure=_is_secure())
@@ -265,6 +295,7 @@ async def register(
         "workspace_id": workspace.id,
         "role": "admin",
         "api_key": raw_key,
+        "email_verified": False,
     }
 
 
@@ -414,6 +445,168 @@ async def revoke_session(
     _clear_session_cookie(response)
     _csrf_clear(response, secure=_is_secure())
     return None
+
+
+@router.post("/verify-email", status_code=200)
+async def verify_email(
+    request: Request,
+    session=Depends(get_session),
+):
+    """Verify the 6-digit code sent after registration. Body: {code: string}."""
+    from app.models.run import User, EmailVerification
+
+    body = await request.json()
+    code = str(body.get("code", "")).strip()
+    if not code:
+        raise HTTPException(400, "code is required")
+
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    result = await _resolve_session(token, session)
+    if result is None:
+        raise HTTPException(401, "Session expired or invalid")
+    user_session, api_key = result
+    if user_session.user_id is None:
+        raise HTTPException(400, "Session not linked to a user account")
+
+    now = _utcnow()
+    verification = (await session.exec(
+        select(EmailVerification).where(
+            EmailVerification.user_id == user_session.user_id,
+            EmailVerification.used == False,  # noqa: E712
+            EmailVerification.expires_at > now,
+        )
+    )).first()
+
+    if verification is None or verification.code != code:
+        raise HTTPException(400, "Invalid or expired verification code")
+
+    verification.used = True
+    session.add(verification)
+
+    user = (await session.exec(select(User).where(User.id == user_session.user_id))).first()
+    if user:
+        user.email_verified_at = now
+        session.add(user)
+
+    await session.commit()
+    return {"verified": True}
+
+
+@router.post("/resend-code", status_code=200)
+async def resend_verification_code(
+    request: Request,
+    session=Depends(get_session),
+):
+    """Resend the email verification code. Invalidates any previous pending codes."""
+    import asyncio as _asyncio
+    from app.models.run import User, EmailVerification
+    from app.services.email import send_verification_code as _send_code
+
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    result = await _resolve_session(token, session)
+    if result is None:
+        raise HTTPException(401, "Session expired or invalid")
+    user_session, api_key = result
+    if user_session.user_id is None:
+        raise HTTPException(400, "Session not linked to a user account")
+
+    user = (await session.exec(select(User).where(User.id == user_session.user_id))).first()
+    if user is None:
+        raise HTTPException(404, "User not found")
+    if user.email_verified_at is not None:
+        return {"message": "Email already verified"}
+
+    # Invalidate previous pending codes
+    old_codes = (await session.exec(
+        select(EmailVerification).where(
+            EmailVerification.user_id == user.id,
+            EmailVerification.used == False,  # noqa: E712
+        )
+    )).all()
+    for old in old_codes:
+        old.used = True
+        session.add(old)
+
+    code = _make_verification_code()
+    verification = EmailVerification(
+        user_id=user.id,
+        code=code,
+        expires_at=_utcnow() + timedelta(minutes=15),
+    )
+    session.add(verification)
+    await session.commit()
+
+    _asyncio.create_task(_send_code(user.email, code))
+    return {"message": "Verification code sent"}
+
+
+@router.post("/accept-invite", status_code=200)
+async def accept_invite(
+    request: Request,
+    session=Depends(get_session),
+):
+    """Accept a workspace invite token. Body: {token: string}. Requires active session."""
+    from app.models.run import WorkspaceInvite, WorkspaceMembership, ApiKey, Workspace
+
+    body = await request.json()
+    invite_token = str(body.get("token", "")).strip()
+    if not invite_token:
+        raise HTTPException(400, "token is required")
+
+    session_token = request.cookies.get(COOKIE_NAME)
+    if not session_token:
+        raise HTTPException(401, "You must be logged in to accept an invite")
+    result = await _resolve_session(session_token, session)
+    if result is None:
+        raise HTTPException(401, "Session expired or invalid")
+    user_session, api_key = result
+
+    now = _utcnow()
+    invite = (await session.exec(
+        select(WorkspaceInvite).where(
+            WorkspaceInvite.token == invite_token,
+            WorkspaceInvite.status == "pending",
+            WorkspaceInvite.expires_at > now,
+        )
+    )).first()
+
+    if invite is None:
+        raise HTTPException(404, "Invite not found or expired")
+
+    # Add workspace membership (idempotent)
+    existing = (await session.exec(
+        select(WorkspaceMembership).where(
+            WorkspaceMembership.api_key_id == api_key.id,
+            WorkspaceMembership.workspace_id == invite.workspace_id,
+        )
+    )).first()
+    if not existing:
+        session.add(WorkspaceMembership(
+            api_key_id=api_key.id,
+            workspace_id=invite.workspace_id,
+        ))
+
+    # Upgrade role if the invite grants higher privileges
+    _role_order = {"read": 0, "reviewer": 1, "write": 2, "admin": 3}
+    if _role_order.get(invite.role, 0) > _role_order.get(api_key.role, 0):
+        api_key.role = invite.role
+        session.add(api_key)
+
+    invite.status = "accepted"
+    invite.accepted_at = now
+    session.add(invite)
+    await session.commit()
+
+    ws = (await session.exec(select(Workspace).where(Workspace.id == invite.workspace_id))).first()
+    return {
+        "workspace_id": invite.workspace_id,
+        "workspace_name": ws.name if ws else None,
+        "role": invite.role,
+    }
 
 
 @router.get("/me")
