@@ -3,20 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Setup — antcrew</title>
+<title>Crear cuenta — antcrew</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <style>[x-cloak]{display:none}</style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center p-6"
-  x-data="onboard()" x-init="init()">
+  x-data="onboard()">
 
 <div class="w-full max-w-lg">
 
   <!-- Logo -->
   <div class="text-center mb-8">
     <span class="font-mono font-bold text-2xl text-indigo-400">antcrew</span>
-    <p class="text-gray-500 text-sm mt-1">Configuración inicial del workspace</p>
+    <p class="text-gray-500 text-sm mt-1">Crea tu cuenta y workspace</p>
   </div>
 
   <!-- Progress -->
@@ -44,42 +44,43 @@
     </template>
   </div>
 
-  <!-- ── STEP 1 ── Workspace + admin key ─────────────────────────────── -->
+  <!-- ── STEP 1 ── Cuenta ────────────────────────────────────────────── -->
   <div x-show="step === 1" x-cloak>
-    <h2 class="text-lg font-semibold mb-1">Crea tu workspace</h2>
-    <p class="text-gray-400 text-sm mb-6">Un workspace agrupa runs, revisores y presupuesto.</p>
+    <h2 class="text-lg font-semibold mb-1">Crea tu cuenta</h2>
+    <p class="text-gray-400 text-sm mb-6">Se creará un workspace personal asociado a tu email.</p>
 
     <div class="space-y-4">
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5">Nombre del workspace</label>
-        <input x-model="wsName" placeholder="ej: Equipo Backend"
+        <label class="block text-xs text-gray-400 mb-1.5">Email</label>
+        <input x-model="email" type="email" placeholder="tu@empresa.com"
+          @keydown.enter="createAccount()"
           class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
       </div>
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5">Slug (URL-friendly)</label>
-        <input x-model="wsSlug" placeholder="ej: equipo-backend"
-          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
-        <p class="text-xs text-gray-600 mt-1">Solo letras minúsculas, números y guiones.</p>
-      </div>
-      <div>
-        <label class="block text-xs text-gray-400 mb-1.5">Tu nombre (será tu label de API key admin)</label>
-        <input x-model="adminLabel" placeholder="ej: alice"
-          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+        <label class="block text-xs text-gray-400 mb-1.5">Contraseña</label>
+        <input x-model="password" type="password" placeholder="Mínimo 8 caracteres"
+          @keydown.enter="createAccount()"
+          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
       </div>
     </div>
 
     <p x-show="step1Error" x-cloak class="text-red-400 text-xs mt-3" x-text="step1Error"></p>
 
-    <button @click="createWorkspace()"
-      :disabled="step1Loading || !wsName.trim() || !wsSlug.trim() || !adminLabel.trim()"
+    <button @click="createAccount()"
+      :disabled="step1Loading || !email.trim() || password.length < 8"
       class="mt-6 w-full py-2.5 rounded-lg font-medium text-sm transition
         bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-      <span x-show="!step1Loading">Crear workspace →</span>
+      <span x-show="!step1Loading">Crear cuenta →</span>
       <span x-show="step1Loading">Creando…</span>
     </button>
+
+    <p class="text-center text-xs text-gray-600 mt-5">
+      ¿Ya tienes cuenta?
+      <a href="/login" class="text-indigo-400 hover:text-indigo-300 transition">Inicia sesión</a>
+    </p>
   </div>
 
-  <!-- ── STEP 2 ── Reviewers ─────────────────────────────────────────── -->
+  <!-- ── STEP 2 ── Revisores ─────────────────────────────────────────── -->
   <div x-show="step === 2" x-cloak>
     <h2 class="text-lg font-semibold mb-1">Añade tus técnicos revisores</h2>
     <p class="text-gray-400 text-sm mb-6">
@@ -130,20 +131,19 @@
     </button>
   </div>
 
-
   <!-- ── STEP 3 ── Listo ──────────────────────────────────────────────── -->
   <div x-show="step === 3" x-cloak>
     <div class="text-center mb-6">
       <div class="text-5xl mb-3">✓</div>
       <h2 class="text-lg font-semibold mb-1">¡Todo listo!</h2>
-      <p class="text-gray-400 text-sm">Tu workspace está configurado.</p>
+      <p class="text-gray-400 text-sm">Tu cuenta y workspace están configurados.</p>
     </div>
 
     <!-- Summary card -->
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5 space-y-3">
       <div class="flex justify-between items-center">
-        <span class="text-xs text-gray-500">Workspace</span>
-        <span class="text-sm font-medium" x-text="wsName"></span>
+        <span class="text-xs text-gray-500">Cuenta</span>
+        <span class="text-sm font-medium" x-text="email"></span>
       </div>
       <div class="flex justify-between items-center">
         <span class="text-xs text-gray-500">Tu API key (admin)</span>
@@ -193,12 +193,11 @@
 function onboard() {
   return {
     step: 1,
-    steps: ['Workspace', 'Revisores', 'Listo'],
+    steps: ['Cuenta', 'Revisores', 'Listo'],
 
     // Step 1
-    wsName: '',
-    wsSlug: '',
-    adminLabel: '',
+    email: '',
+    password: '',
     step1Loading: false,
     step1Error: '',
     workspaceId: null,
@@ -213,35 +212,22 @@ function onboard() {
     // UI
     copied: '',
 
-    init() {
-      // Auto-slug from wsName
-      this.$watch('wsName', v => {
-        if (this.wsSlug === '' || this.wsSlug === this._autoSlug) {
-          this._autoSlug = v.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-          this.wsSlug = this._autoSlug;
-        }
-      });
-    },
-
-    _autoSlug: '',
-
-    async createWorkspace() {
+    async createAccount() {
       this.step1Error = '';
       this.step1Loading = true;
       try {
-        const r = await fetch('/onboard/bootstrap', {
+        const r = await fetch('/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ws_name: this.wsName.trim(),
-            ws_slug: this.wsSlug.trim(),
-            admin_label: this.adminLabel.trim(),
+            email: this.email.trim().toLowerCase(),
+            password: this.password,
           }),
         });
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
-          if (r.status === 403) {
-            this.step1Error = 'El sistema ya tiene workspaces. Ve a Settings para crear más con tus credenciales de admin.';
+          if (r.status === 409) {
+            this.step1Error = 'Ya existe una cuenta con ese email. ¿Quieres iniciar sesión?';
           } else {
             this.step1Error = d.detail || `Error ${r.status}`;
           }
@@ -249,10 +235,9 @@ function onboard() {
         }
         const data = await r.json();
         this.workspaceId = data.workspace_id;
-        this.adminKey = data.key;
+        this.adminKey = data.api_key;
 
-        localStorage.setItem('antcrew_api_key', data.key);
-        localStorage.setItem('antcrew_api_key_label', data.admin_label);
+        localStorage.setItem('antcrew_api_key', data.api_key);
 
         this.step = 2;
       } catch (e) {

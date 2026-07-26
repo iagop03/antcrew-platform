@@ -1,5 +1,12 @@
 # Changelog — antcrew-platform
 
+## v0.4.6 (2026-07-26)
+
+### Changed
+- **Onboard page migrated to multi-tenant flow** — `onboard.html` now calls `POST /auth/register` (email + password) instead of `POST /onboard/bootstrap`. Each user who registers gets their own isolated workspace. Added "¿Ya tienes cuenta? Inicia sesión" link to `/login`. The `/onboard/bootstrap` endpoint remains available for ops/system-level initialization via API.
+
+---
+
 ## v0.4.5 (2026-07-26)
 
 ### Changed
