@@ -70,8 +70,8 @@ jobs:
               v = tomllib.load(f)["project"]["version"]
           with open("CHANGELOG.md") as f:
               content = f.read()
-          if f"[{v}]" not in content:
+          if f"## v{v}" not in content and f"## [{v}]" not in content:
               print(f"::error::CHANGELOG.md is missing an entry for version {v}")
               sys.exit(1)
-          print(f"OK: CHANGELOG.md has entry for [{v}]")
+          print(f"OK: CHANGELOG.md has entry for v{v}")
           PYEOF
