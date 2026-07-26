@@ -280,6 +280,11 @@ async def submit_client_decision(
     decision_payload = {"decision": body.decision, "edited": None, "feedback": body.feedback}
     resolve_review(review.review_id, decision_payload)
 
+    run = (await session.exec(select(Run).where(Run.run_id == review.run_id))).first()
+    if run is not None and run.team == "engine":
+        from app.services.engine_runner import resolve_engine_review
+        resolve_engine_review(review.review_id, body.decision, body.feedback, None)
+
     _STATUS_MAP = {"approve": "approved", "reject": "rejected"}
     review.status = _STATUS_MAP[body.decision]
     review.decision = body.decision

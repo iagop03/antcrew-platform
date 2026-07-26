@@ -418,9 +418,10 @@ async def submit_review(
     if review.status != "pending":
         raise HTTPException(409, f"Review {review_id!r} already resolved (status: {review.status!r})")
 
+    # Always fetch the run — used for workspace scope check and handler dispatch.
+    run_result = await session.exec(select(Run).where(Run.run_id == review.run_id))
+    run = run_result.first()
     if ctx.workspace_ids is not None:
-        run_result = await session.exec(select(Run).where(Run.run_id == review.run_id))
-        run = run_result.first()
         if run is None or not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This review is not accessible with the current API key")
 
@@ -432,7 +433,7 @@ async def submit_review(
 
     resolve_review(review_id, decision_payload)
 
-    try:
+    if run is not None and run.team == "engine":
         from app.services.engine_runner import resolve_engine_review
         new_content = None
         if body.decision == "edit" and body.edited:
@@ -441,8 +442,6 @@ async def submit_review(
             except Exception:
                 new_content = body.edited
         resolve_engine_review(review_id, body.decision, body.feedback, new_content)
-    except Exception:
-        pass
 
     resolved_at = datetime.now(timezone.utc).replace(tzinfo=None)
     review.status = _DECISION_TO_STATUS.get(body.decision, body.decision)
