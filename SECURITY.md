@@ -103,6 +103,41 @@ Covered so far: `STRIPE_WEBHOOK_SECRET`, `SLACK_TOKEN_ENCRYPTION_KEY`, `ANTCREW_
 
 ---
 
+### 9. New cross-cutting feature that affects both runners
+
+The platform has two independent execution engines that must stay in sync on billing, cost,
+and human-control invariants. Any feature that belongs to one of these categories is
+**shared by contract** and must go into the canonical module — not be reimplemented in each runner.
+
+> Canonical module: `app/services/runner_base.py`
+> Pattern: both `runner.py` and `engine_runner.py` import from `runner_base`. Neither imports from the other.
+> Reference: `_check_workspace_budget()` (with asyncio TOCTOU lock + trial messaging), `_mark_workspace_budget_status()`.
+
+**What belongs in `runner_base.py` (shared by contract):**
+
+- [ ] **Budget gate** — does the new feature need to block or throttle runs based on workspace spend or subscription status? → `_check_workspace_budget()`
+- [ ] **Cost attribution** — after the run, is workspace `total_cost_usd` recomputed? → `_mark_workspace_budget_status()`
+- [ ] **BLOCKED_STATUSES** — is a new subscription status added that should block all pipeline execution? → `app/services/billing.py:BLOCKED_STATUSES`, consumed by `runner_base._check_workspace_budget()`
+
+**What lives in each runner separately (intentional divergence):**
+
+| Feature | `runner.py` | `engine_runner.py` |
+|---|---|---|
+| HITL blocking | `PlatformChannel` → `threading.Future` | `HitlReviewer` capability → `threading.Event` |
+| HITL channel routing | per-node Slack / Telegram | platform only (no visual graph) |
+| ManualAction | ✗ (no concept) | `ManualActionCapability` + `resolve_manual_action` |
+| Resume | ✗ | `resume=True` + `.antcrew/goal.json` |
+| Cancellation | ✗ (thread can't be stopped) | `cancel_engine_run()` + `stop_event` |
+| Repo context injection | `_inject_repo_context()` | ✗ |
+
+- [ ] Does the new feature belong to the "shared by contract" column above?
+  - **Yes** → put it in `runner_base.py`; both runners import it; add it to this table.
+  - **No** → decide consciously which runner(s) need it; document the divergence in the table above.
+- [ ] If you add a new billing-blocking condition (trial expiry, fraud flag, etc.), is it in `BLOCKED_STATUSES` in `billing.py` — not hardcoded in one runner?
+- [ ] After adding a shared invariant, verify both runners import from `runner_base`, not from each other.
+
+---
+
 ## Quick reference: where each guard lives
 
 | Guard | File | Function / class |
@@ -116,3 +151,6 @@ Covered so far: `STRIPE_WEBHOOK_SECRET`, `SLACK_TOKEN_ENCRYPTION_KEY`, `ANTCREW_
 | Code execution sandbox | `antcrew-engine/engine/sandbox.py` | `run()`, `run_with_install()` |
 | Docker image override | `antcrew-engine/engine/sandbox.py` | `_docker_image()` + `ANTCREW_SANDBOX_IMAGE` |
 | bcrypt key hashing | `app/core/auth.py` | `_hash()`, `_verify()`, `_key_prefix()` |
+| Budget gate (both runners) | `app/services/runner_base.py` | `_check_workspace_budget()` |
+| Budget update (both runners) | `app/services/runner_base.py` | `_mark_workspace_budget_status()` |
+| Subscription block list | `app/services/billing.py` | `BLOCKED_STATUSES` |
