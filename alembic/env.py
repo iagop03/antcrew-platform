@@ -28,6 +28,12 @@ def _get_url() -> str:
         raise RuntimeError(
             "No database URL found. Set DATABASE_URL env var or sqlalchemy.url in alembic.ini."
         )
+    # Normalize bare postgresql:// → postgresql+asyncpg:// so asyncpg is always used.
+    # Fly/Neon/Supabase often set the URL without the +asyncpg driver qualifier.
+    if url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    elif url.startswith("postgres://"):
+        url = "postgresql+asyncpg://" + url[len("postgres://"):]
     return url
 
 
