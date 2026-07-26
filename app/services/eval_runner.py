@@ -110,9 +110,9 @@ def run_eval_sync(eval_id: str, cfg: EvalRunConfig, loop: asyncio.AbstractEventL
     try:
         from antcrew.eval.case import EvalCase
         from antcrew.eval.runner import EvalRunner
-        from app.services.runner import _make_team
+        from app.services.runner import make_team
 
-        team = _make_team(cfg.team, model=cfg.model)
+        team = make_team(cfg.team, model=cfg.model)
         case = EvalCase(
             request=cfg.request,
             name=cfg.name or cfg.request[:60],

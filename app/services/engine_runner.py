@@ -29,6 +29,12 @@ from typing import Optional
 
 from antcrew.core.events import bus, Event as BusEvent, new_run_id
 
+from app.services.runner_base import (
+    _check_workspace_budget,
+    _get_budget_lock,
+    _mark_workspace_budget_status,
+)
+
 log = logging.getLogger(__name__)
 
 _MAX_WORKERS = int(os.environ.get("ANTCREW_WORKERS", "4"))
@@ -529,32 +535,6 @@ def _run_engine_sync(
 # Async dispatch
 # ---------------------------------------------------------------------------
 
-async def _check_engine_workspace(workspace_id: int) -> None:
-    """Block engine runs when the workspace subscription is cancelled/unpaid or over budget.
-
-    Mirrors runner._check_workspace_budget but kept local so engine_runner has
-    no coupling to runner internals — both modules import BLOCKED_STATUSES directly.
-    """
-    from sqlmodel import select
-    from sqlmodel.ext.asyncio.session import AsyncSession
-    from app.core.database import engine as _db_engine
-    from app.models.run import Workspace
-    from app.services.billing import BLOCKED_STATUSES
-
-    async with AsyncSession(_db_engine, expire_on_commit=False) as session:
-        ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
-        if ws is None:
-            return
-        if ws.subscription_status in BLOCKED_STATUSES:
-            raise ValueError(
-                f"Workspace subscription is '{ws.subscription_status}'. "
-                "Please update your billing details to continue using the engine."
-            )
-        if ws.max_cost_usd is not None and ws.total_cost_usd >= ws.max_cost_usd:
-            raise ValueError(
-                f"Workspace budget exhausted: ${ws.total_cost_usd:.4f} spent of "
-                f"${ws.max_cost_usd:.2f} limit. Update the workspace budget to continue."
-            )
 
 
 async def dispatch_engine(
@@ -600,7 +580,8 @@ async def dispatch_engine(
     hitl_after = hitl_after or []
 
     if workspace_id is not None:
-        await _check_engine_workspace(workspace_id)
+        async with _get_budget_lock(workspace_id):
+            await _check_workspace_budget(workspace_id)
 
     # Resume: load goal from persisted metadata, let goal arg override description.
     if resume and output_dir is not None:
@@ -687,7 +668,6 @@ async def dispatch_engine(
             await _store_engine_state(run_id, goal, output_dir, _store, _satisfied, _expected)
             # Update workspace budget totals (mirrors runner.dispatch behaviour).
             if workspace_id is not None:
-                from app.services.runner import _mark_workspace_budget_status
                 await _mark_workspace_budget_status(workspace_id)
 
     asyncio.ensure_future(_bg())
