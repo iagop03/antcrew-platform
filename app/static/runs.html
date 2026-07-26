@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Runs — antcrew</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen" x-data="dashboard()" x-init="init()">
@@ -26,8 +27,9 @@
     <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span>Pipelines</span></a>
     <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
     <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span>Webhooks</span></a>
+    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
+    <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i><span data-i18n="nav.settings">Settings</span></a>
     <div class="ml-auto flex items-center gap-0.5">
-      <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i></a>
       <div class="relative ml-1" id="ac-pf-w">
         <button id="ac-pf-b" style="width:28px;height:28px;border-radius:50%;background:#4338ca;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span id="ac-pf-i">?</span></button>
         <div id="ac-pf-d" style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:192px;background:#111827;border:1px solid #1f2937;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,.5);z-index:100;overflow:hidden">
@@ -35,8 +37,14 @@
             <p id="ac-pf-n" style="font-size:.8125rem;font-weight:500;color:#f3f4f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
             <p id="ac-pf-e" style="font-size:.75rem;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px"></p>
           </div>
-          <a href="/settings?tab=profile" style="display:block;padding:7px 12px;font-size:.8125rem;color:#9ca3af;text-decoration:none" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">Mi perfil</a>
-          <button onclick="fetch('/auth/token',{method:'DELETE',credentials:'same-origin'}).then(function(){localStorage.removeItem('antcrew_api_key');window.location.replace('/')})" style="display:block;width:100%;text-align:left;padding:7px 12px;font-size:.8125rem;color:#9ca3af;background:none;border:none;cursor:pointer;box-sizing:border-box" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">Cerrar sesión</button>
+          <a href="/settings?tab=profile" data-i18n="nav.profile" style="display:block;padding:7px 12px;font-size:.8125rem;color:#9ca3af;text-decoration:none" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">My profile</a>
+          <button data-i18n="nav.logout" onclick="fetch('/auth/token',{method:'DELETE',credentials:'same-origin'}).then(function(){localStorage.removeItem('antcrew_api_key');window.location.replace('/')})" style="display:block;width:100%;text-align:left;padding:7px 12px;font-size:.8125rem;color:#9ca3af;background:none;border:none;cursor:pointer;box-sizing:border-box" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">Log out</button>
+          <div style="padding:5px 12px 6px;border-top:1px solid #1f2937;display:flex;align-items:center;gap:4px;margin-top:1px">
+            <span data-i18n="nav.lang" style="font-size:.7rem;color:#4b5563;flex:1">Language</span>
+            <button data-lang-btn="en" onclick="window.__i18n&&window.__i18n.setLang('en')" style="font-size:.75rem;background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:3px" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">EN</button>
+            <span style="font-size:.7rem;color:#374151">|</span>
+            <button data-lang-btn="es" onclick="window.__i18n&&window.__i18n.setLang('es')" style="font-size:.75rem;background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:3px" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">ES</button>
+          </div>
         </div>
       </div>
     </div>
