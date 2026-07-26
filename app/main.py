@@ -655,6 +655,7 @@ async def onboard_bootstrap(
         )
 
     from app.core.byok import TRIAL_CREDIT_USD
+    from sqlalchemy.exc import IntegrityError as _IntegrityError
     ws = Workspace(
         name=body.ws_name.strip(),
         slug=body.ws_slug.strip(),
@@ -662,8 +663,7 @@ async def onboard_bootstrap(
         max_cost_usd=TRIAL_CREDIT_USD,
     )
     session.add(ws)
-    await session.commit()
-    await session.refresh(ws)
+    await session.flush()  # get ws.id without committing; rolled back if api_key insert fails
 
     raw = secrets.token_urlsafe(32)
     key = ApiKey(
@@ -674,7 +674,15 @@ async def onboard_bootstrap(
         role="admin",
     )
     session.add(key)
-    await session.commit()
+    try:
+        await session.commit()
+    except _IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            409,
+            f"API key label {body.admin_label.strip()!r} is already taken — choose a different label",
+        )
+    await session.refresh(ws)
 
     return {
         "workspace_id": ws.id,
