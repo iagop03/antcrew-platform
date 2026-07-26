@@ -26,8 +26,12 @@
 html { scroll-behavior: smooth; }
 </style>
 <script>
-// Redirect authenticated users directly to the dashboard
+// Redirect authenticated users to dashboard, but only when not navigating from within the app
 (function() {
+  try {
+    var ref = document.referrer;
+    if (ref && new URL(ref).hostname === location.hostname) return;
+  } catch(e) {}
   fetch('/auth/me', { credentials: 'same-origin' })
     .then(function(r) { if (r.ok) window.location.replace('/dashboard'); })
     .catch(function() {});

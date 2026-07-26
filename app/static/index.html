@@ -12,27 +12,30 @@
 <body class="bg-gray-950 text-gray-100 min-h-screen" x-data="dashFeed()" x-init="init()">
 
 <!-- Nav -->
-<nav class="border-b border-gray-800 px-6 py-3 flex items-center gap-6">
-  <a href="/" class="font-mono font-bold text-indigo-400">antcrew</a>
-  <a href="/" class="text-sm text-white font-medium">Dashboard</a>
-  <a href="/runs" class="text-sm text-gray-400 hover:text-white">Runs</a>
-  <a href="/reviews" class="text-sm text-gray-400 hover:text-white flex items-center gap-1.5">
-    Reviews
-    <span x-show="pendingCount > 0"
-      class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"
-      x-text="pendingCount"></span>
-  </a>
-  <a href="/evals" class="text-sm text-gray-400 hover:text-white">Evals</a>
-  <a href="/tickets" class="text-sm text-gray-400 hover:text-white">Tickets</a>
-  <a href="/compare" class="text-sm text-gray-400 hover:text-white">Compare</a>
-  <a href="/pipelines" class="text-sm text-gray-400 hover:text-white">Pipelines</a>
-  <a href="/webhooks" class="text-sm text-gray-400 hover:text-white">Webhooks</a>
-  <a href="/settings" class="text-sm text-gray-400 hover:text-white">Settings</a>
-  <div class="ml-auto flex items-center gap-2">
-    <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500" title="Live"></span>
-    <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" title="Reconectando…"></span>
+<style>.ac-nav{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;font-size:.8125rem;font-weight:500;color:rgb(107,114,128);text-decoration:none;transition:background .12s,color .12s;white-space:nowrap}.ac-nav:hover{background:rgba(31,41,55,.7);color:rgb(229,231,235)}.ac-nav.ac-on{background:rgba(31,41,55,.95);color:#fff}.ac-nav .ti{font-size:14px;flex-shrink:0}</style>
+<nav class="sticky top-0 z-40 border-b border-gray-800" style="background:rgba(3,7,18,.96);backdrop-filter:blur(10px)">
+  <div class="h-11 px-3 flex items-center gap-0.5">
+    <a href="/dashboard" class="font-mono font-bold text-indigo-400 text-sm px-3 mr-1 shrink-0">antcrew</a>
+    <div class="w-px h-4 bg-gray-800 mx-0.5 shrink-0"></div>
+    <a href="/dashboard" class="ac-nav" data-ac="/dashboard"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></a>
+    <a href="/runs" class="ac-nav" data-ac="/runs"><i class="ti ti-player-play"></i><span>Runs</span></a>
+    <a href="/reviews" class="ac-nav" data-ac="/reviews"><i class="ti ti-eye-check"></i><span>Reviews</span><span id="nav-rev-badge" style="display:none" class="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"></span></a>
+    <a href="/evals" class="ac-nav" data-ac="/evals"><i class="ti ti-chart-bar"></i><span>Evals</span></a>
+    <a href="/tickets" class="ac-nav" data-ac="/tickets"><i class="ti ti-checklist"></i><span>Tickets</span></a>
+    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
+    <a href="/compare" class="ac-nav" data-ac="/compare"><i class="ti ti-scale"></i><span>Compare</span></a>
+    <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span>Pipelines</span></a>
+    <div class="ml-auto flex items-center gap-0.5">
+      <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span>Webhooks</span></a>
+      <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i></a>
+      <div class="ml-2 flex items-center gap-1.5 pl-2 border-l border-gray-800">
+        <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500" title="Live"></span>
+        <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" title="Reconectando…"></span>
+      </div>
+    </div>
   </div>
 </nav>
+<script>(function(){var p=location.pathname;document.querySelectorAll('.ac-nav[data-ac]').forEach(function(el){var dp=el.dataset.ac;if((dp==='/dashboard'&&(p==='/'||p==='/dashboard'))||(dp!=='/dashboard'&&(p===dp||p.startsWith(dp+'/'))))el.classList.add('ac-on');});var k=localStorage.getItem('antcrew_api_key');var h={'Content-Type':'application/json'};if(k)h['X-Api-Key']=k;fetch('/reviews/?status=pending&limit=100',{headers:h,credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&d.length>0){var b=document.getElementById('nav-rev-badge');if(b){b.textContent=d.length>99?'99+':d.length;b.style.display='inline-flex';}}}).catch(function(){});})();</script>
 
 <!-- Header -->
 <div class="px-6 py-5 flex items-start justify-between">
