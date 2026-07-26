@@ -331,7 +331,39 @@ async def login(
     )).first()
 
     if api_key is None:
-        raise HTTPException(401, "No active API key for this account")
+        # User has no active API key (e.g. they revoked it from settings).
+        # Auto-create a new one for their workspace so they can log back in.
+        from app.models.run import Workspace
+        workspace = (await session.exec(
+            select(Workspace).where(Workspace.owner_user_id == user.id)
+        )).first()
+        if workspace is None:
+            raise HTTPException(401, "No active API key for this account")
+        from app.core.auth import _hash as _hash_key, _key_prefix
+        raw_key = secrets.token_urlsafe(32)
+        label_base = re.sub(r"[^a-z0-9-]", "-", email.split("@")[0])[:48] or "user"
+        label = label_base
+        for _attempt in range(20):
+            exists = (await session.exec(
+                select(ApiKey).where(ApiKey.label == label, ApiKey.workspace_id == workspace.id)
+            )).first()
+            if not exists:
+                break
+            label = f"{label_base}-{secrets.token_hex(3)}"
+        else:
+            label = f"user-{secrets.token_hex(6)}"
+        api_key = ApiKey(
+            label=label,
+            key_hash=_hash_key(raw_key),
+            key_prefix=_key_prefix(raw_key),
+            workspace_id=workspace.id,
+            role="admin",
+            email=email,
+            user_id=user.id,
+            created_at=_utcnow(),
+        )
+        session.add(api_key)
+        await session.flush()
 
     token = await _create_session(user.id, api_key.id, session)
     csrf_token = _csrf_gen()

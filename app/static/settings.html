@@ -228,7 +228,12 @@
         <tbody>
           <template x-for="key in keys" :key="key.label">
             <tr class="border-b border-gray-800/40 last:border-0 hover:bg-gray-900/40 transition-colors">
-              <td class="px-4 py-3 font-mono text-sm" x-text="key.label"></td>
+              <td class="px-4 py-3 font-mono text-sm">
+                <span x-text="key.label"></span>
+                <template x-if="isMyKey(key)">
+                  <span class="ml-1.5 inline-block px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-indigo-900/60 text-indigo-300">tú</span>
+                </template>
+              </td>
               <td class="px-4 py-3">
                 <span :class="roleBadgeClass(key.role)"
                   class="inline-block px-2 py-0.5 rounded text-xs font-medium" x-text="key.role"></span>
@@ -251,14 +256,21 @@
               <td class="px-4 py-3 text-gray-600 text-xs" x-text="fmtDate(key.created_at)"></td>
               <td class="px-4 py-3 text-right">
                 <div class="flex items-center justify-end gap-1">
-                  <button @click="startEditKey(key)"
-                    class="text-xs text-gray-500 hover:text-white px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
-                    Editar
-                  </button>
-                  <button @click="revokeKey(key)"
-                    class="text-xs text-gray-700 hover:text-red-400 px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
-                    Revocar
-                  </button>
+                  <template x-if="isMyKey(key)">
+                    <span class="text-xs text-gray-700 px-2.5 py-1 italic">Tu cuenta</span>
+                  </template>
+                  <template x-if="!isMyKey(key)">
+                    <button @click="startEditKey(key)"
+                      class="text-xs text-gray-500 hover:text-white px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
+                      Editar
+                    </button>
+                  </template>
+                  <template x-if="!isMyKey(key)">
+                    <button @click="revokeKey(key)"
+                      class="text-xs text-gray-700 hover:text-red-400 px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
+                      Revocar
+                    </button>
+                  </template>
                 </div>
               </td>
             </tr>
@@ -675,6 +687,7 @@ function settings() {
     editWsForm: { max_cost_usd: '', hitl_default: false, default_repo_url: '', add_credit: '', exit_trial: false },
     wsFormError: '',
 
+    me: null,
     keys: [], keysLoading: false, keysError: '',
     showCreateKey: false, editingKey: null,
     createKeyForm: { label: '', role: 'reviewer', workspace_id: '', email: '', slack_user_id: '', telegram_chat_id: '' },
@@ -707,7 +720,14 @@ function settings() {
     },
 
     async init() {
+      const meR = await fetch('/auth/me', { credentials: 'same-origin' }).catch(() => null);
+      if (meR && meR.ok) this.me = await meR.json();
       await Promise.all([this.loadWorkspaces(), this.loadKeys()]);
+    },
+
+    isMyKey(key) {
+      if (!this.me) return false;
+      return key.email && key.email === this.me.email;
     },
 
     /* ── Workspaces ── */
