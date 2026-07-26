@@ -140,7 +140,7 @@ function loginApp() {
           this._startResendCooldown(60);
           return;
         }
-        window.location.href = '/';
+        window.location.href = '/dashboard';
       } catch (e) {
         this.loginError = 'Error de red — inténtalo de nuevo';
       } finally {
@@ -163,7 +163,7 @@ function loginApp() {
           this.verifyError = d.detail || `Error ${r.status}`;
           return;
         }
-        window.location.href = '/';
+        window.location.href = '/dashboard';
       } catch (e) {
         this.verifyError = 'Error de red — inténtalo de nuevo';
       } finally {

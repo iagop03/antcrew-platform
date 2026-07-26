@@ -244,6 +244,16 @@ function dashFeed() {
     },
 
     async init() {
+      // Auth guard: session-cookie users must be authenticated; API-key users pass through
+      const apiKey = localStorage.getItem('antcrew_api_key');
+      if (!apiKey) {
+        try {
+          const r = await fetch('/auth/me', { credentials: 'same-origin' });
+          if (!r.ok) { window.location.replace('/'); return; }
+          const me = await r.json();
+          if (!me.workspace_id) { window.location.replace('/onboard'); return; }
+        } catch { window.location.replace('/'); return; }
+      }
       await Promise.all([this.loadWorkspace(), this.loadStats(), this.loadTeams(), this.loadFeed()]);
       this.connectWs();
     },

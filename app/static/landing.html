@@ -24,6 +24,16 @@
 }
 
 html { scroll-behavior: smooth; }
+</style>
+<script>
+// Redirect authenticated users directly to the dashboard
+(function() {
+  fetch('/auth/me', { credentials: 'same-origin' })
+    .then(function(r) { if (r.ok) window.location.replace('/dashboard'); })
+    .catch(function() {});
+})();
+</script>
+<style>
 body {
   font-family: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
   background: var(--ground);
@@ -390,8 +400,8 @@ nav {
       <li><a href="#pricing">Precios</a></li>
     </ul>
     <div class="nav-cta">
-      <a href="/trial" class="btn btn-primary btn-sm">Prueba gratuita →</a>
-      <a href="/onboard" class="btn btn-ghost btn-sm" style="margin-left:6px;">Empezar</a>
+      <a href="/login" class="btn btn-ghost btn-sm">Iniciar sesión</a>
+      <a href="/onboard" class="btn btn-primary btn-sm" style="margin-left:6px;">Crear cuenta →</a>
     </div>
   </div>
 </nav>
@@ -405,8 +415,8 @@ nav {
       <h1 class="hero-headline">El equipo de ingeniería que nunca para</h1>
       <p class="hero-sub">Agentes de IA que analizan, implementan y abren PRs. Con revisión humana integrada cuando lo que importa requiere tu criterio.</p>
       <div class="hero-actions">
-        <a href="/trial" class="btn btn-primary">Prueba gratuita — gratis</a>
-        <a href="/onboard" class="btn btn-ghost">Crear workspace</a>
+        <a href="/onboard" class="btn btn-primary">Crear cuenta →</a>
+        <a href="/login" class="btn btn-ghost">Iniciar sesión</a>
       </div>
     </div>
     <div>
@@ -636,8 +646,8 @@ nav {
     <h2 class="cta-title">Tu equipo de IA, listo en minutos</h2>
     <p class="cta-sub">Crea un workspace, conecta tu repositorio y lanza tu primer run hoy mismo.</p>
     <div class="cta-actions">
-      <a href="/trial" class="btn btn-primary">Empezar gratis →</a>
-      <a href="/docs" class="btn btn-ghost">Leer la documentación</a>
+      <a href="/onboard" class="btn btn-primary">Crear cuenta →</a>
+      <a href="/login" class="btn btn-ghost">Iniciar sesión</a>
     </div>
   </div>
 </section>

@@ -6,6 +6,19 @@
 <title>Crear cuenta — antcrew</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script>
+// If user is already authenticated and verified, send them straight to the dashboard
+(function() {
+  fetch('/auth/me', { credentials: 'same-origin' })
+    .then(function(r) {
+      if (r.ok) return r.json();
+    })
+    .then(function(d) {
+      if (d && d.email_verified) window.location.replace('/dashboard');
+    })
+    .catch(function() {});
+})();
+</script>
 <style>[x-cloak]{display:none}</style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex items-center justify-center p-6"
