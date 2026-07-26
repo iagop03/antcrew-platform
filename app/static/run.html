@@ -23,13 +23,27 @@
     <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
     <a href="/compare" class="ac-nav" data-ac="/compare"><i class="ti ti-scale"></i><span>Compare</span></a>
     <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span>Pipelines</span></a>
-    <div class="ml-auto flex items-center gap-0.5">
-      <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span>Webhooks</span></a>
+    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
+    <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span>Webhooks</span></a>
+    <div class="ml-auto flex items-center gap-1.5">
+      <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Live"></span>
+      <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse shrink-0" title="Reconnecting…"></span>
       <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i></a>
+      <div class="relative ml-1" id="ac-pf-w">
+        <button id="ac-pf-b" style="width:28px;height:28px;border-radius:50%;background:#4338ca;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span id="ac-pf-i">?</span></button>
+        <div id="ac-pf-d" style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:192px;background:#111827;border:1px solid #1f2937;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,.5);z-index:100;overflow:hidden">
+          <div style="padding:10px 12px;border-bottom:1px solid #1f2937">
+            <p id="ac-pf-n" style="font-size:.8125rem;font-weight:500;color:#f3f4f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+            <p id="ac-pf-e" style="font-size:.75rem;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px"></p>
+          </div>
+          <a href="/settings?tab=profile" style="display:block;padding:7px 12px;font-size:.8125rem;color:#9ca3af;text-decoration:none" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">Mi perfil</a>
+          <button onclick="fetch('/auth/token',{method:'DELETE',credentials:'same-origin'}).then(function(){localStorage.removeItem('antcrew_api_key');window.location.replace('/')})" style="display:block;width:100%;text-align:left;padding:7px 12px;font-size:.8125rem;color:#9ca3af;background:none;border:none;cursor:pointer;box-sizing:border-box" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">Cerrar sesión</button>
+        </div>
+      </div>
     </div>
   </div>
 </nav>
-<script>(function(){var p=location.pathname;document.querySelectorAll('.ac-nav[data-ac]').forEach(function(el){var dp=el.dataset.ac;if((dp==='/dashboard'&&(p==='/'||p==='/dashboard'))||(dp!=='/dashboard'&&(p===dp||p.startsWith(dp+'/'))))el.classList.add('ac-on');});var k=localStorage.getItem('antcrew_api_key');var h={'Content-Type':'application/json'};if(k)h['X-Api-Key']=k;fetch('/reviews/?status=pending&limit=100',{headers:h,credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&d.length>0){var b=document.getElementById('nav-rev-badge');if(b){b.textContent=d.length>99?'99+':d.length;b.style.display='inline-flex';}}}).catch(function(){});})();</script>
+<script>(function(){var p=location.pathname;document.querySelectorAll('.ac-nav[data-ac]').forEach(function(el){var dp=el.dataset.ac;if((dp==='/dashboard'&&(p==='/'||p==='/dashboard'))||(dp!=='/dashboard'&&(p===dp||p.startsWith(dp+'/'))))el.classList.add('ac-on');});document.addEventListener('click',function(e){var w=document.getElementById('ac-pf-w');if(w&&!w.contains(e.target)){var d=document.getElementById('ac-pf-d');if(d)d.style.display='none';}});var pb=document.getElementById('ac-pf-b');if(pb)pb.addEventListener('click',function(e){e.stopPropagation();var d=document.getElementById('ac-pf-d');if(d)d.style.display=d.style.display==='none'?'block':'none';});var k=localStorage.getItem('antcrew_api_key');var h={'Content-Type':'application/json'};if(k)h['X-Api-Key']=k;fetch('/reviews/?status=pending&limit=100',{headers:h,credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&d.length>0){var b=document.getElementById('nav-rev-badge');if(b){b.textContent=d.length>99?'99+':d.length;b.style.display='inline-flex';}}}).catch(function(){});fetch('/auth/me',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(me){if(!me)return;var n=document.getElementById('ac-pf-n');var em=document.getElementById('ac-pf-e');var i=document.getElementById('ac-pf-i');if(n)n.textContent=me.display_name||'';if(em)em.textContent=me.email||'';if(i){var s=(me.display_name||me.email||'').trim();var pts=s.split(/\s+/);i.textContent=(pts.length>1?pts[0][0]+pts[pts.length-1][0]:s.slice(0,2)).toUpperCase();}}).catch(function(){});})();</script>
 
 <div class="px-6 py-5">
   <!-- Breadcrumb -->

@@ -699,10 +699,61 @@ async def me(
     else:
         email = api_key.email
 
+    display_name: Optional[str] = None
+    if user_session.user_id is not None and user:
+        display_name = user.display_name
+
     return {
         "email": email,
+        "display_name": display_name,
         "workspace_id": api_key.workspace_id,
         "role": api_key.role,
         "email_verified": email_verified,
         "session_expires_at": user_session.expires_at.isoformat() + "Z",
     }
+
+
+@router.patch("/profile", status_code=200)
+async def update_profile(
+    request: Request,
+    session=Depends(get_session),
+):
+    """Update display_name and/or password for the authenticated user."""
+    from app.models.run import User
+
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    result = await _resolve_session(token, session)
+    if result is None:
+        raise HTTPException(401, "Session expired or invalid")
+    user_session, _ = result
+    if user_session.user_id is None:
+        raise HTTPException(400, "Session not linked to a user account")
+
+    body = await request.json()
+    user = (await session.exec(select(User).where(User.id == user_session.user_id))).first()
+    if user is None:
+        raise HTTPException(404, "User not found")
+
+    changed = False
+    if "display_name" in body:
+        name = (body["display_name"] or "").strip()
+        user.display_name = name or None
+        changed = True
+
+    if "new_password" in body:
+        current_pw = body.get("current_password", "")
+        new_pw = body.get("new_password", "")
+        if not _verify_password(current_pw, user.password_hash):
+            raise HTTPException(400, "Current password is incorrect")
+        if len(new_pw) < 8:
+            raise HTTPException(400, "New password must be at least 8 characters")
+        user.password_hash = _hash_password(new_pw)
+        changed = True
+
+    if changed:
+        session.add(user)
+        await session.commit()
+
+    return {"display_name": user.display_name, "email": user.email}

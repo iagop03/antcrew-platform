@@ -372,6 +372,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     password_hash: str
+    display_name: Optional[str] = Field(default=None)
     email_verified_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=_utcnow)
 
