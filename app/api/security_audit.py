@@ -848,15 +848,12 @@ def _sev_order(severity: str) -> int:
 
 
 def _next_cron(cron_expr: Optional[str]) -> Optional[datetime]:
-    """Compute next run datetime from a cron expression using croniter if available."""
+    """Compute next run datetime from a cron expression."""
     if not cron_expr:
         return None
     try:
-        from croniter import croniter  # optional dep
+        from croniter import croniter
         return croniter(cron_expr, _utcnow()).get_next(datetime)
-    except ImportError:
-        log.warning("security_audit: croniter not installed; schedule_next_run_at not computed")
-        return None
     except Exception as exc:
         log.warning("security_audit: invalid cron expression %r: %s", cron_expr, exc)
         return None
