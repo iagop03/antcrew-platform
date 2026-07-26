@@ -88,6 +88,27 @@
       'rev.mine':       'Mine',
       'rev.all':        'All',
 
+      /* reviews page (data-i18n keys used in reviews.html) */
+      'reviews.title':                  'HITL Review Queue',
+      'reviews.subtitle':               'Approve or reject agent output — the pipeline resumes immediately.',
+      'reviews.signed_in_as':           'Signed in as',
+      'reviews.tab.mine':               'My queue',
+      'reviews.tab.all':                'All',
+      'reviews.tab.analytics':          'Analytics',
+      'reviews.analytics.total':        'Total Reviews',
+      'reviews.analytics.pending':      'Pending',
+      'reviews.analytics.rejected':     'Rejected',
+      'reviews.analytics.rejection_rate': 'Rejection Rate',
+      'reviews.mine.empty':             'No pending reviews for you',
+      'reviews.all.empty':              'No pending reviews',
+
+      /* settings page */
+      'settings.subtitle':  'Workspaces, reviewers and LLM configuration',
+      'keys.copynow':       'Key created — copy it now, it won\'t be shown again',
+      'btn.copy':           'Copy',
+      'ws.yes':             'Yes',
+      'ws.no':              'No',
+
       /* common */
       'btn.save':       'Save',
       'btn.cancel':     'Cancel',
@@ -184,6 +205,27 @@
       'rev.mine':       'Mías',
       'rev.all':        'Todas',
 
+      /* reviews page */
+      'reviews.title':                  'Cola de revisión HITL',
+      'reviews.subtitle':               'Aprueba o rechaza el output del agente — el pipeline continúa inmediatamente.',
+      'reviews.signed_in_as':           'Sesión como',
+      'reviews.tab.mine':               'Mi cola',
+      'reviews.tab.all':                'Todas',
+      'reviews.tab.analytics':          'Analytics',
+      'reviews.analytics.total':        'Total Revisiones',
+      'reviews.analytics.pending':      'Pendientes',
+      'reviews.analytics.rejected':     'Rechazadas',
+      'reviews.analytics.rejection_rate': 'Tasa de Rechazo',
+      'reviews.mine.empty':             'No tienes reviews pendientes',
+      'reviews.all.empty':              'No hay reviews pendientes',
+
+      /* settings page */
+      'settings.subtitle':  'Workspaces, revisores y configuración LLM',
+      'keys.copynow':       'Clave creada — cópiala ahora, no se volverá a mostrar',
+      'btn.copy':           'Copiar',
+      'ws.yes':             'Sí',
+      'ws.no':              'No',
+
       /* common */
       'btn.save':       'Guardar',
       'btn.cancel':     'Cancelar',
@@ -250,6 +292,8 @@
 
   // Apply on DOMContentLoaded
   document.addEventListener('DOMContentLoaded', applyI18n);
+  // Re-apply after Alpine finishes init (processes x-teleport, x-show, etc.)
+  document.addEventListener('alpine:initialized', applyI18n);
   // Also apply immediately for scripts that run after DOM is ready
   if (document.readyState !== 'loading') applyI18n();
 })();

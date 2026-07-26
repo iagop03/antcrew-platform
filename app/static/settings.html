@@ -53,7 +53,7 @@
 
 <div class="px-6 py-5 border-b border-gray-800/60">
   <h1 class="text-xl font-semibold">Settings</h1>
-  <p class="text-gray-400 text-sm mt-0.5">Workspaces, revisores y configuración LLM</p>
+  <p class="text-gray-400 text-sm mt-0.5" data-i18n="settings.subtitle">Workspaces, reviewers and LLM configuration</p>
 </div>
 
 <!-- API key banner -->
@@ -80,24 +80,24 @@
   <button @click="tab='workspaces'"
     :class="tab==='workspaces' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
     class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    Workspaces
+    <span data-i18n="tab.workspaces">Workspaces</span>
     <span x-show="workspaces.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="workspaces.length"></span>
   </button>
   <button @click="tab='reviewers'"
     :class="tab==='reviewers' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
     class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    Revisores
+    <span data-i18n="tab.reviewers">Reviewers</span>
     <span x-show="keys.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="keys.length"></span>
   </button>
   <button @click="tab='llm'"
     :class="tab==='llm' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
     class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    Modo LLM
+    <span data-i18n="tab.llm">LLM Mode</span>
   </button>
   <button @click="tab='profile'"
     :class="tab==='profile' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
     class="px-1 py-3 text-sm border-b-2 -mb-px transition-colors">
-    Mi perfil
+    <span data-i18n="tab.profile">My profile</span>
   </button>
 </div>
 
@@ -107,7 +107,7 @@
   <div x-show="tab==='workspaces'">
     <div class="flex items-center justify-between mb-4">
       <span class="text-sm text-gray-400 flex items-center gap-1">
-        Todos los workspaces configurados
+        <span data-i18n="ws.all">All configured workspaces</span>
         <span class="relative inline-flex items-center ml-1">
           <span class="peer/tip inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-800 border border-gray-700 text-gray-500 text-[9px] font-bold cursor-help hover:text-gray-300 hover:border-gray-500 transition-colors select-none leading-none">i</span>
           <span class="pointer-events-none absolute bottom-full left-0 mb-2 w-64 rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-xs text-gray-300 leading-relaxed shadow-xl opacity-0 peer-hover/tip:opacity-100 transition-opacity duration-150 z-50">
@@ -118,28 +118,28 @@
       <button @click="showCreateWs=true; wsFormError=''"
         class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        Nuevo
+        <span data-i18n="ws.new">New</span>
       </button>
     </div>
 
     <p x-show="wsError" class="text-red-400 text-sm mb-3" x-text="wsError"></p>
-    <div x-show="wsLoading" class="text-gray-600 text-sm py-8 text-center">Cargando…</div>
+    <div x-show="wsLoading" class="text-gray-600 text-sm py-8 text-center" data-i18n="loading">Loading…</div>
 
     <div x-show="!wsLoading && workspaces.length === 0 && !wsError"
-      class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm">
-      No hay workspaces todavía.
+      class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm" data-i18n="ws.none">
+      No workspaces yet.
     </div>
 
     <div x-show="!wsLoading && workspaces.length > 0" class="overflow-x-auto rounded-lg border border-gray-800">
       <table class="w-full text-sm" style="font-variant-numeric:tabular-nums">
         <thead>
           <tr class="border-b border-gray-800 text-xs text-gray-600 uppercase tracking-wider">
-            <th class="px-4 py-2.5 text-left font-medium">Nombre</th>
-            <th class="px-4 py-2.5 text-left font-medium">Slug</th>
-            <th class="px-4 py-2.5 text-right font-medium">Presupuesto</th>
-            <th class="px-4 py-2.5 text-center font-medium">HITL</th>
-            <th class="px-4 py-2.5 text-center font-medium">LLM</th>
-            <th class="px-4 py-2.5 text-right font-medium">Acciones</th>
+            <th class="px-4 py-2.5 text-left font-medium" data-i18n="ws.name">Name</th>
+            <th class="px-4 py-2.5 text-left font-medium" data-i18n="ws.slug">Slug</th>
+            <th class="px-4 py-2.5 text-right font-medium" data-i18n="ws.budget">Budget</th>
+            <th class="px-4 py-2.5 text-center font-medium" data-i18n="ws.hitl">HITL</th>
+            <th class="px-4 py-2.5 text-center font-medium" data-i18n="ws.llm">LLM</th>
+            <th class="px-4 py-2.5 text-right font-medium" data-i18n="ws.actions">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -175,17 +175,14 @@
               </td>
               <td class="px-4 py-3 text-right">
                 <div class="flex items-center justify-end gap-1">
-                  <button x-show="ws.is_trial" @click="startEditWs(ws)"
+                  <button x-show="ws.is_trial" @click="startEditWs(ws)" x-text="$t('ws.upgrade')"
                     class="text-xs text-amber-400 hover:text-amber-300 px-2.5 py-1 rounded hover:bg-amber-900/20 transition-colors">
-                    Upgrade
                   </button>
-                  <button @click="startEditWs(ws)"
+                  <button @click="startEditWs(ws)" x-text="$t('ws.edit')"
                     class="text-xs text-gray-500 hover:text-white px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
-                    Editar
                   </button>
-                  <button @click="deleteWs(ws)"
+                  <button @click="deleteWs(ws)" x-text="$t('ws.delete')"
                     class="text-xs text-gray-700 hover:text-red-400 px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
-                    Eliminar
                   </button>
                 </div>
               </td>
@@ -215,7 +212,7 @@
 
     <div class="flex items-center justify-between mb-4">
       <span class="text-sm text-gray-400 flex items-center gap-1">
-        API keys activas
+        <span data-i18n="keys.active">Active API keys</span>
         <span class="relative inline-flex items-center ml-1">
           <span class="peer/tip inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-800 border border-gray-700 text-gray-500 text-[9px] font-bold cursor-help hover:text-gray-300 hover:border-gray-500 transition-colors select-none leading-none">i</span>
           <span class="pointer-events-none absolute bottom-full left-0 mb-2 w-64 rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-xs text-gray-300 leading-relaxed shadow-xl opacity-0 peer-hover/tip:opacity-100 transition-opacity duration-150 z-50">
@@ -226,28 +223,28 @@
       <button @click="showCreateKey=true; keyFormError=''"
         class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        Nueva key
+        <span data-i18n="keys.new">New key</span>
       </button>
     </div>
 
     <p x-show="keysError" class="text-red-400 text-sm mb-3" x-text="keysError"></p>
-    <div x-show="keysLoading" class="text-gray-600 text-sm py-8 text-center">Cargando…</div>
+    <div x-show="keysLoading" class="text-gray-600 text-sm py-8 text-center" data-i18n="loading">Loading…</div>
 
     <div x-show="!keysLoading && keys.length === 0 && !keysError"
-      class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm">
-      No hay API keys configuradas.
+      class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm" data-i18n="keys.none">
+      No API keys configured.
     </div>
 
     <div x-show="!keysLoading && keys.length > 0" class="overflow-x-auto rounded-lg border border-gray-800">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-gray-800 text-xs text-gray-600 uppercase tracking-wider">
-            <th class="px-4 py-2.5 text-left font-medium">Label</th>
-            <th class="px-4 py-2.5 text-left font-medium">Rol</th>
-            <th class="px-4 py-2.5 text-left font-medium">Workspace</th>
-            <th class="px-4 py-2.5 text-left font-medium">Notificaciones</th>
-            <th class="px-4 py-2.5 text-left font-medium">Creada</th>
-            <th class="px-4 py-2.5 text-right font-medium">Acciones</th>
+            <th class="px-4 py-2.5 text-left font-medium" data-i18n="keys.label">Label</th>
+            <th class="px-4 py-2.5 text-left font-medium" data-i18n="keys.role">Role</th>
+            <th class="px-4 py-2.5 text-left font-medium" data-i18n="keys.workspace">Workspace</th>
+            <th class="px-4 py-2.5 text-left font-medium" data-i18n="keys.notifs">Notifications</th>
+            <th class="px-4 py-2.5 text-left font-medium" data-i18n="keys.created">Created</th>
+            <th class="px-4 py-2.5 text-right font-medium" data-i18n="keys.actions">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -282,18 +279,16 @@
               <td class="px-4 py-3 text-right">
                 <div class="flex items-center justify-end gap-1">
                   <template x-if="isMyKey(key)">
-                    <span class="text-xs text-gray-700 px-2.5 py-1 italic">Tu cuenta</span>
+                    <span class="text-xs text-gray-700 px-2.5 py-1 italic" x-text="$t('keys.myAccount')"></span>
                   </template>
                   <template x-if="!isMyKey(key)">
-                    <button @click="startEditKey(key)"
+                    <button @click="startEditKey(key)" x-text="$t('keys.edit')"
                       class="text-xs text-gray-500 hover:text-white px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
-                      Editar
                     </button>
                   </template>
                   <template x-if="!isMyKey(key)">
-                    <button @click="revokeKey(key)"
+                    <button @click="revokeKey(key)" x-text="$t('keys.revoke')"
                       class="text-xs text-gray-700 hover:text-red-400 px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
-                      Revocar
                     </button>
                   </template>
                 </div>
@@ -322,7 +317,7 @@
 
     <div x-show="llmWsId">
       <p x-show="llmError" class="text-red-400 text-sm mb-4" x-text="llmError"></p>
-      <div x-show="llmLoading" class="text-gray-600 text-sm">Cargando…</div>
+      <div x-show="llmLoading" class="text-gray-600 text-sm" data-i18n="loading">Loading…</div>
 
       <div x-show="!llmLoading" class="flex flex-col gap-5">
         <!-- Mode selector -->
@@ -353,17 +348,17 @@
         <!-- Keys list -->
         <div>
           <div class="flex items-center justify-between mb-3">
-            <p class="text-sm text-gray-400">Claves BYOK configuradas</p>
+            <p class="text-sm text-gray-400" data-i18n="llm.title">BYOK keys configured</p>
             <button @click="showAddKey=true; addKeyForm={provider:'anthropic',api_key:'',base_url:'',confirm_overwrite:false}; llmError=''"
               class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-              Añadir clave
+              <span data-i18n="llm.add">Add key</span>
             </button>
           </div>
 
           <div x-show="llmKeys.length === 0"
-            class="border border-dashed border-gray-800 rounded-lg py-8 text-center text-gray-700 text-sm">
-            Sin claves BYOK. El workspace usa las claves de la plataforma.
+            class="border border-dashed border-gray-800 rounded-lg py-8 text-center text-gray-700 text-sm" data-i18n="llm.none">
+            No BYOK keys. Workspace uses platform keys.
           </div>
 
           <div x-show="llmKeys.length > 0" class="rounded-lg border border-gray-800 overflow-hidden">
@@ -374,9 +369,8 @@
                   <span class="font-mono text-sm" x-text="k.provider"></span>
                   <span class="text-gray-600 text-xs" x-text="`configurada ${fmtDate(k.created_at)}`"></span>
                 </div>
-                <button @click="deleteLlmKey(k.provider)"
+                <button @click="deleteLlmKey(k.provider)" x-text="$t('llm.delete')"
                   class="text-xs text-gray-700 hover:text-red-400 px-2.5 py-1 rounded hover:bg-gray-800 transition-colors">
-                  Eliminar
                 </button>
               </div>
             </template>
@@ -393,44 +387,44 @@
       x-text="profileMsg"></p>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
-      <h3 class="text-sm font-medium mb-4">Información personal</h3>
+      <h3 class="text-sm font-medium mb-4" data-i18n="prof.personal">Personal information</h3>
       <div class="flex flex-col gap-4">
         <div>
-          <label class="block text-xs text-gray-500 mb-1.5">Nombre y apellidos</label>
+          <label class="block text-xs text-gray-500 mb-1.5" data-i18n="prof.name">Full name</label>
           <input x-model="profileForm.display_name" type="text" placeholder="Tu nombre completo"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1.5">Email</label>
+          <label class="block text-xs text-gray-500 mb-1.5" data-i18n="prof.email">Email</label>
           <input :value="profileForm.email" type="email" disabled
             class="w-full bg-gray-900 border border-gray-800 rounded-md px-3 py-2 text-sm text-gray-500 cursor-not-allowed">
         </div>
         <div class="flex justify-end">
           <button @click="saveProfile()"
-            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
-            Guardar
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors" data-i18n="prof.save">
+            Save
           </button>
         </div>
       </div>
     </div>
 
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <h3 class="text-sm font-medium mb-4">Cambiar contraseña</h3>
+      <h3 class="text-sm font-medium mb-4" data-i18n="prof.changePw">Change password</h3>
       <div class="flex flex-col gap-4">
         <div>
-          <label class="block text-xs text-gray-500 mb-1.5">Contraseña actual</label>
+          <label class="block text-xs text-gray-500 mb-1.5" data-i18n="prof.current">Current password</label>
           <input x-model="pwForm.current" type="password" placeholder="••••••••"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1.5">Nueva contraseña</label>
+          <label class="block text-xs text-gray-500 mb-1.5" data-i18n="prof.new">New password</label>
           <input x-model="pwForm.newPw" type="password" placeholder="Mínimo 8 caracteres"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <div class="flex justify-end">
           <button @click="savePassword()" :disabled="!pwForm.current || !pwForm.newPw"
-            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors">
-            Cambiar contraseña
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors" data-i18n="prof.change">
+            Change password
           </button>
         </div>
       </div>
@@ -457,7 +451,7 @@
   <div x-show="showCreateWs" class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 pointer-events-auto shadow-2xl"
       @keydown.escape.window="showCreateWs=false" @click.stop>
-      <h3 class="text-base font-semibold mb-5">Nuevo workspace</h3>
+      <h3 class="text-base font-semibold mb-5" data-i18n="ws.newTitle">New workspace</h3>
       <div class="flex flex-col gap-4">
         <div>
           <label class="block text-xs text-gray-500 mb-1.5">Nombre</label>
@@ -508,10 +502,10 @@
         <p x-show="wsFormError" class="text-red-400 text-xs" x-text="wsFormError"></p>
         <div class="flex gap-2 justify-end pt-1">
           <button @click="showCreateWs=false"
-            class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
+            class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors" data-i18n="ws.cancel">Cancel</button>
           <button @click="createWorkspace()" :disabled="!createWsForm.name.trim() || !createWsForm.slug.trim()"
-            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors">
-            Crear workspace
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors" data-i18n="ws.create">
+            Create workspace
           </button>
         </div>
       </div>
