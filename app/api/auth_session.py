@@ -342,6 +342,7 @@ async def login(
         "email": email,
         "workspace_id": api_key.workspace_id,
         "role": api_key.role,
+        "email_verified": user.email_verified_at is not None,
     }
 
 
