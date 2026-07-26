@@ -34,6 +34,13 @@ def _get_url() -> str:
         url = "postgresql+asyncpg://" + url[len("postgresql://"):]
     elif url.startswith("postgres://"):
         url = "postgresql+asyncpg://" + url[len("postgres://"):]
+    # asyncpg uses `ssl=` not `sslmode=`; rewrite the query param.
+    url = url.replace("sslmode=require", "ssl=require")
+    url = url.replace("sslmode=verify-full", "ssl=require")
+    url = url.replace("sslmode=verify-ca", "ssl=require")
+    # Strip any remaining sslmode values asyncpg won't understand.
+    import re as _re
+    url = _re.sub(r"[&?]sslmode=[^&]*", "", url)
     return url
 
 
