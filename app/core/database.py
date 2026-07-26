@@ -474,3 +474,22 @@ async def init_db() -> None:
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session
+
+
+class AsyncSessionFactory:
+    """Async context manager that yields a standalone AsyncSession.
+
+    Used by background tasks that cannot use FastAPI's get_session dependency.
+
+    Usage::
+
+        async with AsyncSessionFactory() as session:
+            ...
+    """
+
+    async def __aenter__(self) -> AsyncSession:
+        self._session = AsyncSession(engine, expire_on_commit=False)
+        return self._session
+
+    async def __aexit__(self, *args) -> None:
+        await self._session.close()

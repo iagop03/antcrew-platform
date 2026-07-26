@@ -1,5 +1,24 @@
 # Changelog — antcrew-platform
 
+## v0.4.7 (2026-07-26)
+
+### Added
+- **SecurityAuditor — LLM-based cross-file security audit** (`app/api/security_audit.py`, migration 026).
+  Three independent trigger modes per workspace: manual (`POST /security/runs/trigger`), GitHub push webhook (`POST /security/webhook/github`, HMAC-verified), and scheduled (cron expression via `schedule_cron`).
+
+  Two-phase LLM audit: Phase 1 builds a catalog of established defensive controls in the repo; Phase 2 checks every equivalent code path for consistency gaps and classic anti-patterns (SSRF, path traversal, CSRF, fail-open auth, hardcoded secrets, IDOR, …). The cross-file consistency check is the main differentiator over bandit — an LLM with full-repo context maintains the catalog and checks every surface against it.
+
+  **FindingsTriager**: critical/high findings create a Ticket + HitlReview (human approves fix before merge); medium/low create a Ticket (BugFixer can auto-fix; human reviews PR).
+
+  **Convergence loop**: after each run, automatically triggers the next iteration (diff-mode) unless: two consecutive runs produce zero net-new findings at `min_severity_to_stop` (converged), `max_iterations` is reached, or cumulative cost exceeds `max_cost_usd`. Stops and reports — never loops silently.
+
+  `AuditFinding` carries a `fingerprint` (sha256[:16]) for dedup across iterations and a `reference_fix` field pointing to the existing fix pattern in the repo that BugFixer should replicate.
+
+  New models: `SecurityAuditConfig`, `SecurityAuditRun`, `AuditFinding`.
+  `AsyncSessionFactory` added to `app/core/database.py` for background-task DB access.
+
+---
+
 ## v0.4.6 (2026-07-26)
 
 ### Changed

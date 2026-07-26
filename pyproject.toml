@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "antcrew-platform"
-version = "0.4.6"
+version = "0.4.7"
 description = "Production backend for antcrew multi-agent pipelines: REST API, HITL review queue, evaluations, model diff, and dashboard"
 readme = "README.md"
 requires-python = ">=3.11"

@@ -29,9 +29,10 @@ from app.api import auth_session as auth_session_api
 from app.api import runs, tickets, stream, pipeline, api_keys, reviews, templates, workspaces, workspaces_byok, workspaces_members, evals
 from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as pipelines_api
 from app.api import client_review, compare as compare_api, contract_schemas as contract_schemas_api
+from app.api import security_audit as security_audit_api
 
 _STATIC = Path(__file__).parent / "static"
-_VERSION = "0.4.6"
+_VERSION = "0.4.7"
 
 # ---------------------------------------------------------------------------
 # Environment — read once at import time so guards can reference it.
@@ -534,9 +535,12 @@ async def lifespan(app: FastAPI):
     _scheduler_task = asyncio.create_task(_eval_scheduler_loop(), name="eval-scheduler")
     _hitl_cleanup_task = asyncio.create_task(_hitl_cleanup_loop(), name="hitl-cleanup")
     _retention_task = asyncio.create_task(_data_retention_loop(), name="data-retention")
+    _security_scheduler_task = asyncio.create_task(
+        security_audit_api.run_schedule_loop(), name="security-audit-scheduler"
+    )
     yield
     stop_listening()
-    for task in (_webhook_task, _scheduler_task, _hitl_cleanup_task, _retention_task):
+    for task in (_webhook_task, _scheduler_task, _hitl_cleanup_task, _retention_task, _security_scheduler_task):
         if task and not task.done():
             task.cancel()
             try:
@@ -601,6 +605,8 @@ app.include_router(pipelines_api.router,       dependencies=_csrf)
 app.include_router(client_review.router,       dependencies=_csrf)
 app.include_router(compare_api.router,         dependencies=_csrf)
 app.include_router(contract_schemas_api.router, dependencies=_csrf)
+app.include_router(security_audit_api.router,         dependencies=_csrf)
+app.include_router(security_audit_api.webhook_router)          # HMAC-signed, no CSRF
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
