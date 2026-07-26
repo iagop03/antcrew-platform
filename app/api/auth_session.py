@@ -627,13 +627,18 @@ async def me(
 
     user_session, api_key = result
 
-    # Resolve email: from User row (register/login path) or ApiKey.email (token exchange path)
+    # Resolve email and verification status from User row
     email: Optional[str] = None
+    email_verified: bool = True  # API-key-only sessions are treated as verified
     if user_session.user_id is not None:
         user = (await session.exec(
             select(User).where(User.id == user_session.user_id)
         )).first()
-        email = user.email if user else api_key.email
+        if user:
+            email = user.email
+            email_verified = user.email_verified_at is not None
+        else:
+            email = api_key.email
     else:
         email = api_key.email
 
@@ -641,5 +646,6 @@ async def me(
         "email": email,
         "workspace_id": api_key.workspace_id,
         "role": api_key.role,
+        "email_verified": email_verified,
         "session_expires_at": user_session.expires_at.isoformat() + "Z",
     }

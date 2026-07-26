@@ -80,55 +80,40 @@
     </p>
   </div>
 
-  <!-- ── STEP 2 ── Revisores ─────────────────────────────────────────── -->
+  <!-- ── STEP 2 ── Verificar email ──────────────────────────────────── -->
   <div x-show="step === 2" x-cloak>
-    <h2 class="text-lg font-semibold mb-1">Añade tus técnicos revisores</h2>
+    <h2 class="text-lg font-semibold mb-1">Verifica tu email</h2>
     <p class="text-gray-400 text-sm mb-6">
-      Cada revisor recibe su propia API key. Cualquiera puede aprobar o rechazar revisiones HITL.
+      Hemos enviado un código de 6 dígitos a <strong x-text="email"></strong>.
     </p>
 
-    <!-- Add reviewer form -->
-    <div class="flex gap-2 mb-4">
-      <input x-model="reviewerName" placeholder="Nombre del revisor (ej: bob)"
-        @keydown.enter="addReviewer()"
-        class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
-      <button @click="addReviewer()"
-        :disabled="reviewerLoading || !reviewerName.trim()"
-        class="px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 transition disabled:opacity-50">
-        <span x-show="!reviewerLoading">+ Añadir</span>
-        <span x-show="reviewerLoading">…</span>
+    <!-- Code input -->
+    <div class="mb-4">
+      <label class="block text-xs text-gray-400 mb-1.5">Código de verificación</label>
+      <input x-model="verifyCode" type="text" inputmode="numeric" maxlength="6"
+        placeholder="123456"
+        @keydown.enter="verifyEmail()"
+        class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-3 text-2xl text-center font-mono tracking-[0.5em] focus:outline-none focus:border-indigo-500 placeholder-gray-700">
+    </div>
+
+    <p x-show="step2Error" x-cloak class="text-red-400 text-xs mb-3" x-text="step2Error"></p>
+
+    <button @click="verifyEmail()"
+      :disabled="step2Loading || verifyCode.length !== 6"
+      class="w-full py-2.5 rounded-lg font-medium text-sm transition
+        bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+      <span x-show="!step2Loading">Verificar →</span>
+      <span x-show="step2Loading">Verificando…</span>
+    </button>
+
+    <div class="mt-4 text-center">
+      <button @click="resendCode()"
+        :disabled="resendCooldown > 0"
+        class="text-xs text-gray-500 hover:text-indigo-400 transition disabled:cursor-not-allowed">
+        <span x-show="resendCooldown === 0">¿No recibiste el código? Reenviar</span>
+        <span x-show="resendCooldown > 0">Reenviar en <span x-text="resendCooldown"></span>s</span>
       </button>
     </div>
-
-    <p x-show="reviewerError" x-cloak class="text-red-400 text-xs mb-3" x-text="reviewerError"></p>
-
-    <!-- Created reviewers -->
-    <div class="space-y-2 mb-6">
-      <template x-if="reviewers.length === 0">
-        <p class="text-gray-600 text-sm text-center py-4">Todavía no hay revisores — o continúa sin añadir ninguno.</p>
-      </template>
-      <template x-for="(rv, i) in reviewers" :key="i">
-        <div class="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3">
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-              <span class="text-sm font-mono text-gray-200" x-text="rv.label"></span>
-              <span class="text-xs px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300">reviewer</span>
-            </div>
-            <button @click="copyText(rv.key, 'key-' + i)"
-              class="text-xs text-gray-500 hover:text-indigo-400 transition flex items-center gap-1">
-              <span x-text="copied === 'key-' + i ? '✓ Copiado' : 'Copiar key'"></span>
-            </button>
-          </div>
-          <code class="text-xs text-gray-500 font-mono break-all" x-text="rv.key"></code>
-        </div>
-      </template>
-    </div>
-
-    <button @click="step = 3"
-      class="w-full py-2.5 rounded-lg font-medium text-sm transition bg-indigo-600 hover:bg-indigo-500 text-white">
-      Continuar →
-    </button>
   </div>
 
   <!-- ── STEP 3 ── Listo ──────────────────────────────────────────────── -->
@@ -154,18 +139,49 @@
       <code class="block text-xs text-gray-400 font-mono break-all bg-gray-950 rounded px-3 py-2"
         x-text="adminKey"></code>
       <div class="flex justify-between items-center pt-1">
-        <span class="text-xs text-gray-500">Revisores</span>
-        <span class="text-sm" x-text="reviewers.length + ' añadidos'"></span>
-      </div>
-      <div class="flex justify-between items-center pt-1">
         <span class="text-xs text-gray-500">Plan</span>
         <span class="text-sm font-mono text-emerald-400">Prueba gratuita activa</span>
       </div>
     </div>
 
-    <!-- How to trigger a run with HITL -->
+    <!-- Invite teammates -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Invita a tu equipo (opcional)</p>
+      <div class="flex gap-2 mb-3">
+        <input x-model="inviteEmail" type="email" placeholder="colega@empresa.com"
+          @keydown.enter="sendInvite()"
+          class="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+        <select x-model="inviteRole"
+          class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-indigo-500">
+          <option value="write">write</option>
+          <option value="reviewer">reviewer</option>
+          <option value="read">read</option>
+          <option value="admin">admin</option>
+        </select>
+        <button @click="sendInvite()"
+          :disabled="inviteLoading || !inviteEmail.trim()"
+          class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 transition disabled:opacity-50">
+          <span x-show="!inviteLoading">Invitar</span>
+          <span x-show="inviteLoading">…</span>
+        </button>
+      </div>
+      <p x-show="inviteError" x-cloak class="text-red-400 text-xs mb-2" x-text="inviteError"></p>
+      <div class="space-y-1.5">
+        <template x-for="(inv, i) in sentInvites" :key="i">
+          <div class="flex items-center gap-2 text-xs text-gray-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+            <span x-text="inv.email"></span>
+            <span class="text-gray-600">·</span>
+            <span class="text-gray-500" x-text="inv.role"></span>
+            <span class="ml-auto text-green-600">Invitación enviada</span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Quick start -->
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
-      <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Cómo lanzar un run con revisión</p>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Lanzar un run con revisión</p>
       <div class="relative">
         <pre class="text-xs text-gray-300 font-mono overflow-x-auto bg-gray-950 rounded-lg px-4 py-3 leading-relaxed"
           x-text="curlExample()"></pre>
@@ -182,7 +198,7 @@
       </a>
       <a href="/reviews"
         class="flex-1 py-2.5 rounded-lg font-medium text-sm text-center transition bg-gray-800 hover:bg-gray-700 text-gray-200">
-        Ver cola de revisiones
+        Cola de revisiones
       </a>
     </div>
   </div>
@@ -193,7 +209,7 @@
 function onboard() {
   return {
     step: 1,
-    steps: ['Cuenta', 'Revisores', 'Listo'],
+    steps: ['Cuenta', 'Verificar email', 'Listo'],
 
     // Step 1
     email: '',
@@ -204,10 +220,17 @@ function onboard() {
     adminKey: '',
 
     // Step 2
-    reviewerName: '',
-    reviewerLoading: false,
-    reviewerError: '',
-    reviewers: [],
+    verifyCode: '',
+    step2Loading: false,
+    step2Error: '',
+    resendCooldown: 0,
+
+    // Step 3
+    inviteEmail: '',
+    inviteRole: 'write',
+    inviteLoading: false,
+    inviteError: '',
+    sentInvites: [],
 
     // UI
     copied: '',
@@ -236,10 +259,9 @@ function onboard() {
         const data = await r.json();
         this.workspaceId = data.workspace_id;
         this.adminKey = data.api_key;
-
         localStorage.setItem('antcrew_api_key', data.api_key);
-
         this.step = 2;
+        this._startResendCooldown(60);
       } catch (e) {
         this.step1Error = e.message;
       } finally {
@@ -247,32 +269,66 @@ function onboard() {
       }
     },
 
-    async addReviewer() {
-      if (!this.reviewerName.trim()) return;
-      this.reviewerError = '';
-      this.reviewerLoading = true;
+    async verifyEmail() {
+      this.step2Error = '';
+      this.step2Loading = true;
       try {
-        const r = await fetch('/api-keys/', {
+        const r = await fetch('/auth/verify-email', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey },
-          body: JSON.stringify({
-            label: this.reviewerName.trim(),
-            workspace_id: this.workspaceId,
-            role: 'reviewer',
-          }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: this.verifyCode.trim() }),
         });
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
-          this.reviewerError = d.detail || `Error ${r.status}`;
+          this.step2Error = d.detail || `Error ${r.status}`;
           return;
         }
-        const k = await r.json();
-        this.reviewers.push({ label: k.label, key: k.key });
-        this.reviewerName = '';
+        this.step = 3;
       } catch (e) {
-        this.reviewerError = e.message;
+        this.step2Error = e.message;
       } finally {
-        this.reviewerLoading = false;
+        this.step2Loading = false;
+      }
+    },
+
+    async resendCode() {
+      if (this.resendCooldown > 0) return;
+      try {
+        await fetch('/auth/resend-code', { method: 'POST' });
+        this._startResendCooldown(60);
+      } catch {}
+    },
+
+    _startResendCooldown(seconds) {
+      this.resendCooldown = seconds;
+      const t = setInterval(() => {
+        this.resendCooldown--;
+        if (this.resendCooldown <= 0) clearInterval(t);
+      }, 1000);
+    },
+
+    async sendInvite() {
+      const em = this.inviteEmail.trim().toLowerCase();
+      if (!em) return;
+      this.inviteError = '';
+      this.inviteLoading = true;
+      try {
+        const r = await fetch(`/workspaces/${this.workspaceId}/invites`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey },
+          body: JSON.stringify({ email: em, role: this.inviteRole }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.inviteError = d.detail || `Error ${r.status}`;
+          return;
+        }
+        this.sentInvites.push({ email: em, role: this.inviteRole });
+        this.inviteEmail = '';
+      } catch (e) {
+        this.inviteError = e.message;
+      } finally {
+        this.inviteLoading = false;
       }
     },
 

@@ -106,6 +106,10 @@ curl /evals/regression/{regression_id}
 - Per-key roles: `admin | write | read | reviewer`
 - One key can access multiple workspaces (membership table)
 - BYOK mode: workspaces supply their own LLM API keys (Anthropic, OpenAI, Groq, etc.)
+- **Email+password registration** — `POST /auth/register` creates user + workspace; returns admin API key
+- **Email verification** — 6-digit code sent on register; `POST /auth/verify-email` confirms it
+- **Workspace invites** — admins send email invites (`POST /workspaces/{id}/invites`); recipients accept via link
+- **Join requests** — users request access by workspace slug; admin approves/rejects via one-click email link
 
 ### Cost management
 - Per-run `cost_usd` + `duration_s`; per-workspace `total_cost_usd`
@@ -237,12 +241,27 @@ curl http://localhost:8000/runs/abc123/artifacts
 | `POST` | `/workspaces/` | Create workspace |
 | `GET` | `/workspaces/{id}/budget` | Budget usage |
 | `POST` | `/workspaces/{id}/members` | Add API key to workspace |
+| `POST` | `/workspaces/{id}/invites` | Invite a user by email (sends link) |
+| `POST` | `/workspaces/join-request` | Request access to a workspace by slug |
 | `GET` | `/api-keys/` | List API keys |
 | `POST` | `/api-keys/` | Create API key |
 | `DELETE` | `/api-keys/{label}` | Revoke API key |
 | `GET` | `/templates/` | List run templates |
 | `POST` | `/templates/` | Save a run template |
 | `GET` | `/templates/{id}` | Load template |
+
+### User auth
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/auth/register` | Create user + workspace; returns admin API key |
+| `POST` | `/auth/login` | Email+password → session cookie |
+| `GET` | `/auth/me` | Current session info (`email`, `role`, `email_verified`) |
+| `POST` | `/auth/verify-email` | Verify 6-digit code from registration email |
+| `POST` | `/auth/resend-code` | Resend email verification code |
+| `POST` | `/auth/accept-invite` | Accept a workspace invite by token |
+| `POST` | `/join-requests/{token}/approve` | Admin approves a join request |
+| `POST` | `/join-requests/{token}/reject` | Admin rejects a join request |
 
 ### Webhooks
 
@@ -275,6 +294,13 @@ Full interactive docs at `/docs` (Swagger UI) and `/redoc`.
 | `PLATFORM_BASE_URL` | — | Public base URL for review links in webhooks |
 | `ANTCREW_WORKERS` | `4` | Background engine worker threads |
 | `BYOK_ENCRYPTION_KEY` | — | Fernet key for encrypting per-workspace LLM API keys |
+| `BASE_URL` | `https://app.antcrew.ai` | Public base URL for invite/join-request links in emails |
+| `SMTP_HOST` | — | SMTP server for email notifications (verification codes, invites) |
+| `SMTP_PORT` | `587` | SMTP port |
+| `SMTP_USER` | — | SMTP login username |
+| `SMTP_PASSWORD` | — | SMTP login password |
+| `SMTP_FROM` | `SMTP_USER` | From address for outgoing emails |
+| `SMTP_TLS` | `true` | `true` = STARTTLS · `ssl` = SMTPS · `none` = plain |
 
 ---
 
@@ -285,8 +311,8 @@ Full interactive docs at `/docs` (Swagger UI) and `/redoc`.
 | API | FastAPI + Pydantic v2 |
 | ORM | SQLModel (async) |
 | DB | SQLite (dev) · PostgreSQL (prod, via `asyncpg`) |
-| Migrations | Alembic (21 revisions) |
-| Auth | `X-Api-Key` header or `PLATFORM_API_KEY` env var |
+| Migrations | Alembic (28 revisions) |
+| Auth | API key (`X-Api-Key`) · email+password session · workspace invites |
 | Frontend | Alpine.js SPA with live WebSocket updates |
 | CI/CD | GitHub Actions → Docker → Fly.io |
 
