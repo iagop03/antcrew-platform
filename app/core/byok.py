@@ -25,6 +25,8 @@ TRIAL_CREDIT_USD: float = float(os.environ.get("TRIAL_CREDIT_USD", "5.0"))
 
 _VALID_PROVIDERS = frozenset({"anthropic", "openai", "groq", "gemini", "ollama"})
 
+_IS_DEV = os.environ.get("APP_ENV", "production").lower() in ("dev", "development", "local")
+
 
 @dataclass
 class BYOKKey:
@@ -50,7 +52,12 @@ def _provider_for_model(model_str: str) -> str:
 def _encrypt(key: str) -> str:
     enc_key = os.environ.get("BYOK_ENCRYPTION_KEY", "")
     if not enc_key:
-        log.warning("byok: BYOK_ENCRYPTION_KEY not set — storing LLM key in plain text (dev mode)")
+        if not _IS_DEV:
+            raise RuntimeError(
+                "BYOK_ENCRYPTION_KEY is required in production. "
+                "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
+        log.warning("byok: BYOK_ENCRYPTION_KEY not set — storing key as plain text (dev only)")
         return key
     try:
         from cryptography.fernet import Fernet
@@ -62,12 +69,20 @@ def _encrypt(key: str) -> str:
 def _decrypt(key_enc: str) -> str:
     enc_key = os.environ.get("BYOK_ENCRYPTION_KEY", "")
     if not enc_key:
-        return key_enc  # plain text (dev mode)
+        if not _IS_DEV:
+            raise RuntimeError(
+                "BYOK_ENCRYPTION_KEY is required in production — cannot decrypt stored BYOK keys."
+            )
+        return key_enc  # dev only: key stored as plain text
     try:
         from cryptography.fernet import Fernet
         return Fernet(enc_key.encode()).decrypt(key_enc.encode()).decode()
-    except Exception:
-        return key_enc  # plain text fallback for keys stored before encryption was enabled
+    except Exception as exc:
+        raise RuntimeError(
+            "BYOK key decryption failed — the stored value may pre-date encryption. "
+            "Re-enter the BYOK key for this workspace to re-encrypt it. "
+            f"Detail: {exc}"
+        ) from exc
 
 
 async def get_workspace_llm_key(

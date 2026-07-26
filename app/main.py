@@ -31,7 +31,7 @@ from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as p
 from app.api import client_review, compare as compare_api, contract_schemas as contract_schemas_api
 
 _STATIC = Path(__file__).parent / "static"
-_VERSION = "0.4.3"
+_VERSION = "0.4.4"
 
 # ---------------------------------------------------------------------------
 # Environment — read once at import time so guards can reference it.

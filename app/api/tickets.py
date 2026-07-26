@@ -65,7 +65,7 @@ async def update_status(
         from app.models.run import Run
         run_result = await session.exec(select(Run).where(Run.run_id == ticket.run_id))
         run = run_result.first()
-        if run and not ws_accessible(run.workspace_id, ctx):
+        if run is None or not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This ticket is not accessible with the current API key")
     ticket.status = body.status
     ticket.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -91,7 +91,7 @@ async def export_ticket(
         from app.models.run import Run
         run_result = await session.exec(select(Run).where(Run.run_id == ticket.run_id))
         run = run_result.first()
-        if run and not ws_accessible(run.workspace_id, ctx):
+        if run is None or not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This ticket is not accessible with the current API key")
 
     from app.services.export import export_to_jira, export_to_linear

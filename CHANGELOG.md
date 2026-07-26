@@ -1,5 +1,13 @@
 # Changelog — antcrew-platform
 
+## v0.4.4 (2026-07-26)
+
+### Security
+- **Fail-open authorization fixed in `reviews.py` and `tickets.py`** — 6 occurrences of `if run and not ws_accessible(...)` changed to `if run is None or not ws_accessible(...)`. Previously, when a `Run` row was missing (orphaned data, deleted run), the condition evaluated to `False` and access was silently granted instead of denied. Fail-closed: a missing run now always raises 403.
+- **BYOK keys no longer stored in plaintext in production** — `_encrypt()` now raises `RuntimeError` if `BYOK_ENCRYPTION_KEY` is unset outside dev mode, instead of silently writing the API key to the database as plaintext. `_decrypt()` also raises in non-dev mode on missing key, and on decryption failure (removing the silent plaintext fallback that exposed pre-encryption keys). Dev mode (`APP_ENV=dev`) retains the plaintext path with a log warning.
+
+---
+
 ## v0.4.3 (2026-07-26)
 
 ### Security

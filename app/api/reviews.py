@@ -274,7 +274,7 @@ async def get_review(
     if ctx.workspace_ids is not None:
         run_result = await session.exec(select(Run).where(Run.run_id == review.run_id))
         run = run_result.first()
-        if run and not ws_accessible(run.workspace_id, ctx):
+        if run is None or not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This review is not accessible with the current API key")
     return (await _to_public(session, [review]))[0]
 
@@ -333,7 +333,7 @@ async def get_review_audit(
         raise ReviewNotFoundError(review_id)
     if ctx.workspace_ids is not None:
         run = (await session.exec(select(Run).where(Run.run_id == review.run_id))).first()
-        if run and not ws_accessible(run.workspace_id, ctx):
+        if run is None or not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This review is not accessible with the current API key")
     entries = (await session.exec(
         select(HitlAuditEntry)
@@ -364,7 +364,7 @@ async def assign_review(
     if ctx.workspace_ids is not None:
         run_result = await session.exec(select(Run).where(Run.run_id == review.run_id))
         run = run_result.first()
-        if run and not ws_accessible(run.workspace_id, ctx):
+        if run is None or not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This review is not accessible with the current API key")
 
     label = body.assigned_to.strip() or None
@@ -421,7 +421,7 @@ async def submit_review(
     if ctx.workspace_ids is not None:
         run_result = await session.exec(select(Run).where(Run.run_id == review.run_id))
         run = run_result.first()
-        if run and not ws_accessible(run.workspace_id, ctx):
+        if run is None or not ws_accessible(run.workspace_id, ctx):
             raise HTTPException(403, "This review is not accessible with the current API key")
 
     decision_payload = {
