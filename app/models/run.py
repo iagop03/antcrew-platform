@@ -108,8 +108,12 @@ class ApiKey(SQLModel, table=True):
 
     __tablename__ = "api_key"
 
+    __table_args__ = (
+        UniqueConstraint("label", "workspace_id", name="uq_api_key_label_workspace"),
+    )
+
     id: Optional[int] = Field(default=None, primary_key=True)
-    label: str = Field(index=True, unique=True)
+    label: str = Field(index=True)
     key_hash: str  # bcrypt hash (or legacy sha256 until next login)
     key_prefix: Optional[str] = Field(default=None, index=True)  # sha256(raw)[:16] for O(1) lookup
     workspace_id: Optional[int] = Field(default=None)

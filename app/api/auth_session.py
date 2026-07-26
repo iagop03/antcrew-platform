@@ -207,7 +207,9 @@ async def register(
         label_base = re.sub(r"[^a-z0-9-]", "-", email.split("@")[0])[:48] or "user"
         label = label_base
         for _attempt in range(20):
-            exists = (await session.exec(select(ApiKey).where(ApiKey.label == label))).first()
+            exists = (await session.exec(
+                select(ApiKey).where(ApiKey.label == label, ApiKey.workspace_id == workspace.id)
+            )).first()
             if not exists:
                 break
             label = f"{label_base}-{secrets.token_hex(3)}"

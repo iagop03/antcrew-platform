@@ -70,9 +70,12 @@ async def create_key(body: CreateKeyRequest, session: AsyncSession = Depends(get
     Set workspace_id to scope the key to a specific workspace.
     Requires: admin role.
     """
-    result = await session.exec(select(ApiKey).where(ApiKey.label == body.label))
+    ws_id = body.workspace_id
+    result = await session.exec(
+        select(ApiKey).where(ApiKey.label == body.label, ApiKey.workspace_id == ws_id)
+    )
     if result.first():
-        raise HTTPException(409, f"Key with label {body.label!r} already exists")
+        raise HTTPException(409, f"Key with label {body.label!r} already exists in this workspace")
     raw = secrets.token_urlsafe(32)
     session.add(ApiKey(
         label=body.label,

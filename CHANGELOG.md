@@ -1,5 +1,12 @@
 # Changelog — antcrew-platform
 
+## v0.4.5 (2026-07-26)
+
+### Changed
+- **API key labels are now unique per workspace, not globally** — `UNIQUE(label)` constraint on `api_key` replaced with `UNIQUE(label, workspace_id)`. Two workspaces can now have keys (e.g. reviewer keys) with the same label without conflict. Migration 025 handles the schema change; `POST /api-keys/` 409 check updated to scope by workspace.
+
+---
+
 ## v0.4.4 (2026-07-26)
 
 ### Security
