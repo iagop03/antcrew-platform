@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 
-from antcrew.core.events import bus, Event as BusEvent, new_run_id
+from antcrew import bus, Event as BusEvent, new_run_id
 
 from app.services.runner_base import (
     _check_workspace_budget,

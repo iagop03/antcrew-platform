@@ -213,7 +213,7 @@ async def create_review(
     await session.refresh(review)
 
     try:
-        from antcrew.core.events import bus as _bus
+        from antcrew import bus as _bus
         artifact_data: object = {}
         try:
             artifact_data = json.loads(body.artifact_json)

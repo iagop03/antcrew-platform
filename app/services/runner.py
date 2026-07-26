@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 
-from antcrew.core.events import bus
+from antcrew import bus
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.database import engine
@@ -97,7 +97,7 @@ def _make_team(
     cls = getattr(module, class_name)
     kwargs: dict = {}
     if model or byok_api_key or byok_base_url:
-        from antcrew.config import build_llm as _build_llm
+        from antcrew import build_llm as _build_llm
         _llm_kw: dict = {}
         if byok_api_key is not None:
             _llm_kw["api_key"] = byok_api_key
@@ -484,9 +484,7 @@ def _run_custom_sync(
     byok_base_url: Optional[str] = None,
 ):
     """Build a CustomTeam from inline TemplateAgent configs and run it."""
-    from antcrew.agents.template_agent import TemplateAgent
-    from antcrew.teams.custom_team import CustomTeam
-    from antcrew.config import build_llm
+    from antcrew import TemplateAgent, CustomTeam, build_llm
 
     _llm_kw2: dict = {}
     if byok_api_key is not None:
@@ -535,8 +533,7 @@ async def dispatch_custom(
 ) -> Optional[str]:
     """Dispatch a custom pipeline defined by a list of TemplateAgent step configs."""
     try:
-        from antcrew.agents.template_agent import TemplateAgent  # noqa: F401
-        from antcrew.teams.custom_team import CustomTeam  # noqa: F401
+        from antcrew import TemplateAgent, CustomTeam  # noqa: F401
     except ImportError as exc:
         raise ImportError(
             f"CustomTeam or TemplateAgent not available: {exc}. "
@@ -618,7 +615,7 @@ def _resolve_node_channel(
     """Return the appropriate channel object for a node's channel_type."""
     if channel_type == "slack" and slack_creds:
         try:
-            from antcrew.integrations.slack import SlackChannel
+            from antcrew import SlackChannel
             return SlackChannel(
                 bot_token=slack_creds["bot_token"],
                 channel_id=slack_creds["channel_id"],
@@ -628,7 +625,7 @@ def _resolve_node_channel(
             log.warning("runner: SlackChannel unavailable (%s) — falling back to PlatformChannel", exc)
     elif channel_type == "telegram" and telegram_creds:
         try:
-            from antcrew.integrations.telegram.integration import TelegramChannel
+            from antcrew import TelegramChannel
             return TelegramChannel(
                 token=telegram_creds["token"],
                 chat_id=telegram_creds.get("chat_id"),
@@ -660,7 +657,7 @@ def _run_pipeline_sync(
       node.channel_type → "platform" | "slack" | "telegram"
     """
     from app.services.pipeline_builder import build_team_from_definition
-    from antcrew.core.events import bus as _bus, new_run_id
+    from antcrew import bus as _bus, new_run_id
 
     # Build agents — each node gets its own LLM from node.model
     agents, supervisor = build_team_from_definition(
@@ -762,7 +759,7 @@ def _run_pipeline_sync(
     _bus.emit("pipeline.end", {"cost_usd": cost, "success": True},
               run_id=_run_id, thread_id=thread_id)
 
-    from antcrew.core.run_result import RunResult
+    from antcrew import RunResult
     return RunResult(state=state, thread_id=thread_id, cost_usd=cost)
 
 
@@ -781,7 +778,7 @@ def _run_interactive_pipeline(
     """
     import asyncio
     import json as _json
-    from antcrew.teams.base import AGENT_ARTIFACT
+    from antcrew import AGENT_ARTIFACT
 
     def _artifact_info(agent_name: str) -> tuple:
         """AGENT_ARTIFACT lookup with fallback to base agent type for duplicate nodes."""

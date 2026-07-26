@@ -17,13 +17,13 @@ from typing import TYPE_CHECKING, Optional
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from antcrew.core.events import bus
+from antcrew import bus
 from app.core.database import engine
 from app.models.run import Run, Event as DBEvent, HitlReview, WebhookDelivery, Workspace, WebhookConfig, WebhookEvent, ApiKey
 from app.services.webhook import notify_new_delivery
 
 if TYPE_CHECKING:
-    from antcrew.core.events import Event
+    from antcrew import Event
 
 log = logging.getLogger(__name__)
 

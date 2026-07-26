@@ -256,7 +256,7 @@ async def publish_engine_run(
             conditions[cond] = "satisfied"
 
     try:
-        from antcrew.integrations.github import GitHubIntegration
+        from antcrew import GitHubIntegration
         gh = GitHubIntegration(token=token, repo=body.repo)
         pr_url = gh.create_engine_pr(
             goal=state.get("goal") or run.request,

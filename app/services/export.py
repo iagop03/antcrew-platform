@@ -66,7 +66,7 @@ async def export_to_jira(ticket: "DbTicket") -> str:
             "Jira not configured. Set JIRA_URL, JIRA_USER, JIRA_TOKEN, and JIRA_PROJECT_KEY."
         )
 
-    from antcrew.integrations.jira import JiraIntegration
+    from antcrew import JiraIntegration
 
     jira = JiraIntegration(url=url, email=user, api_token=token, project_key=project)
     adapter = _TicketAdapter(ticket)

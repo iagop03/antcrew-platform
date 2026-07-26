@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from antcrew.core.events import bus, Event
+from antcrew import bus, Event
 from app.core.auth import check_ws_api_key, check_ws_session_token
 
 log = logging.getLogger(__name__)

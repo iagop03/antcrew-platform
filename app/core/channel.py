@@ -65,7 +65,7 @@ class PlatformChannel:
         artifact_data = _serialize_artifact(artifact)
         options = response_options or ["approve", "edit", "reject"]
 
-        from antcrew.core.events import bus
+        from antcrew import bus
         bus.emit(
             "hitl.review_required",
             {

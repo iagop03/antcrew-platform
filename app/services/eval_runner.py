@@ -92,7 +92,7 @@ def run_eval_sync(eval_id: str, cfg: EvalRunConfig, loop: asyncio.AbstractEventL
 
     def _emit(event_type: str, payload: dict) -> None:
         try:
-            from antcrew.core.events import bus, Event as _Event
+            from antcrew import bus, Event as _Event
             import time as _t
             ev = _Event(
                 type=event_type,
