@@ -137,11 +137,16 @@ docker run -p 8000:8000 \
 ```bash
 git clone https://github.com/iagop03/antcrew-platform.git
 cd antcrew-platform
-pip install -e ".[dev]"
 
+# 1. Install deps + apply migrations (once)
+make setup
+
+# 2. Set your API key
 export ANTHROPIC_API_KEY=sk-ant-...
+# (or copy .env.example → .env and fill it in)
 
-uvicorn app.main:app --reload
+# 3. Start the dev server (applies any pending migrations, then starts)
+make dev
 # → http://localhost:8000
 # → http://localhost:8000/docs  (Swagger UI)
 ```
@@ -336,7 +341,9 @@ API key is stored in `localStorage` and sent as `X-Api-Key` on every request. In
 ## Makefile
 
 ```bash
-make run              # Start dev server (SQLite, hot-reload)
+make setup            # First-time: install deps + apply migrations
+make dev              # Day-to-day: migrate then start dev server (SQLite, hot-reload)
+make run              # Start dev server without auto-migrating
 make migrate          # Apply pending Alembic migrations
 make migration NAME=x # Generate a new migration
 make check-migrations # CI gate — exits 1 if pending migrations exist

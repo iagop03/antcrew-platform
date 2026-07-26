@@ -4,7 +4,7 @@
 DB ?= platform.db
 DATABASE_URL ?= sqlite+aiosqlite:///$(DB)
 
-.PHONY: migrate migration check-migrations downgrade run test
+.PHONY: migrate migration check-migrations downgrade run dev setup test
 
 ## Run all pending Alembic migrations
 migrate:
@@ -34,6 +34,17 @@ current:
 ## Show migration history
 history:
 	DATABASE_URL=$(DATABASE_URL) python -m alembic history --verbose
+
+## First-time setup: install deps + apply migrations (run once after cloning)
+setup:
+	pip install -e ".[dev]"
+	DATABASE_URL=$(DATABASE_URL) python -m alembic upgrade head
+	@echo ""
+	@echo "Setup complete. Set ANTHROPIC_API_KEY, then run: make dev"
+
+## Start dev server with migrations applied (the single command for day-to-day work)
+dev: migrate
+	DATABASE_URL=$(DATABASE_URL) python -m uvicorn app.main:app --reload --port 8000
 
 ## Start the platform (dev mode: SQLite, no auth, auto-reload)
 run:
