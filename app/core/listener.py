@@ -288,6 +288,35 @@ async def _persist_event(event: "Event") -> None:
                                     base_url=_base_url,
                                 ))
 
+            elif event.type == "manual_action.required" and event.run_id:
+                from app.models.run import Ticket
+                ticket_id = event.payload.get("ticket_id")
+                if ticket_id:
+                    # Create the blocking Ticket if it doesn't exist yet
+                    stmt = select(Ticket).where(Ticket.ticket_id == ticket_id)
+                    if not (await session.exec(stmt)).first():
+                        run_for_block = (await session.exec(
+                            select(Run).where(Run.run_id == event.run_id)
+                        )).first()
+                        session.add(Ticket(
+                            ticket_id=ticket_id,
+                            run_id=event.run_id,
+                            title=event.payload.get("title", "Manual step required"),
+                            description=event.payload.get("description", ""),
+                            ticket_type="manual_action",
+                            blocking=True,
+                            assignee=event.payload.get("assignee"),
+                            status="open",
+                            priority="high",
+                        ))
+                    # Mark the run as blocked
+                    run_to_block = (await session.exec(
+                        select(Run).where(Run.run_id == event.run_id)
+                    )).first()
+                    if run_to_block and run_to_block.status == "running":
+                        run_to_block.status = "blocked"
+                        session.add(run_to_block)
+
             await session.commit()
     except Exception as exc:
         log.warning("platform listener: DB write failed: %s", exc)

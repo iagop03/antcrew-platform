@@ -333,6 +333,82 @@ async def artifacts_zip(
     )
 
 
+@router.get("/{run_id}/blocking-tickets")
+async def blocking_tickets(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+):
+    """Return open blocking (manual-action) tickets for a run.
+
+    When a run has status ``blocked``, this endpoint shows what a human needs
+    to complete before the pipeline can continue.  Resolve each ticket via
+    ``PATCH /tickets/{ticket_id}/status`` with ``{"status": "done"}``.
+    """
+    from sqlmodel import select as _sel
+    from app.models.run import Ticket
+
+    run = await get_run(session, run_id)
+    if not run:
+        raise RunNotFoundError(run_id)
+    _assert_run_access(run, ctx)
+
+    result = await session.exec(
+        _sel(Ticket)
+        .where(Ticket.run_id == run_id, Ticket.blocking == True)  # noqa: E712
+        .order_by(Ticket.created_at)
+    )
+    return {"run_id": run_id, "status": run.status, "blocking_tickets": list(result.all())}
+
+
+@router.post(
+    "/{run_id}/unblock",
+    dependencies=[Depends(require_role("admin"))],
+)
+async def force_unblock(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Force-unblock a blocked run without requiring ticket resolution (admin only).
+
+    Marks all open blocking tickets for this run as ``done`` and sets
+    run.status back to ``running``.  Use this to recover from stuck pipelines
+    or when the manual step was completed outside the platform.
+    """
+    from sqlmodel import select as _sel
+    from app.models.run import Ticket
+    from app.services.engine_runner import resolve_manual_action
+
+    run = await get_run(session, run_id)
+    if not run:
+        raise RunNotFoundError(run_id)
+    _assert_run_access(run, ctx)
+    if run.status != "blocked":
+        raise HTTPException(409, f"Run {run_id!r} is not blocked (status={run.status!r})")
+
+    tickets = (await session.exec(
+        _sel(Ticket).where(
+            Ticket.run_id == run_id,
+            Ticket.blocking == True,  # noqa: E712
+            Ticket.status != "done",
+        )
+    )).all()
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    for t in tickets:
+        t.status = "done"
+        t.updated_at = now
+        session.add(t)
+        resolve_manual_action(t.ticket_id)
+
+    run.status = "running"
+    session.add(run)
+    await session.commit()
+    return {"run_id": run_id, "unblocked_tickets": len(tickets), "status": "running"}
+
+
 @router.get("/{run_id}/events", response_model=list[DBEvent])
 async def events(
     run_id: str,

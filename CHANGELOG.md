@@ -1,5 +1,21 @@
 # Changelog — antcrew-platform
 
+## v0.4.8 (2026-07-26)
+
+### Added
+- **Blocking manual-action tickets** — pipelines can now pause mid-execution waiting for a human to complete a step (configure credentials, run a command, make a decision). Three ways to trigger: (1) `ManualActionCapability` in an engine run (set `manual_action_done` in conditions); (2) `POST /tickets/` with `ticket_type="manual_action"`; (3) SecurityAuditRun creating a blocking ticket for a critical finding that requires manual remediation
+- **`Ticket.ticket_type`** — new field (`task | manual_action | bug`), default `"task"`
+- **`Ticket.blocking`** — when `True`, blocks the associated run; the run status becomes `"blocked"`
+- **`Ticket.assignee`** — email of the human responsible for completing the step
+- **`Run.status = "blocked"`** — new valid status; run is suspended waiting for a blocking ticket to be resolved
+- **`PATCH /tickets/{ticket_id}/status → done`** — automatically unblocks the run (sets status back to `"running"`) and wakes up the blocked engine thread via `resolve_manual_action(ticket_id)`
+- **`GET /runs/{run_id}/blocking-tickets`** — list open blocking tickets for a run with a single API call
+- **`POST /runs/{run_id}/unblock`** (admin) — force-unblock a run by marking all blocking tickets done; useful for recovering from stuck pipelines
+- **`ManualActionCapability`** (antcrew-engine 0.3.9) — engine capability that pauses the pipeline; activated by adding `"manual_action_done"` to the engine run conditions
+- Migration 027: adds `ticket_type`, `blocking`, `assignee` columns to `ticket` table
+
+---
+
 ## v0.4.7 (2026-07-26)
 
 ### Added

@@ -83,8 +83,12 @@ class Ticket(SQLModel, table=True):
     acceptance_criteria: str = Field(default="")
     dependencies: str = Field(default="")  # JSON-encoded list of ticket_ids
     priority: str = Field(default="medium")
-    status: str = Field(default="open")
+    status: str = Field(default="open")   # open | in_progress | done | blocked
     prd_title: str = Field(default="")
+    # Manual-action fields
+    ticket_type: str = Field(default="task")          # task | manual_action | bug
+    blocking: bool = Field(default=False)             # when True, blocks the run until resolved
+    assignee: Optional[str] = Field(default=None)    # email of the human responsible
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
 

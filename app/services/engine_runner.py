@@ -51,6 +51,58 @@ def cancel_engine_run(run_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# ManualAction threading bridge
+# ---------------------------------------------------------------------------
+
+_manual_action_events: dict[str, _threading.Event] = {}
+
+
+def resolve_manual_action(ticket_id: str) -> bool:
+    """Unblock a ManualActionCapability waiting on *ticket_id*. Called from the ticket API."""
+    event = _manual_action_events.pop(ticket_id, None)
+    if event is None:
+        return False
+    event.set()
+    return True
+
+
+def _make_manual_action_callback(run_id: str, event_log, timeout: int = 86400):
+    """Return a blocking callable for ManualActionCapability.
+
+    The callback emits a ``manual_action.required`` bus event (which the
+    listener picks up to create the blocking Ticket + set run.status="blocked"),
+    then blocks on a threading.Event until the human resolves the ticket.
+    """
+    def request_action(content: dict) -> None:
+        import uuid as _u
+        ticket_id = str(_u.uuid4())
+        event = _threading.Event()
+        _manual_action_events[ticket_id] = event
+
+        bus.emit(BusEvent(
+            "manual_action.required",
+            {
+                "ticket_id":   ticket_id,
+                "title":       content.get("title", "Manual step required"),
+                "description": content.get("description", ""),
+                "assignee":    content.get("assignee"),
+            },
+            run_id=run_id,
+            thread_id="default",
+        ))
+
+        fired = event.wait(timeout=timeout)
+        _manual_action_events.pop(ticket_id, None)
+        if not fired:
+            log.warning(
+                "engine runner: manual_action %s timed out after %ds for run %s — continuing",
+                ticket_id, timeout, run_id,
+            )
+
+    return request_action
+
+
+# ---------------------------------------------------------------------------
 # HITL threading bridge
 # ---------------------------------------------------------------------------
 
@@ -206,6 +258,7 @@ AVAILABLE_ENGINE_CAPABILITIES = [
     "DependencyInstaller",
     "DocGenerator",
     "HitlReviewer",
+    "ManualActionCapability",
     "TestGenerator",
     "TestRunner",
     "BugFixer",
@@ -250,10 +303,16 @@ def _build_engine_registry(
     capability_models: "dict[str, str] | None" = None,
     max_tasks: int = 12,
     parallel_workers: int = 5,
+    manual_action_callback=None,
+    manual_action_title: str = "Manual step required",
+    manual_action_description: str = "",
+    manual_action_assignee: "str | None" = None,
+    manual_action_needs: "frozenset | None" = None,
 ):
     from antcrew_engine.capabilities import (
         Architect, BugFixer, CodeGenerator, CodeRegenerator, CodeReviewer,
-        DependencyInstaller, DocGenerator, ReviewFixer, TaskPlanner, TestGenerator, TestRunner,
+        DependencyInstaller, DocGenerator, ManualActionCapability, ReviewFixer,
+        TaskPlanner, TestGenerator, TestRunner,
     )
     from antcrew_engine.config import build_llm as _build_llm
     from antcrew_engine.engine import CapabilityRegistry
@@ -278,6 +337,13 @@ def _build_engine_registry(
     registry.register(CodeReviewer(llm=_llm("code_reviewer")))
     registry.register(ReviewFixer(llm=_llm("review_fixer")))
     registry.register(DocGenerator(llm=_llm("doc_generator")))
+    registry.register(ManualActionCapability(
+        title=manual_action_title,
+        description=manual_action_description,
+        assignee=manual_action_assignee,
+        needs=manual_action_needs,
+        request_action=manual_action_callback,
+    ))
     return registry
 
 
@@ -288,9 +354,10 @@ def _build_engine_validators():
     )
     return [
         *artifact_validators(
-            ("requirements", "requirements_exists"),
-            ("architecture", "architecture_exists"),
-            ("task_graph",   "task_graph_exists"),
+            ("requirements",       "requirements_exists"),
+            ("architecture",       "architecture_exists"),
+            ("task_graph",         "task_graph_exists"),
+            ("manual_action_done", "manual_action_done"),  # ManualActionCapability signal
         ),
         AllTasksCompletedValidator(),
         DependenciesInstalledValidator(),
@@ -359,6 +426,11 @@ def _run_engine_sync(
     parallel_workers: int = 5,
     byok_api_key: Optional[str] = None,
     byok_base_url: Optional[str] = None,
+    manual_action_title: str = "Manual step required",
+    manual_action_description: str = "",
+    manual_action_assignee: "str | None" = None,
+    manual_action_after: "list[str] | None" = None,
+    manual_action_timeout_s: int = 86400,
 ) -> tuple[bool, float]:
     from antcrew_engine.capabilities.hitl_reviewer import HitlReviewer
     from antcrew_engine.capabilities.validators import artifact_validators
@@ -367,6 +439,7 @@ def _run_engine_sync(
     from antcrew_engine.engine.bus_bridge import EventBusBridge
 
     hitl_after = hitl_after or []
+    manual_action_after = manual_action_after or []
 
     llm = build_llm(model, prompt_caching=True, api_key=byok_api_key or None, base_url=byok_base_url or None)
     event_log = EventLog()
@@ -374,11 +447,20 @@ def _run_engine_sync(
 
     goal = _build_engine_goal(goal_description, tech, conditions, full)
     store = FilesystemStore(output_dir) if output_dir else MemoryStore()
+
+    manual_needs = frozenset(ConditionId(c) for c in manual_action_after) if manual_action_after else None
+    manual_cb = _make_manual_action_callback(run_id, event_log, timeout=manual_action_timeout_s)
+
     registry = _build_engine_registry(
         llm,
         capability_models=capability_models,
         max_tasks=max_tasks,
         parallel_workers=parallel_workers,
+        manual_action_callback=manual_cb,
+        manual_action_title=manual_action_title,
+        manual_action_description=manual_action_description,
+        manual_action_assignee=manual_action_assignee,
+        manual_action_needs=manual_needs,
     )
     validators = _build_engine_validators()
 
@@ -495,6 +577,11 @@ async def dispatch_engine(
     workspace_id: Optional[int] = None,
     max_tasks: int = 12,
     parallel_workers: int = 5,
+    manual_action_title: str = "Manual step required",
+    manual_action_description: str = "",
+    manual_action_assignee: "str | None" = None,
+    manual_action_after: "list[str] | None" = None,
+    manual_action_timeout_s: int = 86400,
 ) -> str:
     """Start a capability-driven engine run in the background.
 
@@ -577,6 +664,8 @@ async def dispatch_engine(
                 fix_attempts, hitl_after, source_dir, stop_event, hitl_max_rejections,
                 max_cost_usd, capability_models, max_tasks, parallel_workers,
                 _byok_api_key, _byok_base_url,
+                manual_action_title, manual_action_description,
+                manual_action_assignee, manual_action_after, manual_action_timeout_s,
             )
             success, cost_usd, _store, _satisfied, _expected = await loop.run_in_executor(_executor, fn)
         except Exception as exc:

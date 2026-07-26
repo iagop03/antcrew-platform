@@ -52,6 +52,12 @@ class EngineRunRequest(BaseModel):
     output_dir: Optional[str] = None          # server-side absolute path for FilesystemStore
     source_dir: Optional[str] = None          # load existing .py files from this directory
     resume: bool = False                      # reload goal + artifacts from output_dir
+    # Manual-action gate — add "manual_action_done" to conditions to activate
+    manual_action_title: str = "Manual step required"
+    manual_action_description: str = ""
+    manual_action_assignee: Optional[str] = None
+    manual_action_after: list[str] = []        # conditions that must be met before the manual step
+    manual_action_timeout_s: int = 86400       # seconds to wait (default 24 h)
 
     @field_validator("max_iter")
     @classmethod
@@ -146,6 +152,11 @@ async def trigger_engine_run(
             resume=body.resume,
             created_by=ctx.created_by,
             workspace_id=ctx.workspace_id,
+            manual_action_title=body.manual_action_title,
+            manual_action_description=body.manual_action_description,
+            manual_action_assignee=body.manual_action_assignee,
+            manual_action_after=body.manual_action_after or None,
+            manual_action_timeout_s=body.manual_action_timeout_s,
         )
     except Exception as exc:
         raise HTTPException(422, str(exc))
