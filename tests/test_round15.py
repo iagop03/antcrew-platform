@@ -13,14 +13,13 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.run import ApiKey, EvalRun, HitlReview, Run, Workspace
+from app.models.run import ApiKey, EvalRun, Run, Workspace
 
 
 # ---------------------------------------------------------------------------

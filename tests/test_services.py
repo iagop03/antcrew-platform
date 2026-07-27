@@ -1,10 +1,9 @@
 """Tests for run/ticket service helpers."""
 from __future__ import annotations
 
-import pytest
 
-from app.models.run import Run, Ticket
-from app.services.runs import upsert_tickets_from_run, list_tickets, get_run
+from app.models.run import Ticket
+from app.services.runs import upsert_tickets_from_run, list_tickets
 
 
 async def test_upsert_tickets_from_run_creates(session):

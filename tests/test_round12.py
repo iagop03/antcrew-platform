@@ -14,7 +14,7 @@ Covers:
 from __future__ import annotations
 
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -269,9 +269,8 @@ def test_socket_mode_two_orgs_start_two_handlers(monkeypatch):
 @pytest.mark.asyncio
 async def test_listener_uses_workspace_token_over_env(monkeypatch):
     """When workspace has slack_bot_token_enc, listener uses it instead of SLACK_BOT_TOKEN."""
-    import asyncio
     from app.core import listener as _listener
-    from app.models.run import Run, HitlReview
+    from app.models.run import Run
 
     monkeypatch.delenv("SLACK_TOKEN_ENCRYPTION_KEY", raising=False)
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-global")
@@ -308,7 +307,6 @@ async def test_listener_uses_workspace_token_over_env(monkeypatch):
 
     with patch("app.core.slack_hitl.send_hitl_to_slack", new=fake_send), \
          patch("app.core.slack_hitl.start_slack_socket_mode"):
-        from antcrew.core.events import Event as AcEvent
         fake_event = MagicMock()
         fake_event.type = "hitl.review_required"
         fake_event.run_id = "r12-run-1"

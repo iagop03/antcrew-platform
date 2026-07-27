@@ -11,7 +11,6 @@ Covers:
 """
 from __future__ import annotations
 
-import json
 import pytest
 from httpx import AsyncClient
 
@@ -259,7 +258,6 @@ async def test_custom_pipeline_empty_request_rejected(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_mark_review_timed_out(session):
     """_mark_review_timed_out should update the review status to 'timeout'."""
-    import os
     from datetime import datetime, timezone
     from app.models.run import HitlReview
 

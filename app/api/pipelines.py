@@ -6,7 +6,7 @@ User pipelines are stored in the pipeline_def table.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException

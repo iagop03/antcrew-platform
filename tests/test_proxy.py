@@ -17,12 +17,10 @@ Covers:
 from __future__ import annotations
 
 import hashlib
-import os
 from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.run import ApiKey, Workspace

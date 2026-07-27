@@ -20,7 +20,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.auth import WorkspaceContext
 from app.models.run import (
-    ApiKey, HitlAuditEntry, HitlReview, Run, WebhookConfig, WebhookDelivery, WebhookEvent,
+    HitlAuditEntry, HitlReview, Run, WebhookConfig, WebhookDelivery, WebhookEvent,
     Workspace,
 )
 

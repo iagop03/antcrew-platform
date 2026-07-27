@@ -76,7 +76,6 @@ def test_make_team_falls_back_when_team_rejects_llm(monkeypatch):
     def patched_make_team(team_name, max_cost_usd=None, model=""):
         if model:
             # Temporarily replace build_llm inside the function scope
-            import importlib
             import antcrew.config as _cfg
             orig_build = _cfg.build_llm
             _cfg.build_llm = lambda m, **_kw: _FakeLLM()

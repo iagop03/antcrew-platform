@@ -477,7 +477,6 @@ def _run_engine_sync(
     # Wire HITL reviewers.
     # Auto-detect the actual artifact ID and triggering condition from the registry
     # so --hitl-after architect correctly reads "architecture" (not "architect").
-    import dataclasses as _dc
     for cap_name in hitl_after:
         source_exec = next((e for e in registry.all() if e.descriptor.name == cap_name), None)
         triggers_condition: str | None = None

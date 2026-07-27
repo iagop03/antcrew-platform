@@ -9,7 +9,6 @@ Reviewers must start a conversation with the bot first and share their chat ID
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 from typing import Optional
@@ -38,7 +37,6 @@ async def send_review_assigned(
         f"[Ver revisión]({review_url})"
     )
     try:
-        import json as _json
         import httpx
 
         url = _API_BASE.format(token=_TOKEN)

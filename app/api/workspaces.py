@@ -541,7 +541,7 @@ async def test_slack(
     if not ws:
         raise WorkspaceNotFoundError(workspace_id)
 
-    from app.core.slack_hitl import _decrypt, send_hitl_to_slack
+    from app.core.slack_hitl import _decrypt
     import os
 
     bot_token = (

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from sqlmodel import select
 
-from app.models.run import Run, HitlReview, WebhookDelivery
+from app.models.run import Run, WebhookDelivery
 
 
 class _FakeEvent:

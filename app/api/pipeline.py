@@ -194,7 +194,7 @@ async def trigger_visual_pipeline(
     pipeline_id can be an integer (user pipeline) or "template:fullstack",
     "template:dev", "template:content", or "template:research" for built-in templates.
     """
-    from app.api.pipelines import _TEMPLATES, get_pipeline
+    from app.api.pipelines import _TEMPLATES
     from app.services.runner import dispatch_pipeline
 
     # Resolve definition

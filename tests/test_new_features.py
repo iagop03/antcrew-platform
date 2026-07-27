@@ -7,7 +7,7 @@ import zipfile
 import pytest
 from httpx import AsyncClient
 
-from app.models.run import EvalRun, Run, RunTemplate
+from app.models.run import EvalRun, Run
 
 
 # ---------------------------------------------------------------------------

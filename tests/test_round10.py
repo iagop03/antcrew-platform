@@ -9,11 +9,10 @@ Covers:
 """
 from __future__ import annotations
 
-import json
 import pytest
 from httpx import AsyncClient
 
-from app.models.run import Workspace, Run, WebhookConfig, WebhookEvent, WebhookDelivery
+from app.models.run import Workspace, Run, WebhookConfig, WebhookEvent
 
 
 # ---------------------------------------------------------------------------

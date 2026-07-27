@@ -9,14 +9,14 @@ import string
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-log = logging.getLogger(__name__)
-
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlmodel import select
 
 from app.core.database import get_session
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -607,7 +607,7 @@ async def accept_invite(
     session=Depends(get_session),
 ):
     """Accept a workspace invite token. Body: {token: string}. Requires active session."""
-    from app.models.run import WorkspaceInvite, WorkspaceMembership, ApiKey, Workspace
+    from app.models.run import WorkspaceInvite, WorkspaceMembership, Workspace
 
     body = await request.json()
     invite_token = str(body.get("token", "")).strip()

@@ -27,7 +27,6 @@ from app.core.database import engine
 from app.core.channel import PlatformChannel
 from app.services.runs import upsert_tickets_from_run
 from app.services.runner_base import (
-    _budget_locks,
     _get_budget_lock,
     _check_workspace_budget,
     _mark_workspace_budget_status,

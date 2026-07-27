@@ -22,7 +22,6 @@ from httpx import AsyncClient
 
 @pytest.mark.asyncio
 async def test_get_review_by_id(client: AsyncClient, session):
-    from datetime import datetime, timezone
     from app.models.run import HitlReview
 
     review = HitlReview(

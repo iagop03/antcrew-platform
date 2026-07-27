@@ -5,7 +5,6 @@ import asyncio
 import functools
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -126,7 +125,7 @@ async def dispatch_due_schedules(engine) -> int:
     async with _Sess(engine, expire_on_commit=False) as session:
         result = await session.exec(
             select(EvalSchedule).where(
-                EvalSchedule.enabled == True,
+                EvalSchedule.enabled == True,  # noqa: E712
                 EvalSchedule.next_run_at <= now,
             )
         )

@@ -32,9 +32,10 @@ from app.api import client_review, compare as compare_api, contract_schemas as c
 from app.api import security_audit as security_audit_api
 from app.api import invites as invites_api
 from app.api import workspaces_proxy as workspaces_proxy_api
+from app.core.csrf import require_csrf as _require_csrf
 
 _STATIC = Path(__file__).parent / "static"
-_VERSION = "0.4.9"
+_VERSION = "0.5.0"
 
 # ---------------------------------------------------------------------------
 # Environment — read once at import time so guards can reference it.
@@ -617,8 +618,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-from app.core.csrf import require_csrf as _require_csrf
 
 _csrf = [Depends(_require_csrf)]
 

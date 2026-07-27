@@ -9,10 +9,10 @@ from typing import Optional, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, model_validator
-from sqlmodel import select, col, desc
+from sqlmodel import select, col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible, ws_filter
+from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible
 from app.core.exceptions import ReviewNotFoundError
 from app.core.channel import resolve_review
 from app.core.database import get_session

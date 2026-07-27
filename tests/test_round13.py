@@ -132,7 +132,7 @@ async def test_run_cancel_requires_write(client: AsyncClient, session):
     run = Run(run_id="r13-cancel-test", team="dev", request="x", status="running", thread_id="t")
     session.add(run)
     await session.commit()
-    r = await client.post(f"/runs/r13-cancel-test/cancel",
+    r = await client.post("/runs/r13-cancel-test/cancel",
                           headers={"X-Api-Key": "reader-r13-key"})
     assert r.status_code == 403
 

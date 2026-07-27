@@ -10,7 +10,7 @@ from pydantic import BaseModel, field_validator
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, _hash, _key_prefix
+from app.core.auth import require_api_key, require_role, _hash, _key_prefix
 from app.core.database import get_session
 from app.models.run import ApiKey
 

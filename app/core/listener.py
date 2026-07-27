@@ -295,9 +295,6 @@ async def _persist_event(event: "Event") -> None:
                     # Create the blocking Ticket if it doesn't exist yet
                     stmt = select(Ticket).where(Ticket.ticket_id == ticket_id)
                     if not (await session.exec(stmt)).first():
-                        run_for_block = (await session.exec(
-                            select(Run).where(Run.run_id == event.run_id)
-                        )).first()
                         session.add(Ticket(
                             ticket_id=ticket_id,
                             run_id=event.run_id,

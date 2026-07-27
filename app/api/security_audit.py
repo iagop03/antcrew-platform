@@ -578,7 +578,6 @@ async def _maybe_next_iteration(
     session: AsyncSession,
 ) -> None:
     """Check convergence conditions; if not met, create and schedule next iteration."""
-    from app.core.database import AsyncSessionFactory
 
     # Compute cumulative cost across all runs in this cycle
     all_cycle_runs = (await session.exec(

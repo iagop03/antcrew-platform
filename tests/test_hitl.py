@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import concurrent.futures
-import json
 
 import pytest
 from httpx import AsyncClient

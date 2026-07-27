@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from sqlmodel import select
 
 from app.core.auth import (
-    get_workspace_context,
     WorkspaceContext,
     require_role,
     require_verified_session,

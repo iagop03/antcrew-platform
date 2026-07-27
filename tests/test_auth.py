@@ -1,8 +1,6 @@
 """Tests for API key auth."""
 from __future__ import annotations
 
-import os
-import pytest
 
 
 async def test_health_always_open(client):

@@ -1,8 +1,6 @@
 """API smoke tests for runs, tickets, and health endpoints."""
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone
 
 from app.models.run import Run, Ticket
 

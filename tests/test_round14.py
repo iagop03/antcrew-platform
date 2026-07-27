@@ -176,7 +176,6 @@ def _make_async_client_mock(post_return=None, get_return=None, post_side_effect=
 @pytest.mark.asyncio
 async def test_platform_channel_registers_and_polls():
     """PlatformChannel posts review and returns decision once poll shows resolved."""
-    import httpx as _httpx
     from antcrew.integrations.platform import PlatformChannel
 
     ch = PlatformChannel(url="http://fake", api_key="sk-test", poll_interval_s=0.0)

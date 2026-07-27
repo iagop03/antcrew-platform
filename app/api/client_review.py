@@ -18,8 +18,6 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 
-_e = html.escape  # shorthand — every user-controlled value must go through this before HTML interpolation
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -29,6 +27,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.channel import resolve_review
 from app.core.database import get_session
 from app.models.run import HitlReview, HitlAuditEntry, Run
+
+_e = html.escape  # shorthand — every user-controlled value must go through this before HTML interpolation
 
 router = APIRouter(prefix="/r", tags=["client-review"])
 

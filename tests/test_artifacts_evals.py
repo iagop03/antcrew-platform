@@ -1,7 +1,6 @@
 """Tests for GET /runs/{id}/artifacts and the /evals/ surface."""
 from __future__ import annotations
 
-import uuid
 
 import pytest
 from httpx import AsyncClient

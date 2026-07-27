@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-import json
 import logging
 import uuid
 from typing import Optional

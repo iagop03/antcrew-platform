@@ -12,14 +12,13 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.run import ApiKey, HitlReview, HitlAuditEntry
+from app.models.run import ApiKey
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +47,6 @@ async def test_create_key_via_api_uses_bcrypt(client: AsyncClient, session: Asyn
     """POST /api-keys/ (in open mode) creates a key with bcrypt hash and key_prefix."""
     r = await client.post("/api-keys/", json={"label": "bcrypt-test-r16", "role": "write"})
     assert r.status_code == 201, r.text
-    raw_key = r.json()["key"]
-
     db_key = (await session.exec(
         select(ApiKey).where(ApiKey.label == "bcrypt-test-r16")
     )).first()
