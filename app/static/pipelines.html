@@ -40,16 +40,16 @@ body{overflow:hidden}
   <div class="h-11 px-3 flex items-center gap-0.5">
     <a href="/dashboard" class="font-mono font-bold text-indigo-400 text-sm px-3 mr-1 shrink-0">antcrew</a>
     <div class="w-px h-4 bg-gray-800 mx-0.5 shrink-0"></div>
-    <a href="/dashboard" class="ac-nav" data-ac="/dashboard"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></a>
-    <a href="/runs"    class="ac-nav" data-ac="/runs"><i class="ti ti-player-play"></i><span>Runs</span></a>
-    <a href="/reviews" class="ac-nav" data-ac="/reviews"><i class="ti ti-eye-check"></i><span>Reviews</span><span id="nav-rev-badge" style="display:none" class="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"></span></a>
-    <a href="/evals"   class="ac-nav" data-ac="/evals"><i class="ti ti-chart-bar"></i><span>Evals</span></a>
-    <a href="/tickets" class="ac-nav" data-ac="/tickets"><i class="ti ti-checklist"></i><span>Tickets</span></a>
+    <a href="/dashboard" class="ac-nav" data-ac="/dashboard"><i class="ti ti-layout-dashboard"></i><span data-i18n="nav.dashboard">Dashboard</span></a>
+    <a href="/runs"    class="ac-nav" data-ac="/runs"><i class="ti ti-player-play"></i><span data-i18n="nav.runs">Runs</span></a>
+    <a href="/reviews" class="ac-nav" data-ac="/reviews"><i class="ti ti-eye-check"></i><span data-i18n="nav.reviews">Reviews</span><span id="nav-rev-badge" style="display:none" class="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"></span></a>
+    <a href="/evals"   class="ac-nav" data-ac="/evals"><i class="ti ti-chart-bar"></i><span data-i18n="nav.evals">Evals</span></a>
+    <a href="/tickets" class="ac-nav" data-ac="/tickets"><i class="ti ti-checklist"></i><span data-i18n="nav.tickets">Tickets</span></a>
     <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
-    <a href="/compare"  class="ac-nav" data-ac="/compare"><i class="ti ti-scale"></i><span>Compare</span></a>
-    <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span>Pipelines</span></a>
+    <a href="/compare"  class="ac-nav" data-ac="/compare"><i class="ti ti-scale"></i><span data-i18n="nav.compare">Compare</span></a>
+    <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span data-i18n="nav.pipelines">Pipelines</span></a>
     <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
-    <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span>Webhooks</span></a>
+    <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span data-i18n="nav.webhooks">Webhooks</span></a>
     <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
     <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i><span data-i18n="nav.settings">Settings</span></a>
     <div class="ml-auto flex items-center gap-0.5">
@@ -227,86 +227,9 @@ body{overflow:hidden}
       </defs>
 
       <g id="stage" :transform="`translate(${pan.x},${pan.y}) scale(${zoom})`">
-
-        <!-- Edges -->
-        <g id="edges-layer">
-          <template x-for="edge in edges" :key="edge.id">
-            <g class="edge-group">
-              <path :d="edgePath(edge)" fill="none" stroke="transparent" stroke-width="14" class="edge-path" @click="selectEdge(edge)"/>
-              <path :d="edgePath(edge)" fill="none"
-                :stroke="edge.condition ? '#f59e0b' : '#6366f1'"
-                stroke-width="1.5" stroke-opacity=".75"
-                :marker-end="edge.condition ? 'url(#arrow-cond)' : 'url(#arrow)'"/>
-              <template x-if="edge.condition">
-                <g :transform="`translate(${edgeMid(edge).x},${edgeMid(edge).y})`">
-                  <rect x="-44" y="-10" width="88" height="20" rx="4"
-                    fill="#1c1917" stroke="#f59e0b" stroke-width="1" class="edge-label-bg"
-                    @click="editEdgeCondition(edge)"/>
-                  <text text-anchor="middle" y="5" fill="#fbbf24" font-size="10" font-family="monospace"
-                    x-text="edge.condition" @click="editEdgeCondition(edge)"/>
-                </g>
-              </template>
-              <g :transform="`translate(${edgeMid(edge).x},${edgeMid(edge).y})`" class="edge-delete" @click="removeEdge(edge)">
-                <circle r="8" fill="#7f1d1d"/>
-                <text text-anchor="middle" y="4" fill="white" font-size="11">✕</text>
-              </g>
-            </g>
-          </template>
-        </g>
-
-        <!-- Nodes -->
-        <g id="nodes-layer">
-          <template x-for="node in nodes" :key="node.id">
-            <g class="node-group" :class="selectedNodeId===node.id?'selected':''"
-              :transform="`translate(${node.x},${node.y})`"
-              @mousedown="onNodeMouseDown($event, node)">
-              <!-- Shadow -->
-              <rect x="2" y="4" width="168" height="56" rx="9" fill="rgba(0,0,0,.5)"/>
-              <!-- Body -->
-              <rect class="node-body" width="168" height="56" rx="9"
-                :fill="nodeColor(node.type)+'18'"
-                :stroke="selectedNodeId===node.id ? '#818cf8' : nodeColor(node.type)"
-                stroke-width="1.5"/>
-              <!-- Color accent bar -->
-              <rect x="0" y="0" width="4" height="56" rx="2"
-                :fill="nodeColor(node.type)" opacity=".8"/>
-              <!-- Label -->
-              <text x="90" y="22" text-anchor="middle" fill="#e2e8f0" font-size="11"
-                font-family="ui-monospace,monospace" font-weight="600"
-                x-text="node.label || node.type"></text>
-              <!-- Model badge -->
-              <text x="90" y="38" text-anchor="middle" fill="#475569" font-size="9"
-                font-family="ui-monospace,monospace"
-                x-text="modelShortLabel(node.model||'claude')"></text>
-              <!-- HITL badge -->
-              <template x-if="node.hitl">
-                <g transform="translate(10,4)">
-                  <rect width="44" height="13" rx="3"
-                    :fill="edgesFromNode(node.id).length===0 ? '#451a03' : (node.channel_type==='slack' ? '#4a1942' : node.channel_type==='telegram' ? '#0c2a3d' : '#1e1b4b')"
-                    :stroke="edgesFromNode(node.id).length===0 ? '#d97706' : (node.channel_type==='slack' ? '#a855f7' : node.channel_type==='telegram' ? '#38bdf8' : '#818cf8')"
-                    stroke-width="1"/>
-                  <text x="22" y="9.5" text-anchor="middle" font-size="8" font-family="ui-monospace,monospace"
-                    :fill="edgesFromNode(node.id).length===0 ? '#fbbf24' : '#c4b5fd'"
-                    x-text="edgesFromNode(node.id).length===0 ? '⚠ HITL' : (node.channel_type==='slack' ? 'SLACK' : node.channel_type==='telegram' ? 'TG' : 'HITL')"></text>
-                </g>
-              </template>
-              <!-- Delete -->
-              <g transform="translate(156,4)" @mousedown.stop @click="removeNode(node)"
-                class="edge-delete" style="cursor:pointer">
-                <circle r="7" fill="#450a0a"/>
-                <text text-anchor="middle" y="4" fill="#fca5a5" font-size="9">✕</text>
-              </g>
-              <!-- Input handle -->
-              <circle class="handle-in" cx="0" cy="28" r="5"
-                :fill="nodeColor(node.type)" opacity=".7"/>
-              <!-- Output handle -->
-              <circle class="handle-out" cx="168" cy="28" r="6"
-                :fill="nodeColor(node.type)"
-                @mousedown.stop="onHandleMouseDown($event, node)"/>
-            </g>
-          </template>
-        </g>
-
+        <!-- Rendered imperatively by renderCanvas() — x-for doesn't work inside SVG -->
+        <g id="edges-layer"></g>
+        <g id="nodes-layer"></g>
       </g>
 
       <!-- Temp edge -->
@@ -436,7 +359,7 @@ body{overflow:hidden}
                     'bg-red-900/50 text-red-300': r.status==='error',
                     'bg-gray-800 text-gray-400': !['running','success','done','error'].includes(r.status)
                   }" x-text="r.status"></span>
-                <span class="font-mono text-gray-600" x-text="r.cost_usd ? '$'+r.cost_usd.toFixed(3) : '—'"></span>
+                <span class="font-mono text-gray-600" x-text="r.cost_usd ? '€'+r.cost_usd.toFixed(3) : '—'"></span>
               </div>
               <p class="text-gray-400 truncate" x-text="r.request"></p>
               <p class="text-gray-700 text-xs" x-text="timeAgo(r.created_at)"></p>
@@ -888,6 +811,7 @@ function app() {
       this.zoom = def.zoom || 1;
       this.pan = def.pan ? { ...def.pan } : { x: 40, y: 40 };
       this.saveStatus = '';
+      this.renderCanvas();
       this.loadPipelineRuns();
     },
 
@@ -903,6 +827,7 @@ function app() {
       this.zoom = 1;
       this.pan = { x: 40, y: 40 };
       this.saveStatus = '';
+      this.renderCanvas();
     },
 
     async forkTemplate() {
@@ -1020,7 +945,118 @@ function app() {
 
     // ── Canvas ─────────────────────────────────────────────────────────────
 
-    render() { /* Alpine reactivity handles re-renders */ },
+    // x-for inside SVG doesn't work in Alpine (SVG <template> has no .content).
+    // All canvas content is rendered imperatively by renderCanvas().
+
+    render() { this.renderCanvas(); },
+
+    _svg(tag, attrs) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      Object.entries(attrs || {}).forEach(([k, v]) => el.setAttribute(k, v));
+      return el;
+    },
+
+    renderCanvas() {
+      // Update stage transform (pan + zoom)
+      const stage = document.getElementById('stage');
+      if (stage) stage.setAttribute('transform', `translate(${this.pan.x},${this.pan.y}) scale(${this.zoom})`);
+      this._renderEdges();
+      this._renderNodes();
+    },
+
+    _renderEdges() {
+      const layer = document.getElementById('edges-layer');
+      if (!layer) return;
+      layer.innerHTML = '';
+      for (const edge of this.edges) {
+        const d = this.edgePath(edge);
+        if (!d) continue;
+        const g = this._svg('g'); g.classList.add('edge-group');
+        // Hit area
+        const hit = this._svg('path', { d, fill: 'none', stroke: 'transparent', 'stroke-width': '14', class: 'edge-path' });
+        g.appendChild(hit);
+        // Visible stroke
+        const vis = this._svg('path', { d, fill: 'none', stroke: edge.condition ? '#f59e0b' : '#6366f1', 'stroke-width': '1.5', 'stroke-opacity': '.75', 'marker-end': edge.condition ? 'url(#arrow-cond)' : 'url(#arrow)' });
+        g.appendChild(vis);
+        // Condition label
+        if (edge.condition) {
+          const mid = this.edgeMid(edge);
+          const lg = this._svg('g', { transform: `translate(${mid.x},${mid.y})` });
+          const bg = this._svg('rect', { x: '-44', y: '-10', width: '88', height: '20', rx: '4', fill: '#1c1917', stroke: '#f59e0b', 'stroke-width': '1', class: 'edge-label-bg' });
+          bg.addEventListener('click', () => this.editEdgeCondition(edge));
+          const tx = this._svg('text', { 'text-anchor': 'middle', y: '5', fill: '#fbbf24', 'font-size': '10', 'font-family': 'monospace' });
+          tx.textContent = edge.condition; tx.addEventListener('click', () => this.editEdgeCondition(edge));
+          lg.appendChild(bg); lg.appendChild(tx); g.appendChild(lg);
+        }
+        // Delete button
+        const mid = this.edgeMid(edge);
+        const dg = this._svg('g', { transform: `translate(${mid.x},${mid.y})`, class: 'edge-delete' });
+        dg.style.cursor = 'pointer'; dg.style.opacity = '0';
+        g.addEventListener('mouseenter', () => dg.style.opacity = '1');
+        g.addEventListener('mouseleave', () => dg.style.opacity = '0');
+        dg.appendChild(this._svg('circle', { r: '8', fill: '#7f1d1d' }));
+        const dx = this._svg('text', { 'text-anchor': 'middle', y: '4', fill: 'white', 'font-size': '11' });
+        dx.textContent = '✕'; dg.appendChild(dx);
+        dg.addEventListener('click', (ev) => { ev.stopPropagation(); this.removeEdge(edge); this.renderCanvas(); });
+        g.appendChild(dg);
+        layer.appendChild(g);
+      }
+    },
+
+    _renderNodes() {
+      const layer = document.getElementById('nodes-layer');
+      if (!layer) return;
+      layer.innerHTML = '';
+      for (const node of this.nodes) {
+        const color = nodeColor(node.type);
+        const sel = this.selectedNodeId === node.id;
+        const g = this._svg('g', { class: 'node-group' + (sel ? ' selected' : ''), transform: `translate(${node.x},${node.y})` });
+        g.dataset.nid = node.id;
+        // Shadow
+        g.appendChild(this._svg('rect', { x: '2', y: '4', width: '168', height: '56', rx: '9', fill: 'rgba(0,0,0,.5)' }));
+        // Body
+        g.appendChild(this._svg('rect', { class: 'node-body', width: '168', height: '56', rx: '9', fill: color + '18', stroke: sel ? '#818cf8' : color, 'stroke-width': '1.5' }));
+        // Color bar
+        g.appendChild(this._svg('rect', { x: '0', y: '0', width: '4', height: '56', rx: '2', fill: color, opacity: '.8' }));
+        // Label
+        const lbl = this._svg('text', { x: '90', y: '22', 'text-anchor': 'middle', fill: '#e2e8f0', 'font-size': '11', 'font-family': 'ui-monospace,monospace', 'font-weight': '600' });
+        lbl.textContent = node.label || node.type; g.appendChild(lbl);
+        // Model badge
+        const mod = this._svg('text', { x: '90', y: '38', 'text-anchor': 'middle', fill: '#475569', 'font-size': '9', 'font-family': 'ui-monospace,monospace' });
+        mod.textContent = this.modelShortLabel(node.model || 'claude'); g.appendChild(mod);
+        // HITL badge
+        if (node.hitl) {
+          const hasDown = this.edgesFromNode(node.id).length > 0;
+          const hbg = hasDown ? (node.channel_type === 'slack' ? '#4a1942' : node.channel_type === 'telegram' ? '#0c2a3d' : '#1e1b4b') : '#451a03';
+          const hst = hasDown ? (node.channel_type === 'slack' ? '#a855f7' : node.channel_type === 'telegram' ? '#38bdf8' : '#818cf8') : '#d97706';
+          const hg = this._svg('g', { transform: 'translate(10,4)' });
+          hg.appendChild(this._svg('rect', { width: '44', height: '13', rx: '3', fill: hbg, stroke: hst, 'stroke-width': '1' }));
+          const ht = this._svg('text', { x: '22', y: '9.5', 'text-anchor': 'middle', 'font-size': '8', 'font-family': 'ui-monospace,monospace', fill: hasDown ? '#c4b5fd' : '#fbbf24' });
+          ht.textContent = !hasDown ? '⚠ HITL' : (node.channel_type === 'slack' ? 'SLACK' : node.channel_type === 'telegram' ? 'TG' : 'HITL');
+          hg.appendChild(ht); g.appendChild(hg);
+        }
+        // Delete button (visible on hover)
+        const dbtn = this._svg('g', { transform: 'translate(156,4)', class: 'edge-delete' });
+        dbtn.style.cursor = 'pointer'; dbtn.style.opacity = '0';
+        g.addEventListener('mouseenter', () => dbtn.style.opacity = '1');
+        g.addEventListener('mouseleave', () => dbtn.style.opacity = '0');
+        dbtn.appendChild(this._svg('circle', { r: '7', fill: '#450a0a' }));
+        const dtx = this._svg('text', { 'text-anchor': 'middle', y: '4', fill: '#fca5a5', 'font-size': '9' });
+        dtx.textContent = '✕'; dbtn.appendChild(dtx);
+        dbtn.addEventListener('mousedown', (e) => e.stopPropagation());
+        dbtn.addEventListener('click', () => { this.removeNode(node); this.renderCanvas(); });
+        g.appendChild(dbtn);
+        // Input handle
+        g.appendChild(this._svg('circle', { class: 'handle-in', cx: '0', cy: '28', r: '5', fill: color, opacity: '.7' }));
+        // Output handle
+        const oh = this._svg('circle', { class: 'handle-out', cx: '168', cy: '28', r: '6', fill: color });
+        oh.addEventListener('mousedown', (e) => { e.stopPropagation(); this.onHandleMouseDown(e, node); });
+        g.appendChild(oh);
+        // Node drag/select
+        g.addEventListener('mousedown', (e) => this.onNodeMouseDown(e, node));
+        layer.appendChild(g);
+      }
+    },
 
     // Use container div (always visible) for coordinate mapping.
     // Avoids getBoundingClientRect() returning zeros when SVG is display:none.
@@ -1045,14 +1081,6 @@ function app() {
       const c = this._canvasClientCoords(e);
       this.dragging = { type: 'canvas', startX: c.x - this.pan.x, startY: c.y - this.pan.y };
       this.selectedNodeId = null;
-    },
-
-    onNodeMouseDown(e, node) {
-      if (e.target.classList.contains('handle-out')) return;
-      e.stopPropagation();
-      this.selectedNodeId = node.id;
-      const c = this._canvasCoords(e);
-      this.dragging = { type: 'node', nodeId: node.id, offsetX: c.x - node.x, offsetY: c.y - node.y };
     },
 
     onHandleMouseDown(e, node) {
@@ -1083,12 +1111,18 @@ function app() {
         const c = this._canvasClientCoords(e);
         this.pan.x = c.x - this.dragging.startX;
         this.pan.y = c.y - this.dragging.startY;
+        // Fast path: only update stage transform, skip full re-render during pan
+        const stage = document.getElementById('stage');
+        if (stage) stage.setAttribute('transform', `translate(${this.pan.x},${this.pan.y}) scale(${this.zoom})`);
       } else if (this.dragging.type === 'node') {
         const c = this._canvasCoords(e);
         const node = this.nodes.find(n => n.id === this.dragging.nodeId);
         if (node) {
           node.x = Math.round(c.x - this.dragging.offsetX);
           node.y = Math.round(c.y - this.dragging.offsetY);
+          // Fast path: only move the dragged node group instead of re-rendering all
+          const g = document.querySelector(`#nodes-layer [data-nid="${node.id}"]`);
+          if (g) g.setAttribute('transform', `translate(${node.x},${node.y})`);
         }
       }
     },
@@ -1108,7 +1142,12 @@ function app() {
         }
         this.drawing = false;
         this.tempEdgePath = '';
+        this.renderCanvas();
         return;
+      }
+      if (this.dragging && this.dragging.type === 'node') {
+        // After node drag ends, re-render edges (they depend on node positions)
+        this.renderCanvas();
       }
       this.dragging = null;
     },
@@ -1148,6 +1187,7 @@ function app() {
       }
 
       this.nodes.push({ id: nodeId, type, label, model: 'claude', hitl: false, channel_type: 'platform', x, y });
+      this.renderCanvas();
     },
 
     // ── Edges ──────────────────────────────────────────────────────────────
@@ -1162,6 +1202,7 @@ function app() {
       this.nodes = this.nodes.filter(n => n.id !== node.id);
       this.edges = this.edges.filter(e => e.from !== node.id && e.to !== node.id);
       if (this.selectedNodeId === node.id) this.selectedNodeId = null;
+      this.renderCanvas();
     },
 
     onKeyDown(e) {
@@ -1182,6 +1223,16 @@ function app() {
     saveEdgeCondition() {
       if (this.editingEdge) this.editingEdge.condition = this.editingEdgeCondition.trim() || null;
       this.editingEdge = null;
+      this.renderCanvas();
+    },
+
+    onNodeMouseDown(e, node) {
+      if (e.target.classList.contains('handle-out')) return;
+      e.stopPropagation();
+      this.selectedNodeId = node.id;
+      const c = this._canvasCoords(e);
+      this.dragging = { type: 'node', nodeId: node.id, offsetX: c.x - node.x, offsetY: c.y - node.y };
+      this.renderCanvas(); // re-render to show selection highlight
     },
   };
 }

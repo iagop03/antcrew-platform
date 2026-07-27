@@ -18,16 +18,16 @@
   <div class="h-11 px-3 flex items-center gap-0.5">
     <a href="/dashboard" class="font-mono font-bold text-indigo-400 text-sm px-3 mr-1 shrink-0">antcrew</a>
     <div class="w-px h-4 bg-gray-800 mx-0.5 shrink-0"></div>
-    <a href="/dashboard" class="ac-nav" data-ac="/dashboard"><i class="ti ti-layout-dashboard"></i><span>Dashboard</span></a>
-    <a href="/runs" class="ac-nav" data-ac="/runs"><i class="ti ti-player-play"></i><span>Runs</span></a>
-    <a href="/reviews" class="ac-nav" data-ac="/reviews"><i class="ti ti-eye-check"></i><span>Reviews</span><span id="nav-rev-badge" style="display:none" class="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"></span></a>
-    <a href="/evals" class="ac-nav" data-ac="/evals"><i class="ti ti-chart-bar"></i><span>Evals</span></a>
-    <a href="/tickets" class="ac-nav" data-ac="/tickets"><i class="ti ti-checklist"></i><span>Tickets</span></a>
+    <a href="/dashboard" class="ac-nav" data-ac="/dashboard"><i class="ti ti-layout-dashboard"></i><span data-i18n="nav.dashboard">Dashboard</span></a>
+    <a href="/runs" class="ac-nav" data-ac="/runs"><i class="ti ti-player-play"></i><span data-i18n="nav.runs">Runs</span></a>
+    <a href="/reviews" class="ac-nav" data-ac="/reviews"><i class="ti ti-eye-check"></i><span data-i18n="nav.reviews">Reviews</span><span id="nav-rev-badge" style="display:none" class="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"></span></a>
+    <a href="/evals" class="ac-nav" data-ac="/evals"><i class="ti ti-chart-bar"></i><span data-i18n="nav.evals">Evals</span></a>
+    <a href="/tickets" class="ac-nav" data-ac="/tickets"><i class="ti ti-checklist"></i><span data-i18n="nav.tickets">Tickets</span></a>
     <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
-    <a href="/compare" class="ac-nav" data-ac="/compare"><i class="ti ti-scale"></i><span>Compare</span></a>
-    <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span>Pipelines</span></a>
+    <a href="/compare" class="ac-nav" data-ac="/compare"><i class="ti ti-scale"></i><span data-i18n="nav.compare">Compare</span></a>
+    <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span data-i18n="nav.pipelines">Pipelines</span></a>
     <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
-    <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span>Webhooks</span></a>
+    <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span data-i18n="nav.webhooks">Webhooks</span></a>
     <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
     <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i><span data-i18n="nav.settings">Settings</span></a>
     <div class="ml-auto flex items-center gap-1.5">
@@ -73,11 +73,12 @@
           :class="budget.exhausted ? 'bg-red-500' : budget.remaining_usd / budget.budget_usd < 0.15 ? 'bg-yellow-500' : 'bg-green-500'"></span>
         <span class="font-mono"
           :class="budget.exhausted ? 'text-red-400' : 'text-gray-400'"
-          x-text="'$' + budget.total_spend_usd.toFixed(2) + ' / $' + budget.budget_usd.toFixed(2) + ' este mes'"></span>
+          x-text="'€' + budget.total_spend_usd.toFixed(2) + ' / €' + budget.budget_usd.toFixed(2) + ' este mes'"></span>
       </div>
     </template>
     <button @click="showRunModal = true"
-      class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-1.5">
+      class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-1.5"
+      data-i18n="runs.new">
       <i class="ti ti-plus text-sm"></i> New Run
     </button>
   </div>
@@ -108,7 +109,7 @@
       <i class="ti ti-currency-dollar text-purple-400"></i> Gasto total
     </p>
     <p class="text-2xl font-semibold font-mono text-purple-400"
-      x-text="budget ? '$' + budget.total_spend_usd.toFixed(2) : (stats.total_cost != null ? '$' + Number(stats.total_cost).toFixed(2) : '—')"></p>
+      x-text="budget ? '€' + budget.total_spend_usd.toFixed(2) : (stats.total_cost != null ? '€' + Number(stats.total_cost).toFixed(2) : '—')"></p>
   </div>
 </div>
 
@@ -117,7 +118,7 @@
   <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
     <div class="px-4 py-2.5 border-b border-gray-800 flex items-center justify-between">
       <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Actividad reciente</span>
-      <button @click="loadFeed()" class="text-xs text-gray-500 hover:text-white transition flex items-center gap-1">
+      <button @click="loadFeed()" class="text-xs text-gray-500 hover:text-white transition flex items-center gap-1" data-i18n="common.refresh">
         <i class="ti ti-refresh text-xs"></i> Refresh
       </button>
     </div>
@@ -175,20 +176,22 @@
 <!-- New Run Modal (same as runs.html) -->
 <div x-show="showRunModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
   <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
-    <h2 class="text-lg font-semibold mb-4">New Run</h2>
+    <h2 class="text-lg font-semibold mb-4" data-i18n="runs.modal.title">New Run</h2>
     <div class="flex gap-1 mb-5 bg-gray-800 rounded-lg p-1">
       <button type="button" @click="form.mode = 'team'"
         class="flex-1 text-sm py-1.5 rounded-md transition font-medium"
-        :class="form.mode === 'team' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'">Team run</button>
+        :class="form.mode === 'team' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'"
+        data-i18n="runs.modal.team_run">Team run</button>
       <button type="button" @click="form.mode = 'engine'"
         class="flex-1 text-sm py-1.5 rounded-md transition font-medium"
-        :class="form.mode === 'engine' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'">Engine run</button>
+        :class="form.mode === 'engine' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'"
+        data-i18n="runs.modal.engine_run">Engine run</button>
     </div>
     <form @submit.prevent="triggerRun()">
       <template x-if="form.mode === 'team'">
         <div>
           <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1">Team</label>
+            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.team_run">Team</label>
             <select x-model="form.team" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
               <template x-for="t in teamOptions" :key="t">
                 <option :value="t" x-text="t"></option>
@@ -196,26 +199,26 @@
             </select>
           </div>
           <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1">Request</label>
+            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.goal">Request</label>
             <textarea x-model="form.request" rows="3" placeholder="Build an auth module with JWT…"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
           </div>
           <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1">Max cost (USD, optional)</label>
+            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.max_cost">Max cost (USD, optional)</label>
             <input type="number" step="0.01" min="0.01" x-model.number="form.max_cost_usd" placeholder="e.g. 2.00"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
           </div>
           <div class="mb-5 flex items-center gap-2.5">
             <input type="checkbox" id="hitl-toggle" x-model="form.hitl"
               class="w-4 h-4 rounded border-gray-600 bg-gray-800">
-            <label for="hitl-toggle" class="text-sm text-gray-300 select-none cursor-pointer">Enable HITL</label>
+            <label for="hitl-toggle" class="text-sm text-gray-300 select-none cursor-pointer" data-i18n="runs.modal.hitl">Enable HITL</label>
           </div>
         </div>
       </template>
       <template x-if="form.mode === 'engine'">
         <div>
           <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1">Goal</label>
+            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.goal">Goal</label>
             <textarea x-model="form.goal" rows="3" placeholder="Build a REST API for a task manager…"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
           </div>
@@ -228,10 +231,10 @@
       </template>
       <div class="flex gap-3 mt-1">
         <button type="button" @click="showRunModal = false"
-          class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition">Cancel</button>
+          class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition" data-i18n="common.cancel">Cancel</button>
         <button type="submit" :disabled="submitting"
           class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
-          x-text="submitting ? 'Starting…' : 'Start Run'"></button>
+          x-text="submitting ? window.__i18n?.t('runs.modal.starting') || 'Starting…' : window.__i18n?.t('runs.modal.start') || 'Start Run'"></button>
       </div>
       <p x-show="formError" class="text-red-400 text-xs mt-3" x-text="formError"></p>
     </form>
@@ -333,7 +336,7 @@ function dashFeed() {
                 : isError ? 'ti ti-circle-x text-red-400'
                 : 'ti ti-minus text-gray-500',
               title: (run.request || run.team || '').slice(0, 72),
-              subtitle: `${run.team} · ${run.cost_usd ? '$' + run.cost_usd.toFixed(3) : '—'} · ${this.timeAgo(run.created_at)}`,
+              subtitle: `${run.team} · ${run.cost_usd ? '€' + run.cost_usd.toFixed(3) : '—'} · ${this.timeAgo(run.created_at)}`,
               badge: run.status,
               badgeClass: isRunning ? 'bg-blue-900/50 text-blue-300'
                 : isSuccess ? 'bg-green-900/50 text-green-300'
