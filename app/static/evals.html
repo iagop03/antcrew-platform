@@ -257,8 +257,8 @@
     <button @click="regOpen = !regOpen"
       class="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition">
       <span x-text="regOpen ? '▾' : '▸'" class="text-gray-500"></span>
-      Regression Tests
-      <span class="text-xs text-gray-500 font-normal">(prompt drift detection)</span>
+      <span data-i18n="evals.regression.title">Regression Tests</span>
+      <span class="text-xs text-gray-500 font-normal" data-i18n="evals.regression.subtitle">(prompt drift detection)</span>
     </button>
   </div>
 
@@ -266,21 +266,21 @@
     <div class="grid grid-cols-2 gap-4">
       <!-- Form -->
       <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h3 class="text-sm font-medium text-gray-300 mb-3">New Regression Batch</h3>
+        <h3 class="text-sm font-medium text-gray-300 mb-3" data-i18n="evals.regression.batch">New Regression Batch</h3>
         <div class="space-y-3">
           <div>
-            <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1">Run IDs (one per line)</label>
+            <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1" data-i18n="evals.regression.run_ids">Run IDs (one per line)</label>
             <textarea x-model="regRunIds" rows="4" placeholder="run_id_1&#10;run_id_2&#10;run_id_3"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono text-gray-200 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1">Team override</label>
+              <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1" data-i18n="evals.regression.team_override">Team override</label>
               <input x-model="regTeam" placeholder="e.g. DevTeam"
                 class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-indigo-500" />
             </div>
             <div>
-              <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1">Model override</label>
+              <label class="block text-xs text-gray-500 uppercase tracking-wide mb-1" data-i18n="evals.regression.model_override">Model override</label>
               <input x-model="regModel" placeholder="e.g. claude"
                 class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-indigo-500" />
             </div>
@@ -289,15 +289,15 @@
           <button @click="submitRegression()"
             :disabled="regSubmitting || !regRunIds.trim()"
             class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium px-3 py-2 rounded-lg transition">
-            <span x-show="!regSubmitting">Run Regression</span>
-            <span x-show="regSubmitting" x-cloak>Launching…</span>
+            <span x-show="!regSubmitting" data-i18n="evals.regression.run">Run Regression</span>
+            <span x-show="regSubmitting" x-cloak data-i18n="evals.regression.running">Launching…</span>
           </button>
         </div>
       </div>
 
       <!-- Result panel -->
       <div x-show="!currentReg" class="bg-gray-900 border border-dashed border-gray-700 rounded-xl p-4 flex items-center justify-center">
-        <p class="text-gray-600 text-sm text-center">Results appear here after a regression run.</p>
+        <p class="text-gray-600 text-sm text-center" data-i18n="evals.regression.empty">Results appear here after a regression run.</p>
       </div>
       <template x-if="currentReg">
         <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">

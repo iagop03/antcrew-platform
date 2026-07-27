@@ -25,6 +25,10 @@ body{overflow:hidden}
 .palette-chip{cursor:grab;border:1px solid rgba(255,255,255,.07);transition:background .12s,border-color .12s}
 .palette-chip:hover{border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.05)}
 .palette-chip:active{cursor:grabbing}
+.port-handle{cursor:crosshair;opacity:0;transition:opacity .12s}
+.node-group:hover .port-handle{opacity:.75}
+.port-handle:hover{opacity:1 !important}
+.comment-node{cursor:move}
 .ac-nav{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;font-size:.8125rem;font-weight:500;color:rgb(107,114,128);text-decoration:none;transition:background .12s,color .12s;white-space:nowrap}
 .ac-nav:hover{background:rgba(31,41,55,.7);color:rgb(229,231,235)}
 .ac-nav.ac-on{background:rgba(31,41,55,.95);color:#fff}
@@ -90,6 +94,19 @@ body{overflow:hidden}
     <span x-show="activeId && isTemplate" class="text-xs bg-gray-800 text-gray-600 px-2 py-0.5 rounded font-mono">template</span>
   </div>
 
+  <!-- Undo/redo + extra tools -->
+  <div x-show="activeId" x-cloak class="flex items-center gap-0.5 border-r border-gray-700/50 pr-2 mr-0.5">
+    <button @click="undo()" :disabled="historyIdx <= 0" title="Deshacer (Ctrl+Z)"
+      class="px-1.5 py-1 text-gray-600 hover:text-gray-300 text-sm transition-colors disabled:opacity-25 rounded">↩</button>
+    <button @click="redo()" :disabled="historyIdx >= history.length - 1" title="Rehacer (Ctrl+Y)"
+      class="px-1.5 py-1 text-gray-600 hover:text-gray-300 text-sm transition-colors disabled:opacity-25 rounded">↪</button>
+    <button @click="addComment()" title="Añadir comentario (Ctrl+M)"
+      class="px-1.5 py-1 text-gray-600 hover:text-yellow-400 text-xs transition-colors rounded">💬</button>
+    <button @click="snapToGrid = !snapToGrid" title="Encajar a cuadrícula (Ctrl+G)"
+      class="px-1.5 py-1 text-xs transition-colors rounded font-mono"
+      :class="snapToGrid ? 'text-indigo-400' : 'text-gray-600 hover:text-gray-300'">⊞</button>
+  </div>
+
   <div class="flex items-center gap-1.5">
     <span x-show="saveStatus" x-cloak class="text-xs"
       :class="saveStatus==='saved'?'text-emerald-500':saveStatus==='error'?'text-red-400':'text-gray-500'"
@@ -101,12 +118,12 @@ body{overflow:hidden}
       Guardar
     </button>
 
-    <button x-show="activeId && isTemplate" @click="forkTemplate()"
+    <button x-show="activeId && isTemplate" @click="saveAsName=activeName+' (copia)'; showSaveAsModal=true"
       class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
-      Clonar →
+      Guardar como…
     </button>
 
-    <!-- Run button: clean play icon, no background -->
+    <!-- Run button -->
     <button x-show="activeId" @click="showRunModal=true"
       class="flex items-center gap-1.5 px-3 py-1.5 text-emerald-400 hover:text-emerald-300 text-xs font-medium transition-colors rounded hover:bg-emerald-950/40">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,1 11,6 2,11"/></svg>
@@ -197,6 +214,17 @@ body{overflow:hidden}
       <rect width="100%" height="100%" fill="url(#grid)"/>
     </svg>
 
+    <!-- Draft restore banner -->
+    <div x-show="hasDraft" x-cloak
+      class="absolute top-3 z-10 bg-amber-950/95 border border-amber-800/70 rounded-lg px-4 py-2.5 flex items-center gap-3 text-xs shadow-xl"
+      style="left:50%;transform:translateX(-50%)">
+      <span class="text-amber-300">Cambios no guardados de la sesión anterior</span>
+      <button @click="_restoreDraft()"
+        class="text-white bg-amber-700 hover:bg-amber-600 px-2.5 py-0.5 rounded transition-colors font-medium">Restaurar</button>
+      <button @click="hasDraft=false; localStorage.removeItem('ac_pipeline_draft')"
+        class="text-amber-600 hover:text-amber-400 transition-colors ml-1">✕</button>
+    </div>
+
     <!-- Empty state -->
     <div x-show="!activeId" class="absolute inset-0 flex items-center justify-center pointer-events-none">
       <div class="text-center space-y-2">
@@ -264,12 +292,20 @@ body{overflow:hidden}
             <input x-model="selectedNode.label" @input="render()"
               class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
           </div>
-          <div>
+          <!-- Comment node info -->
+          <div x-show="selectedNode.type === 'comment'"
+            class="rounded p-2 text-xs text-yellow-400/80 bg-yellow-950/25 border border-yellow-800/30 leading-relaxed">
+            Nodo de documentación — no afecta la ejecución.
+            <button @click="startEditComment(selectedNodeId)" class="underline ml-1">Editar texto</button>
+          </div>
+
+          <div x-show="selectedNode.type !== 'comment'">
             <label class="block text-xs text-gray-500 mb-1">Tipo</label>
             <p class="text-xs font-mono text-gray-500 bg-gray-800/60 rounded px-2 py-1.5 truncate" x-text="selectedNode.type"></p>
           </div>
 
-          <!-- Provider selector -->
+          <!-- Provider selector (hidden for comment nodes) -->
+          <template x-if="selectedNode.type !== 'comment'">
           <div>
             <label class="block text-xs text-gray-500 mb-1">Proveedor</label>
             <select :value="nodeProvider(selectedNode.model)"
@@ -313,9 +349,10 @@ body{overflow:hidden}
             class="rounded p-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-800/40 leading-relaxed">
             ⚠ Sin downstream — HITL se saltea.
           </div>
+          </template>
         </div>
 
-        <div>
+        <div x-show="selectedNode.type !== 'comment'">
           <p class="text-xs text-gray-600 uppercase tracking-wide mb-2">Conexiones</p>
           <div class="space-y-1">
             <template x-for="e in edgesFromNode(selectedNodeId)" :key="e.id">
@@ -502,6 +539,46 @@ body{overflow:hidden}
   </div>
 </template>
 
+<!-- ── Save as modal ── -->
+<template x-teleport="body">
+  <div x-show="showSaveAsModal" x-cloak class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+    @click.self="showSaveAsModal=false" @keydown.escape.window="showSaveAsModal=false">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-sm p-5 space-y-4">
+      <h3 class="font-semibold text-sm">Guardar como nuevo pipeline</h3>
+      <input x-model="saveAsName" @keydown.enter="savePipelineAs()" @keydown.escape="showSaveAsModal=false"
+        placeholder="Nombre del nuevo pipeline"
+        class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+      <div class="flex gap-2 justify-end">
+        <button @click="showSaveAsModal=false"
+          class="px-3 py-1.5 text-xs text-gray-500 hover:text-white transition-colors">Cancelar</button>
+        <button @click="savePipelineAs()" :disabled="!saveAsName.trim()"
+          class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs rounded transition-colors">
+          Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- ── Comment edit modal ── -->
+<template x-teleport="body">
+  <div x-show="editingCommentId" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    @click.self="finishEditComment()">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-80 p-5 space-y-3">
+      <h3 class="font-semibold text-sm">Editar comentario</h3>
+      <textarea x-model="editingCommentText" rows="4" @keydown.escape="finishEditComment()"
+        placeholder="Escribe una nota de documentación…"
+        class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-yellow-600 resize-none"></textarea>
+      <div class="flex gap-2 justify-end">
+        <button @click="editingCommentId=null"
+          class="px-3 py-1.5 text-xs text-gray-500 hover:text-white transition-colors">Cancelar</button>
+        <button @click="finishEditComment()"
+          class="px-3 py-1.5 bg-yellow-700 hover:bg-yellow-600 text-white text-xs rounded transition-colors">Guardar</button>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script>
 // ── Constants ─────────────────────────────────────────────────────────────
 const NODE_W = 168, NODE_H = 56;
@@ -628,6 +705,27 @@ function app() {
     newAgent: { label: '', color: '#7c3aed' },
     newAgentError: '',
 
+    // Undo/redo
+    history: [],
+    historyIdx: -1,
+
+    // Port drawing
+    drawFromPort: 'e',
+
+    // Save as
+    showSaveAsModal: false,
+    saveAsName: '',
+
+    // Snap to grid
+    snapToGrid: false,
+
+    // Draft recovery
+    hasDraft: false,
+
+    // Comment editing
+    editingCommentId: null,
+    editingCommentText: '',
+
     // ── Computed ───────────────────────────────────────────────────────────
 
     get selectedNode() {
@@ -681,24 +779,58 @@ function app() {
       return this.edges.filter(e => e.from === nodeId);
     },
 
+    _portCoords(node, port) {
+      switch(port || 'e') {
+        case 'n': return [node.x + NODE_W/2, node.y];
+        case 's': return [node.x + NODE_W/2, node.y + NODE_H];
+        case 'w': return [node.x,            node.y + NODE_H/2];
+        default:  return [node.x + NODE_W,   node.y + NODE_H/2];
+      }
+    },
+
+    _portDir(port) {
+      switch(port || 'e') {
+        case 'n': return {x:0, y:-1};
+        case 's': return {x:0, y:1};
+        case 'w': return {x:-1, y:0};
+        default:  return {x:1, y:0};
+      }
+    },
+
+    _nearestPort(node, cx, cy) {
+      const pts = [
+        {id:'n', px:node.x+NODE_W/2, py:node.y},
+        {id:'e', px:node.x+NODE_W,   py:node.y+NODE_H/2},
+        {id:'s', px:node.x+NODE_W/2, py:node.y+NODE_H},
+        {id:'w', px:node.x,          py:node.y+NODE_H/2},
+      ];
+      let best='w', min=Infinity;
+      for (const {id,px,py} of pts) {
+        const d = Math.hypot(px-cx, py-cy);
+        if (d < min) { min=d; best=id; }
+      }
+      return best;
+    },
+
     edgePath(edge) {
       const fn = this.nodes.find(n => n.id === edge.from);
       const tn = this.nodes.find(n => n.id === edge.to);
       if (!fn || !tn) return '';
-      const x1 = fn.x + NODE_W, y1 = fn.y + NODE_H / 2;
-      const x2 = tn.x,          y2 = tn.y + NODE_H / 2;
-      const c = Math.max(60, Math.abs(x2 - x1) / 2);
-      return `M ${x1} ${y1} C ${x1+c} ${y1} ${x2-c} ${y2} ${x2} ${y2}`;
+      const fp = edge.fromPort || 'e', tp = edge.toPort || 'w';
+      const [x1,y1] = this._portCoords(fn, fp);
+      const [x2,y2] = this._portCoords(tn, tp);
+      const dist = Math.max(60, Math.hypot(x2-x1, y2-y1) * 0.45);
+      const d1 = this._portDir(fp), d2 = this._portDir(tp);
+      return `M ${x1} ${y1} C ${x1+d1.x*dist} ${y1+d1.y*dist} ${x2+d2.x*dist} ${y2+d2.y*dist} ${x2} ${y2}`;
     },
 
     edgeMid(edge) {
       const fn = this.nodes.find(n => n.id === edge.from);
       const tn = this.nodes.find(n => n.id === edge.to);
       if (!fn || !tn) return { x: 0, y: 0 };
-      return {
-        x: (fn.x + NODE_W + tn.x) / 2,
-        y: (fn.y + tn.y + NODE_H) / 2,
-      };
+      const [x1,y1] = this._portCoords(fn, edge.fromPort||'e');
+      const [x2,y2] = this._portCoords(tn, edge.toPort||'w');
+      return { x: (x1+x2)/2, y: (y1+y2)/2 };
     },
 
     timeAgo(iso) {
@@ -715,6 +847,7 @@ function app() {
     async init() {
       this._loadCustomAgents();
       await Promise.all([this.loadPipelineList(), this.loadPalette(), this.loadWorkspaces()]);
+      this._checkDraft();
     },
 
     _loadCustomAgents() {
@@ -811,7 +944,10 @@ function app() {
       this.zoom = def.zoom || 1;
       this.pan = def.pan ? { ...def.pan } : { x: 40, y: 40 };
       this.saveStatus = '';
+      this.history = [];
+      this.historyIdx = -1;
       this.renderCanvas();
+      this.pushHistory();
       this.loadPipelineRuns();
     },
 
@@ -827,7 +963,10 @@ function app() {
       this.zoom = 1;
       this.pan = { x: 40, y: 40 };
       this.saveStatus = '';
+      this.history = [];
+      this.historyIdx = -1;
       this.renderCanvas();
+      this.pushHistory();
     },
 
     async forkTemplate() {
@@ -997,10 +1136,52 @@ function app() {
         dg.appendChild(this._svg('circle', { r: '8', fill: '#7f1d1d' }));
         const dx = this._svg('text', { 'text-anchor': 'middle', y: '4', fill: 'white', 'font-size': '11' });
         dx.textContent = '✕'; dg.appendChild(dx);
-        dg.addEventListener('click', (ev) => { ev.stopPropagation(); this.removeEdge(edge); this.renderCanvas(); });
+        dg.addEventListener('click', (ev) => { ev.stopPropagation(); this.pushHistory(); this.removeEdge(edge); this.renderCanvas(); this._autoSave(); });
         g.appendChild(dg);
         layer.appendChild(g);
       }
+    },
+
+    _renderCommentNode(node, layer) {
+      const W = 168, H = NODE_H;
+      const sel = this.selectedNodeId === node.id;
+      const g = this._svg('g', { class: 'node-group comment-node' + (sel ? ' selected' : ''), transform: `translate(${node.x},${node.y})` });
+      g.dataset.nid = node.id;
+      g.appendChild(this._svg('rect', {
+        width: W.toString(), height: H.toString(), rx: '6',
+        fill: '#fef9c310', stroke: sel ? '#fbbf24' : '#ca8a0440',
+        'stroke-width': '1.5', 'stroke-dasharray': '5,3',
+      }));
+      // Text lines
+      const words = (node.label || 'Comentario').split(/\s+/);
+      const lines = []; let line = '';
+      for (const w of words) {
+        const test = line ? line + ' ' + w : w;
+        if (test.length > 22 && line) { lines.push(line); line = w; } else line = test;
+      }
+      if (line) lines.push(line);
+      for (let i = 0; i < Math.min(lines.length, 3); i++) {
+        const tx = this._svg('text', { x: '10', y: (18 + i * 14).toString(), 'font-size': '10', fill: '#fde04799', 'font-family': 'ui-sans-serif,sans-serif' });
+        tx.textContent = lines[i]; g.appendChild(tx);
+      }
+      if (lines.length > 3) {
+        const el = this._svg('text', { x: '10', y: '52', 'font-size': '9', fill: '#ca8a04aa' });
+        el.textContent = '…'; g.appendChild(el);
+      }
+      // Delete button
+      const dbtn = this._svg('g', { transform: 'translate(156,4)' });
+      dbtn.style.cursor = 'pointer'; dbtn.style.opacity = '0';
+      g.addEventListener('mouseenter', () => dbtn.style.opacity = '1');
+      g.addEventListener('mouseleave', () => dbtn.style.opacity = '0');
+      dbtn.appendChild(this._svg('circle', { r: '7', fill: '#450a0a' }));
+      const dtx = this._svg('text', { 'text-anchor': 'middle', y: '4', fill: '#fca5a5', 'font-size': '9' });
+      dtx.textContent = '✕'; dbtn.appendChild(dtx);
+      dbtn.addEventListener('mousedown', (e) => e.stopPropagation());
+      dbtn.addEventListener('click', () => { this.pushHistory(); this.removeNode(node); this.renderCanvas(); this._autoSave(); });
+      g.appendChild(dbtn);
+      g.addEventListener('dblclick', (e) => { e.stopPropagation(); this.startEditComment(node.id); });
+      g.addEventListener('mousedown', (e) => this.onNodeMouseDown(e, node));
+      layer.appendChild(g);
     },
 
     _renderNodes() {
@@ -1008,6 +1189,7 @@ function app() {
       if (!layer) return;
       layer.innerHTML = '';
       for (const node of this.nodes) {
+        if (node.type === 'comment') { this._renderCommentNode(node, layer); continue; }
         const color = nodeColor(node.type);
         const sel = this.selectedNodeId === node.id;
         const g = this._svg('g', { class: 'node-group' + (sel ? ' selected' : ''), transform: `translate(${node.x},${node.y})` });
@@ -1044,14 +1226,20 @@ function app() {
         const dtx = this._svg('text', { 'text-anchor': 'middle', y: '4', fill: '#fca5a5', 'font-size': '9' });
         dtx.textContent = '✕'; dbtn.appendChild(dtx);
         dbtn.addEventListener('mousedown', (e) => e.stopPropagation());
-        dbtn.addEventListener('click', () => { this.removeNode(node); this.renderCanvas(); });
+        dbtn.addEventListener('click', () => { this.pushHistory(); this.removeNode(node); this.renderCanvas(); this._autoSave(); });
         g.appendChild(dbtn);
-        // Input handle
-        g.appendChild(this._svg('circle', { class: 'handle-in', cx: '0', cy: '28', r: '5', fill: color, opacity: '.7' }));
-        // Output handle
-        const oh = this._svg('circle', { class: 'handle-out', cx: '168', cy: '28', r: '6', fill: color });
-        oh.addEventListener('mousedown', (e) => { e.stopPropagation(); this.onHandleMouseDown(e, node); });
-        g.appendChild(oh);
+        // 4 port handles (N, E, S, W)
+        const PORTS = [
+          {id:'n', cx:NODE_W/2, cy:0},
+          {id:'e', cx:NODE_W,   cy:NODE_H/2},
+          {id:'s', cx:NODE_W/2, cy:NODE_H},
+          {id:'w', cx:0,        cy:NODE_H/2},
+        ];
+        for (const {id, cx, cy} of PORTS) {
+          const ph = this._svg('circle', { class: 'port-handle', cx: cx.toString(), cy: cy.toString(), r: '5.5', fill: color });
+          ph.addEventListener('mousedown', (e) => { e.stopPropagation(); this.onHandleMouseDown(e, node, id); });
+          g.appendChild(ph);
+        }
         // Node drag/select
         g.addEventListener('mousedown', (e) => this.onNodeMouseDown(e, node));
         layer.appendChild(g);
@@ -1076,23 +1264,21 @@ function app() {
     },
 
     onSvgMouseDown(e) {
-      if (e.target.closest('.node-group') || e.target.closest('.handle-out')) return;
+      if (e.target.closest('.node-group') || e.target.classList.contains('port-handle')) return;
       if (this.drawing) { this.drawing = false; return; }
       const c = this._canvasClientCoords(e);
       this.dragging = { type: 'canvas', startX: c.x - this.pan.x, startY: c.y - this.pan.y };
       this.selectedNodeId = null;
     },
 
-    onHandleMouseDown(e, node) {
+    onHandleMouseDown(e, node, port) {
       e.stopPropagation();
       this.drawing = true;
       this.drawFromId = node.id;
+      this.drawFromPort = port || 'e';
+      const [px, py] = this._portCoords(node, port || 'e');
       const c = this._canvasClientCoords(e);
-      this._updateTempEdge(
-        node.x * this.zoom + this.pan.x + NODE_W * this.zoom,
-        node.y * this.zoom + this.pan.y + NODE_H/2 * this.zoom,
-        c.x, c.y
-      );
+      this._updateTempEdge(px * this.zoom + this.pan.x, py * this.zoom + this.pan.y, c.x, c.y);
     },
 
     onSvgMouseMove(e) {
@@ -1100,9 +1286,8 @@ function app() {
         const c = this._canvasClientCoords(e);
         const fn = this.nodes.find(n => n.id === this.drawFromId);
         if (fn) {
-          const x1 = fn.x * this.zoom + this.pan.x + NODE_W * this.zoom;
-          const y1 = fn.y * this.zoom + this.pan.y + NODE_H/2 * this.zoom;
-          this._updateTempEdge(x1, y1, c.x, c.y);
+          const [px, py] = this._portCoords(fn, this.drawFromPort);
+          this._updateTempEdge(px * this.zoom + this.pan.x, py * this.zoom + this.pan.y, c.x, c.y);
         }
         return;
       }
@@ -1118,9 +1303,9 @@ function app() {
         const c = this._canvasCoords(e);
         const node = this.nodes.find(n => n.id === this.dragging.nodeId);
         if (node) {
-          node.x = Math.round(c.x - this.dragging.offsetX);
-          node.y = Math.round(c.y - this.dragging.offsetY);
-          // Fast path: only move the dragged node group instead of re-rendering all
+          const snap = v => this.snapToGrid ? Math.round(v / 24) * 24 : Math.round(v);
+          node.x = snap(c.x - this.dragging.offsetX);
+          node.y = snap(c.y - this.dragging.offsetY);
           const g = document.querySelector(`#nodes-layer [data-nid="${node.id}"]`);
           if (g) g.setAttribute('transform', `translate(${node.x},${node.y})`);
         }
@@ -1136,18 +1321,21 @@ function app() {
         );
         if (toNode && toNode.id !== this.drawFromId) {
           const exists = this.edges.some(e => e.from === this.drawFromId && e.to === toNode.id);
-          if (!exists) {
-            this.edges.push({ id: edgeId(), from: this.drawFromId, to: toNode.id, condition: null });
+          if (!exists && toNode.type !== 'comment') {
+            const toPort = this._nearestPort(toNode, c.x, c.y);
+            this.pushHistory();
+            this.edges.push({ id: edgeId(), from: this.drawFromId, to: toNode.id, fromPort: this.drawFromPort, toPort, condition: null });
           }
         }
         this.drawing = false;
         this.tempEdgePath = '';
         this.renderCanvas();
+        this._autoSave();
         return;
       }
       if (this.dragging && this.dragging.type === 'node') {
-        // After node drag ends, re-render edges (they depend on node positions)
         this.renderCanvas();
+        this._autoSave();
       }
       this.dragging = null;
     },
@@ -1176,8 +1364,9 @@ function app() {
       // Always use the container div's rect (never the SVG's, which can be display:none).
       const container = document.getElementById('canvas-container');
       const rect = container.getBoundingClientRect();
-      const x = Math.round((e.clientX - rect.left - this.pan.x) / this.zoom);
-      const y = Math.round((e.clientY - rect.top  - this.pan.y) / this.zoom);
+      const snap = v => this.snapToGrid ? Math.round(v / 24) * 24 : Math.round(v);
+      const x = snap((e.clientX - rect.left - this.pan.x) / this.zoom);
+      const y = snap((e.clientY - rect.top  - this.pan.y) / this.zoom);
 
       let nodeId = type;
       if (this.nodes.some(n => n.id === nodeId)) {
@@ -1186,8 +1375,10 @@ function app() {
         nodeId = `${type}_${i}`;
       }
 
+      this.pushHistory();
       this.nodes.push({ id: nodeId, type, label, model: 'claude', hitl: false, channel_type: 'platform', x, y });
       this.renderCanvas();
+      this._autoSave();
     },
 
     // ── Edges ──────────────────────────────────────────────────────────────
@@ -1202,7 +1393,6 @@ function app() {
       this.nodes = this.nodes.filter(n => n.id !== node.id);
       this.edges = this.edges.filter(e => e.from !== node.id && e.to !== node.id);
       if (this.selectedNodeId === node.id) this.selectedNodeId = null;
-      this.renderCanvas();
     },
 
     onKeyDown(e) {
@@ -1211,7 +1401,15 @@ function app() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedNodeId) {
         e.preventDefault();
         const node = this.nodes.find(n => n.id === this.selectedNodeId);
-        if (node) this.removeNode(node);
+        if (node) { this.pushHistory(); this.removeNode(node); this.renderCanvas(); this._autoSave(); }
+        return;
+      }
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); this.undo(); return; }
+        if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); this.redo(); return; }
+        if (e.key === 'd' || e.key === 'D') { e.preventDefault(); this.duplicateNode(); return; }
+        if (e.key === 'g' || e.key === 'G') { e.preventDefault(); this.snapToGrid = !this.snapToGrid; return; }
+        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); this.addComment(); return; }
       }
     },
 
@@ -1221,18 +1419,154 @@ function app() {
     },
 
     saveEdgeCondition() {
-      if (this.editingEdge) this.editingEdge.condition = this.editingEdgeCondition.trim() || null;
+      if (this.editingEdge) {
+        this.pushHistory();
+        this.editingEdge.condition = this.editingEdgeCondition.trim() || null;
+      }
       this.editingEdge = null;
       this.renderCanvas();
+      this._autoSave();
     },
 
     onNodeMouseDown(e, node) {
-      if (e.target.classList.contains('handle-out')) return;
+      if (e.target.classList.contains('port-handle')) return;
       e.stopPropagation();
+      const wasSelected = this.selectedNodeId === node.id;
       this.selectedNodeId = node.id;
       const c = this._canvasCoords(e);
       this.dragging = { type: 'node', nodeId: node.id, offsetX: c.x - node.x, offsetY: c.y - node.y };
-      this.renderCanvas(); // re-render to show selection highlight
+      if (!wasSelected) this.pushHistory();
+      this.renderCanvas();
+    },
+
+    // ── Undo / Redo ───────────────────────────────────────────────────────────
+
+    pushHistory() {
+      const snap = JSON.stringify({ nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})) });
+      this.history = this.history.slice(0, this.historyIdx + 1);
+      this.history.push(snap);
+      if (this.history.length > 60) this.history.shift(); else this.historyIdx++;
+    },
+
+    undo() {
+      if (this.historyIdx <= 0) return;
+      this.historyIdx--;
+      const s = JSON.parse(this.history[this.historyIdx]);
+      this.nodes = s.nodes; this.edges = s.edges;
+      this.renderCanvas(); this._autoSave();
+    },
+
+    redo() {
+      if (this.historyIdx >= this.history.length - 1) return;
+      this.historyIdx++;
+      const s = JSON.parse(this.history[this.historyIdx]);
+      this.nodes = s.nodes; this.edges = s.edges;
+      this.renderCanvas(); this._autoSave();
+    },
+
+    // ── Auto-save draft ───────────────────────────────────────────────────────
+
+    _autoSave() {
+      if (!this.activeId) return;
+      try {
+        localStorage.setItem('ac_pipeline_draft', JSON.stringify({
+          activeId: this.activeId, activeName: this.activeName,
+          activeDescription: this.activeDescription, isTemplate: this.isTemplate,
+          nodes: this.nodes, edges: this.edges, zoom: this.zoom, pan: this.pan, ts: Date.now(),
+        }));
+      } catch {}
+    },
+
+    _checkDraft() {
+      try {
+        const d = JSON.parse(localStorage.getItem('ac_pipeline_draft') || 'null');
+        if (d && d.activeId && Date.now() - d.ts < 7 * 24 * 3600 * 1000) this.hasDraft = true;
+      } catch {}
+    },
+
+    _restoreDraft() {
+      try {
+        const d = JSON.parse(localStorage.getItem('ac_pipeline_draft') || 'null');
+        if (!d) return;
+        this._stopRunsPoller();
+        this.activeId = d.activeId; this.activeName = d.activeName || '';
+        this.activeDescription = d.activeDescription || ''; this.isTemplate = !!d.isTemplate;
+        this.nodes = (d.nodes || []).map(n => ({ model:'claude', hitl:false, channel_type:'platform', ...n }));
+        this.edges = (d.edges || []).map(e => ({ ...e, id: e.id || edgeId() }));
+        this.zoom = d.zoom || 1; this.pan = d.pan ? {...d.pan} : {x:40,y:40};
+        this.hasDraft = false; this.selectedNodeId = null;
+        this.history = []; this.historyIdx = -1;
+        this.renderCanvas(); this.pushHistory();
+      } catch {}
+    },
+
+    // ── Save as ───────────────────────────────────────────────────────────────
+
+    async savePipelineAs() {
+      const name = (this.saveAsName || '').trim();
+      if (!name) return;
+      const ws = this.workspaces[0];
+      if (!ws) { alert('Necesitas al menos un workspace.'); return; }
+      const body = {
+        name, workspace_id: ws.id,
+        description: this.activeDescription || null,
+        definition: { nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})), zoom: this.zoom, pan: {...this.pan} },
+      };
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const r = await fetch('/pipelines/', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', ...(key?{'X-Api-Key':key}:{})},
+        credentials: 'same-origin', body: JSON.stringify(body),
+      });
+      if (!r.ok) { alert('Error al guardar'); return; }
+      const created = await r.json();
+      await this.loadPipelineList();
+      this.showSaveAsModal = false; this.saveAsName = '';
+      this.loadPipeline(created);
+    },
+
+    // ── Duplicate node ────────────────────────────────────────────────────────
+
+    duplicateNode() {
+      const src = this.selectedNode;
+      if (!src) return;
+      let nodeId = src.type; let i = 2;
+      while (this.nodes.some(n => n.id === `${src.type}_${i}`)) i++;
+      nodeId = `${src.type}_${i}`;
+      const dup = { ...src, id: nodeId, x: src.x + 24, y: src.y + 24 };
+      this.pushHistory();
+      this.nodes.push(dup);
+      this.selectedNodeId = dup.id;
+      this.renderCanvas(); this._autoSave();
+    },
+
+    // ── Comment nodes ─────────────────────────────────────────────────────────
+
+    addComment() {
+      if (!this.activeId) this.newPipeline();
+      const id = 'comment_' + Date.now();
+      const cx = Math.round((-this.pan.x + 220) / this.zoom);
+      const cy = Math.round((-this.pan.y + 140) / this.zoom);
+      this.pushHistory();
+      this.nodes.push({ id, type: 'comment', label: 'Comentario', model: null, hitl: false, channel_type: null, x: cx, y: cy });
+      this.selectedNodeId = id;
+      this.renderCanvas();
+      this.startEditComment(id);
+      this._autoSave();
+    },
+
+    startEditComment(nodeId) {
+      const node = this.nodes.find(n => n.id === nodeId);
+      if (!node) return;
+      this.editingCommentId = nodeId;
+      this.editingCommentText = node.label === 'Comentario' ? '' : (node.label || '');
+    },
+
+    finishEditComment() {
+      if (!this.editingCommentId) return;
+      const node = this.nodes.find(n => n.id === this.editingCommentId);
+      if (node) { node.label = this.editingCommentText.trim() || 'Comentario'; this.renderCanvas(); this._autoSave(); }
+      this.editingCommentId = null;
     },
   };
 }

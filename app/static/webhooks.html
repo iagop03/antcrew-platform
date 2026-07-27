@@ -55,8 +55,8 @@
 <!-- Header -->
 <div class="px-6 py-5 flex items-center justify-between">
   <div>
-    <h1 class="text-xl font-semibold">Webhook Management</h1>
-    <p class="text-gray-400 text-sm mt-0.5">Register and manage per-workspace webhook URLs</p>
+    <h1 class="text-xl font-semibold" data-i18n="whk.title">Webhook Management</h1>
+    <p class="text-gray-400 text-sm mt-0.5" data-i18n="whk.subtitle">Register and manage per-workspace webhook URLs</p>
   </div>
 </div>
 
@@ -71,7 +71,7 @@
 
 <!-- Workspace selector -->
 <div class="px-6 mb-6 flex items-center gap-3">
-  <label class="text-sm text-gray-400">Workspace:</label>
+  <label class="text-sm text-gray-400" data-i18n="whk.workspace">Workspace:</label>
   <select x-model="selectedWsId" @change="loadHooks()"
     class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
     <option value="">— select —</option>
@@ -86,26 +86,26 @@
 <div class="px-6" x-show="selectedWsId">
   <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden mb-6">
     <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-      <span class="text-sm font-medium">Registered webhooks</span>
+      <span class="text-sm font-medium" data-i18n="whk.registered">Registered webhooks</span>
       <button @click="showCreate = true"
         class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition">
-        + Register
+        <span data-i18n="whk.register">+ Register</span>
       </button>
     </div>
 
     <template x-if="hooks.length === 0 && !loading">
-      <div class="px-4 py-8 text-center text-gray-500 text-sm">No webhooks registered for this workspace.</div>
+      <div class="px-4 py-8 text-center text-gray-500 text-sm" data-i18n="whk.empty">No webhooks registered for this workspace.</div>
     </template>
 
     <template x-if="hooks.length > 0">
       <table class="w-full text-sm">
         <thead class="border-b border-gray-800">
           <tr class="text-gray-400 text-xs uppercase tracking-wide">
-            <th class="px-4 py-3 text-left">URL</th>
-            <th class="px-4 py-3 text-left">Events</th>
-            <th class="px-4 py-3 text-left">Label</th>
-            <th class="px-4 py-3 text-left">Status</th>
-            <th class="px-4 py-3 text-left">Created</th>
+            <th class="px-4 py-3 text-left" data-i18n="whk.col.url">URL</th>
+            <th class="px-4 py-3 text-left" data-i18n="whk.col.events">Events</th>
+            <th class="px-4 py-3 text-left" data-i18n="whk.col.label">Label</th>
+            <th class="px-4 py-3 text-left" data-i18n="whk.col.status">Status</th>
+            <th class="px-4 py-3 text-left" data-i18n="whk.col.created">Created</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -127,7 +127,7 @@
               <td class="px-4 py-3 text-right">
                 <button @click="deleteHook(hook.id)"
                   class="text-xs text-red-400 hover:text-red-300 transition px-2 py-1 rounded hover:bg-red-950">
-                  Delete
+                  <span data-i18n="whk.delete">Delete</span>
                 </button>
               </td>
             </tr>
@@ -143,19 +143,19 @@
   @keydown.escape.window="showCreate = false">
   <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 shadow-xl"
     @click.outside="showCreate = false">
-    <h2 class="text-base font-semibold mb-4">Register Webhook</h2>
+    <h2 class="text-base font-semibold mb-4" data-i18n="whk.modal.title">Register Webhook</h2>
 
     <div class="space-y-4">
       <div>
-        <label class="block text-xs text-gray-400 mb-1">URL <span class="text-red-400">*</span></label>
+        <label class="block text-xs text-gray-400 mb-1"><span data-i18n="whk.modal.url">URL</span> <span class="text-red-400">*</span></label>
         <input x-model="form.url" type="url" placeholder="https://example.com/webhook"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white
                  focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
-        <p class="text-xs text-gray-500 mt-1">Must start with https://</p>
+        <p class="text-xs text-gray-500 mt-1" data-i18n="whk.modal.https">Must start with https://</p>
       </div>
 
       <div>
-        <label class="block text-xs text-gray-400 mb-1">Event types</label>
+        <label class="block text-xs text-gray-400 mb-1" data-i18n="whk.modal.events">Event types</label>
         <div class="space-y-1">
           <template x-for="ev in availableEvents" :key="ev">
             <label class="flex items-center gap-2 cursor-pointer">
@@ -168,7 +168,7 @@
       </div>
 
       <div>
-        <label class="block text-xs text-gray-400 mb-1">Label <span class="text-gray-600">(optional)</span></label>
+        <label class="block text-xs text-gray-400 mb-1"><span data-i18n="whk.modal.label">Label</span> <span class="text-gray-600" data-i18n="whk.modal.optional">(optional)</span></label>
         <input x-model="form.label" type="text" placeholder="e.g. CI notifier"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white
                  focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-600">
@@ -177,12 +177,13 @@
 
     <div class="flex justify-end gap-3 mt-6">
       <button @click="showCreate = false"
-        class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cancel</button>
+        class="px-4 py-2 text-sm text-gray-400 hover:text-white transition" data-i18n="whk.modal.cancel">Cancel</button>
       <button @click="createHook()"
         :disabled="!form.url || form.events.length === 0 || saving"
         class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed
                text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-        <span x-text="saving ? 'Registering…' : 'Register'"></span>
+        <span x-show="!saving" data-i18n="whk.modal.register">Register</span>
+        <span x-show="saving" x-cloak data-i18n="whk.modal.registering">Registering…</span>
       </button>
     </div>
     <p x-show="formError" class="text-xs text-red-400 mt-2" x-text="formError"></p>
