@@ -33,19 +33,22 @@ async def _make_workspace(session, name="ws-r10", slug="ws-r10", max_cost_usd=No
 # ---------------------------------------------------------------------------
 
 async def _make_runner_engine(monkeypatch):
-    """Create a fresh in-memory engine for tests that call runner functions directly.
+    """Create a fresh in-memory engine for tests that call runner_base functions directly.
 
-    runner.py uses engine from app.core.database. Tests use their own in-memory engine
-    via the session fixture. We monkeypatch runner.engine to point to the test engine
-    so DB writes are visible in both directions.
+    _check_workspace_budget and _mark_workspace_budget_status live in runner_base,
+    which imports engine from app.core.database inside each function call.
+    Patching app.core.database.engine ensures both runner.py and runner_base.py
+    see the test engine regardless of where they import it from.
     """
     from sqlalchemy.ext.asyncio import create_async_engine
     from sqlmodel import SQLModel
+    import app.core.database as db_mod
     import app.services.runner as runner_mod
 
     test_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with test_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+    monkeypatch.setattr(db_mod, "engine", test_engine)
     monkeypatch.setattr(runner_mod, "engine", test_engine)
     return test_engine
 

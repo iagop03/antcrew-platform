@@ -1,5 +1,26 @@
 # Changelog — antcrew-platform
 
+## v0.5.0 (2026-07-27)
+
+### Added
+- **Proxy LLM key mode** — third billing tier (×0.7) that lets customers hold their own LLM API keys without ever exposing them to the platform.
+  - Platform generates a UUID token per workspace, stores it encrypted with the BYOK key; the customer runs `antcrew-proxy` (Docker) with their real provider keys and the UUID token.
+  - On every LLM call the platform sends the UUID token to the proxy instead of calling the provider directly. The proxy validates the token (constant-time `hmac.compare_digest`), substitutes the real API key, and forwards the request. Platform never touches provider keys.
+  - **Multi-provider routing** by URL path prefix: `/anthropic/…` → `api.anthropic.com`, `/openai/…` → `api.openai.com`, `/groq/…` → `api.groq.com/openai`, `/gemini/…` → `generativelanguage.googleapis.com/v1beta/openai`. Full streaming (SSE) passthrough via `aiter_raw()`.
+  - **`resolve_workspace_llm_config(session, workspace, model)`** in `runner_base.py` — canonical three-way dispatch for managed / BYOK / proxy, used by both `runner.py` and `engine_runner.py`.
+  - **Proxy API**: `GET /workspaces/{id}/proxy` (status), `POST /workspaces/{id}/proxy/generate` (generate/rotate token + docker command), `POST /workspaces/{id}/proxy/activate` (switch mode), `DELETE /workspaces/{id}/proxy` (revoke, revert to managed).
+  - **Settings UI** — violet Proxy ×0.7 button, token generate/reveal panel (shown once), docker run command in `<details>`, revoke button; workspace table badge shows violet for proxy-mode workspaces.
+  - Migration 030: adds `proxy_url TEXT NULL` and `proxy_token_enc TEXT NULL` to `workspace`.
+  - `_check_proxy_config()` lifespan guard — warns/blocks at startup if proxy-mode workspaces exist without `BYOK_ENCRYPTION_KEY`.
+  - **`antcrew-proxy`** open-source companion repo published at `github.com/iagop03/antcrew-proxy` with GitHub Actions CI pushing to `ghcr.io/iagop03/antcrew-proxy` (linux/amd64 + arm64).
+
+### Changed
+- `Workspace.llm_key_mode` now accepts `"proxy"` in addition to `"managed"` and `"byok"`.
+- `get_cost_multiplier()` returns `0.7` for proxy mode.
+- `_check_workspace_budget` and `_mark_workspace_budget_status` are now in `runner_base.py`; both runners import from there (eliminates the cross-module private import).
+
+---
+
 ## v0.4.9 (2026-07-26)
 
 ### Added

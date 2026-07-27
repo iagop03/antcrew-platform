@@ -105,7 +105,7 @@ curl /evals/regression/{regression_id}
 - API key header (`X-Api-Key`) or env var `PLATFORM_API_KEY`
 - Per-key roles: `admin | write | read | reviewer`
 - One key can access multiple workspaces (membership table)
-- BYOK mode: workspaces supply their own LLM API keys (Anthropic, OpenAI, Groq, etc.)
+- **Three LLM key modes**: Managed (platform key, ×3.0) / BYOK (customer key, ×0.4) / Proxy (customer runs `antcrew-proxy` locally, ×0.7 — platform never sees the key)
 - **Email+password registration** — `POST /auth/register` creates user + workspace; returns admin API key
 - **Email verification** — 6-digit code sent on register; `POST /auth/verify-email` confirms it
 - **Workspace invites** — admins send email invites (`POST /workspaces/{id}/invites`); recipients accept via link
@@ -298,7 +298,7 @@ Full interactive docs at `/docs` (Swagger UI) and `/redoc`.
 | `WEBHOOK_URL` | — | Global fallback webhook fired on every `pipeline.end` |
 | `PLATFORM_BASE_URL` | — | Public base URL for review links in webhooks |
 | `ANTCREW_WORKERS` | `4` | Background engine worker threads |
-| `BYOK_ENCRYPTION_KEY` | — | Fernet key for encrypting per-workspace LLM API keys |
+| `BYOK_ENCRYPTION_KEY` | — | Fernet key for encrypting per-workspace LLM API keys and proxy tokens |
 | `BASE_URL` | `https://app.antcrew.ai` | Public base URL for invite/join-request links in emails |
 | `SMTP_HOST` | — | SMTP server for email notifications (verification codes, invites) |
 | `SMTP_PORT` | `587` | SMTP port |

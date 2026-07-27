@@ -607,12 +607,9 @@ async def dispatch_engine(
         from app.models.run import Workspace as _WS
         async with AsyncSession(_db_engine, expire_on_commit=False) as _sess:
             _ws = (await _sess.exec(_sel(_WS).where(_WS.id == workspace_id))).first()
-            if _ws and getattr(_ws, "llm_key_mode", "managed") == "byok":
-                from app.core.byok import get_workspace_llm_key_for_model
-                _byok = await get_workspace_llm_key_for_model(_sess, workspace_id, model)
-                if _byok:
-                    _byok_api_key = _byok.key
-                    _byok_base_url = _byok.base_url
+            if _ws:
+                from app.services.runner_base import resolve_workspace_llm_config
+                _byok_api_key, _byok_base_url = await resolve_workspace_llm_config(_sess, _ws, model)
 
     run_id = new_run_id()
     stop_event = _threading.Event()

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +65,44 @@ async def _check_workspace_budget(workspace_id: int) -> None:
                 f"Workspace budget exhausted: ${ws.total_cost_usd:.4f} spent of "
                 f"${ws.max_cost_usd:.2f} limit. Update the workspace budget to continue."
             )
+
+
+async def resolve_workspace_llm_config(
+    session: Any,
+    workspace: Any,
+    model: str = "claude",
+) -> tuple[Optional[str], Optional[str]]:
+    """Return (api_key, base_url) for the workspace's active LLM mode.
+
+    managed → (None, None): platform env key is used by the LLM client.
+    byok    → (customer_key, custom_base_url_or_None)
+    proxy   → (proxy_token, proxy_url): platform sends token; proxy substitutes real key.
+
+    Both runners call this; the result flows into build_llm(api_key=..., base_url=...).
+    The proxy token is decrypted here — the Anthropic key never touches platform memory.
+    """
+    mode = getattr(workspace, "llm_key_mode", "managed")
+
+    if mode == "byok":
+        from app.core.byok import get_workspace_llm_key_for_model
+        byok = await get_workspace_llm_key_for_model(session, workspace.id, model)
+        if byok:
+            return byok.key, byok.base_url
+        return None, None
+
+    if mode == "proxy":
+        proxy_url = getattr(workspace, "proxy_url", None)
+        proxy_token_enc = getattr(workspace, "proxy_token_enc", None)
+        if proxy_url and proxy_token_enc:
+            from app.core.byok import _decrypt, _provider_for_model
+            token = _decrypt(proxy_token_enc)
+            # Append provider so the proxy can route to the right upstream key.
+            # e.g. base_url = "https://proxy.example.com/anthropic" for Claude models.
+            provider = _provider_for_model(model)
+            return token, f"{proxy_url.rstrip('/')}/{provider}"
+        return None, None
+
+    return None, None  # managed: use platform env key
 
 
 async def _mark_workspace_budget_status(workspace_id: int) -> None:

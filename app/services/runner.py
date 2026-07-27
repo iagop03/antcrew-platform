@@ -73,10 +73,6 @@ AVAILABLE_TEAMS = list(_TEAM_REGISTRY)
 # Includes "custom" (POST /run/pipeline) for discoverability in GET /run/teams
 ALL_PIPELINE_TYPES = AVAILABLE_TEAMS + ["custom", "engine"]
 
-# Public alias — use this instead of _make_team from outside this module
-make_team = _make_team  # noqa: E305
-
-
 def _make_team(
     team_name: str,
     max_cost_usd: Optional[float] = None,
@@ -122,6 +118,9 @@ def _make_team(
                 kwargs["max_cost_usd"] = max_cost_usd
             return cls(**kwargs)
         raise
+
+
+make_team = _make_team  # public alias for eval_runner and external callers
 
 
 _REPO_SKIP = {
@@ -387,12 +386,8 @@ async def dispatch(
             if _ws:
                 if _ws.hitl_timeout_s is not None:
                     _hitl_timeout = _ws.hitl_timeout_s
-                if getattr(_ws, "llm_key_mode", "managed") == "byok":
-                    from app.core.byok import get_workspace_llm_key
-                    _byok = await get_workspace_llm_key(_sess, workspace_id, "anthropic")
-                    if _byok:
-                        _byok_api_key = _byok.key
-                        _byok_base_url = _byok.base_url
+                from app.services.runner_base import resolve_workspace_llm_config
+                _byok_api_key, _byok_base_url = await resolve_workspace_llm_config(_sess, _ws, model or "claude")
 
     # Clone repo and inject context before dispatching to the thread pool.
     _tmp_repo_dir: Optional[Path] = None
@@ -559,12 +554,8 @@ async def dispatch_custom(
             if _ws:
                 if _ws.hitl_timeout_s is not None:
                     _hitl_timeout = _ws.hitl_timeout_s
-                if getattr(_ws, "llm_key_mode", "managed") == "byok":
-                    from app.core.byok import get_workspace_llm_key_for_model
-                    _byok = await get_workspace_llm_key_for_model(_sess, workspace_id, model)
-                    if _byok:
-                        _byok_api_key = _byok.key
-                        _byok_base_url = _byok.base_url
+                from app.services.runner_base import resolve_workspace_llm_config
+                _byok_api_key, _byok_base_url = await resolve_workspace_llm_config(_sess, _ws, model)
 
     loop = asyncio.get_running_loop()
     run_id_future: asyncio.Future[str] = loop.create_future()
@@ -881,12 +872,8 @@ async def dispatch_pipeline(
             if _ws:
                 if _ws.hitl_timeout_s is not None:
                     _hitl_timeout = _ws.hitl_timeout_s
-                if getattr(_ws, "llm_key_mode", "managed") == "byok":
-                    from app.core.byok import get_workspace_llm_key_for_model
-                    _byok = await get_workspace_llm_key_for_model(_sess, workspace_id, model)
-                    if _byok:
-                        _byok_api_key = _byok.key
-                        _byok_base_url = _byok.base_url
+                from app.services.runner_base import resolve_workspace_llm_config
+                _byok_api_key, _byok_base_url = await resolve_workspace_llm_config(_sess, _ws, model)
                 # Slack creds — only fetch if a node requests slack channel
                 if "slack" in node_channel_types and getattr(_ws, "slack_bot_token_enc", None):
                     try:

@@ -21,7 +21,8 @@ Before merging a PR that touches any of the following surfaces, verify each appl
 - [ ] Is the new `_check_*` function called in `lifespan()` before `start_listening()`?
 
 Covered so far: `STRIPE_WEBHOOK_SECRET`, `SLACK_TOKEN_ENCRYPTION_KEY`, `ANTCREW_REQUIRE_AUTH`,
-`DATABASE_URL` (no SQLite on public host), `ANTCREW_SANDBOX`, `CORS_ORIGINS`.
+`DATABASE_URL` (no SQLite on public host), `ANTCREW_SANDBOX`, `CORS_ORIGINS`,
+`BYOK_ENCRYPTION_KEY` (also encrypts proxy tokens — shared check covers both).
 
 ---
 
@@ -153,4 +154,6 @@ and human-control invariants. Any feature that belongs to one of these categorie
 | bcrypt key hashing | `app/core/auth.py` | `_hash()`, `_verify()`, `_key_prefix()` |
 | Budget gate (both runners) | `app/services/runner_base.py` | `_check_workspace_budget()` |
 | Budget update (both runners) | `app/services/runner_base.py` | `_mark_workspace_budget_status()` |
+| LLM config resolution (all modes) | `app/services/runner_base.py` | `resolve_workspace_llm_config()` |
 | Subscription block list | `app/services/billing.py` | `BLOCKED_STATUSES` |
+| Proxy token encryption | `app/core/byok.py` | `_encrypt` / `_decrypt` (same Fernet key as BYOK) |

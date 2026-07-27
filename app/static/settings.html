@@ -170,7 +170,11 @@
                 <span x-show="!ws.hitl_default" class="text-gray-700">No</span>
               </td>
               <td class="px-4 py-3 text-center">
-                <span :class="ws.llm_key_mode==='byok' ? 'bg-emerald-900/50 text-emerald-400' : 'bg-gray-800 text-gray-500'"
+                <span :class="ws.llm_key_mode==='byok'
+                    ? 'bg-emerald-900/50 text-emerald-400'
+                    : ws.llm_key_mode==='proxy'
+                    ? 'bg-violet-900/50 text-violet-400'
+                    : 'bg-gray-800 text-gray-500'"
                   class="inline-block px-2 py-0.5 rounded text-xs font-mono" x-text="ws.llm_key_mode"></span>
               </td>
               <td class="px-4 py-3 text-right">
@@ -323,7 +327,7 @@
         <!-- Mode selector -->
         <div class="p-4 bg-gray-900 border border-gray-800 rounded-lg">
           <p class="text-xs text-gray-600 uppercase tracking-wider mb-3">Modo de facturación LLM</p>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             <button @click="setLlmMode('managed')"
               :class="llmMode==='managed'
                 ? 'bg-indigo-600 text-white border-transparent'
@@ -340,9 +344,69 @@
               :title="llmKeys.length === 0 ? 'Añade al menos una clave antes de activar BYOK' : ''">
               BYOK <span class="text-xs opacity-70">×0.4</span>
             </button>
+            <button @click="activateProxy()"
+              :class="llmMode==='proxy'
+                ? 'bg-violet-700 text-white border-transparent'
+                : 'bg-transparent text-gray-400 border-gray-700 hover:text-gray-200 hover:border-gray-500'"
+              class="px-4 py-1.5 rounded border text-sm transition-colors"
+              :disabled="!proxyConfigured"
+              :title="!proxyConfigured ? 'Genera un token proxy antes de activar este modo' : ''">
+              Proxy <span class="text-xs opacity-70">×0.7</span>
+            </button>
           </div>
           <p x-show="llmMode==='byok'" class="text-emerald-500 text-xs mt-2.5">Usando tus claves — multiplicador ×0.4 activo</p>
           <p x-show="llmMode==='managed'" class="text-gray-600 text-xs mt-2.5">Usando claves de la plataforma — multiplicador ×3.0</p>
+          <p x-show="llmMode==='proxy'" class="text-violet-400 text-xs mt-2.5">Modo proxy activo — la plataforma nunca ve tu clave Anthropic · multiplicador ×0.7</p>
+        </div>
+
+        <!-- Proxy configuration -->
+        <div class="p-4 bg-gray-900 border border-gray-800 rounded-lg">
+          <p class="text-xs text-gray-600 uppercase tracking-wider mb-3">Proxy local (opcional)</p>
+          <p class="text-xs text-gray-500 mb-4 leading-relaxed">
+            Ejecuta <code class="bg-gray-800 px-1 rounded text-gray-300">antcrew-proxy</code> en tu infraestructura.
+            La plataforma envía llamadas LLM a tu proxy; el proxy sustituye con tu clave real de Anthropic.
+            La plataforma nunca recibe tu API key.
+          </p>
+
+          <div x-show="proxyConfigured" class="mb-4 p-3 bg-violet-950/30 border border-violet-800/40 rounded-lg text-xs">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0"></span>
+              <span class="text-violet-300 font-medium">Proxy configurado</span>
+            </div>
+            <span class="text-gray-500" x-text="proxyUrl"></span>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">URL del proxy</label>
+              <input x-model="proxyUrlInput" type="url"
+                placeholder="https://proxy.tudominio.com"
+                class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-violet-500 transition-colors">
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click="generateProxyToken()"
+                :disabled="!proxyUrlInput"
+                class="px-3 py-1.5 bg-violet-700 hover:bg-violet-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm rounded-md transition-colors">
+                <span x-text="proxyConfigured ? 'Rotar token' : 'Generar token'"></span>
+              </button>
+              <button x-show="proxyConfigured" @click="revokeProxy()"
+                class="px-3 py-1.5 text-xs text-gray-600 hover:text-red-400 rounded hover:bg-gray-800 transition-colors">
+                Revocar
+              </button>
+            </div>
+          </div>
+
+          <div x-show="proxyToken" class="mt-4 p-3 bg-gray-800 border border-violet-700/40 rounded-lg">
+            <p class="text-xs text-violet-400 font-medium mb-2">Token generado — cópialo ahora, no se volverá a mostrar</p>
+            <div class="flex items-start gap-2">
+              <code class="text-xs text-gray-300 break-all flex-1" x-text="proxyToken"></code>
+              <button @click="copyProxyToken()" class="shrink-0 text-xs text-gray-500 hover:text-white px-2 py-1 rounded hover:bg-gray-700 transition-colors">Copiar</button>
+            </div>
+            <details class="mt-3">
+              <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400">Ver comando Docker</summary>
+              <pre class="mt-2 text-xs text-gray-400 whitespace-pre-wrap break-all" x-text="proxyDockerCmd"></pre>
+            </details>
+          </div>
         </div>
 
         <!-- Keys list -->
@@ -770,6 +834,7 @@ function settings() {
     llmWsId: '', llmMode: 'managed', llmKeys: [],
     llmLoading: false, llmError: '',
     showAddKey: false,
+    proxyConfigured: false, proxyUrl: '', proxyUrlInput: '', proxyToken: '', proxyDockerCmd: '',
     addKeyForm: { provider: 'anthropic', api_key: '', confirm_overwrite: false },
 
     apiHeaders() {
@@ -1014,6 +1079,8 @@ function settings() {
         const r = await fetch(`/workspaces/${this.llmWsId}/llm-keys`, { headers: this.apiHeaders() });
         if (!r.ok) throw new Error(await r.text());
         this.llmKeys = await r.json();
+        this.proxyToken = ''; this.proxyDockerCmd = '';
+        await this.loadProxyStatus();
       } catch(e) { this.llmError = e.message; }
       this.llmLoading = false;
     },
@@ -1028,6 +1095,68 @@ function settings() {
         this.llmMode = mode;
         await this.loadWorkspaces();
       } catch(e) { this.llmError = e.message; }
+    },
+
+    /* ── Proxy mode ── */
+    async loadProxyStatus() {
+      if (!this.llmWsId) return;
+      try {
+        const r = await fetch(`/workspaces/${this.llmWsId}/proxy`, { headers: this.apiHeaders() });
+        if (r.ok) {
+          const d = await r.json();
+          this.proxyConfigured = d.configured;
+          this.proxyUrl = d.proxy_url || '';
+          if (!this.proxyUrlInput) this.proxyUrlInput = d.proxy_url || '';
+        }
+      } catch(e) {}
+    },
+
+    async generateProxyToken() {
+      this.llmError = '';
+      this.proxyToken = '';
+      if (!this.proxyUrlInput) return;
+      try {
+        const r = await fetch(`/workspaces/${this.llmWsId}/proxy/generate`, {
+          method: 'POST', headers: this.apiHeaders(),
+          body: JSON.stringify({ proxy_url: this.proxyUrlInput }),
+        });
+        if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al generar token'; return; }
+        const d = await r.json();
+        this.proxyToken = d.token;
+        this.proxyDockerCmd = d.docker_command;
+        await this.loadProxyStatus();
+      } catch(e) { this.llmError = e.message; }
+    },
+
+    async activateProxy() {
+      this.llmError = '';
+      try {
+        const r = await fetch(`/workspaces/${this.llmWsId}/proxy/activate`, {
+          method: 'POST', headers: this.apiHeaders(),
+        });
+        if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al activar proxy'; return; }
+        this.llmMode = 'proxy';
+        await this.loadWorkspaces();
+      } catch(e) { this.llmError = e.message; }
+    },
+
+    async revokeProxy() {
+      if (!confirm('¿Revocar el token proxy? El proxy dejará de aceptar peticiones de la plataforma.')) return;
+      this.llmError = '';
+      try {
+        const r = await fetch(`/workspaces/${this.llmWsId}/proxy`, {
+          method: 'DELETE', headers: this.apiHeaders(),
+        });
+        if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al revocar'; return; }
+        this.proxyToken = ''; this.proxyDockerCmd = '';
+        await this.loadProxyStatus();
+        await this.loadLlmData();
+        await this.loadWorkspaces();
+      } catch(e) { this.llmError = e.message; }
+    },
+
+    copyProxyToken() {
+      if (this.proxyToken) navigator.clipboard.writeText(this.proxyToken).catch(() => {});
     },
 
     llmProviderConfigured(provider) {

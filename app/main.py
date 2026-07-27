@@ -31,6 +31,7 @@ from app.api import eval_schedules, engine, billing, webhook_mor, pipelines as p
 from app.api import client_review, compare as compare_api, contract_schemas as contract_schemas_api
 from app.api import security_audit as security_audit_api
 from app.api import invites as invites_api
+from app.api import workspaces_proxy as workspaces_proxy_api
 
 _STATIC = Path(__file__).parent / "static"
 _VERSION = "0.4.9"
@@ -455,6 +456,40 @@ async def _check_byok_config() -> None:
     )
 
 
+async def _check_proxy_config() -> None:
+    """Warn when proxy-mode workspaces exist but BYOK_ENCRYPTION_KEY is not set.
+
+    Proxy tokens are encrypted with the same key as BYOK keys. If the key is
+    absent, the tokens are stored in plaintext — same risk as BYOK without encryption.
+    Only emits a warning; does not block startup (no proxy rows = no risk).
+    """
+    enc_key = os.environ.get("BYOK_ENCRYPTION_KEY")
+    if enc_key:
+        return  # already verified by _check_byok_config
+
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from app.core.database import engine as _engine
+
+    try:
+        async with AsyncSession(_engine, expire_on_commit=False) as session:
+            any_proxy = (await session.exec(
+                select(Workspace).where(Workspace.llm_key_mode == "proxy").limit(1)
+            )).first()
+    except Exception:
+        return
+
+    if any_proxy:
+        host = os.environ.get("HOST", "127.0.0.1")
+        is_public = host not in ("127.0.0.1", "localhost", "::1")
+        if is_public:
+            raise RuntimeError(
+                "Proxy-mode workspaces exist but BYOK_ENCRYPTION_KEY is not set. "
+                "Proxy tokens would be stored in plaintext — set BYOK_ENCRYPTION_KEY "
+                "to encrypt them at rest."
+            )
+        log.warning("proxy: proxy tokens stored in plaintext — set BYOK_ENCRYPTION_KEY before production")
+
+
 async def _check_mor_config() -> None:
     """Warn or block when Lemon Squeezy webhooks are accepted without signature verification.
 
@@ -526,6 +561,7 @@ async def lifespan(app: FastAPI):
     await _check_mor_config()
     await _check_slack_config()
     await _check_byok_config()
+    await _check_proxy_config()
     start_listening()
     from app.core.slack_hitl import maybe_start_from_env as _slack_start
     _slack_start()
@@ -596,6 +632,7 @@ app.include_router(reviews.router,             dependencies=_csrf)
 app.include_router(templates.router,           dependencies=_csrf)
 app.include_router(workspaces.router,          dependencies=_csrf)
 app.include_router(workspaces_byok.router,     dependencies=_csrf)
+app.include_router(workspaces_proxy_api.router, dependencies=_csrf)
 app.include_router(workspaces_members.router,  dependencies=_csrf)
 app.include_router(evals.router,               dependencies=_csrf)
 app.include_router(eval_schedules.router,      dependencies=_csrf)

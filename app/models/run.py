@@ -33,7 +33,9 @@ class Workspace(SQLModel, table=True):
     billing_provider: str = Field(default="mor")                          # mor | stripe
     mor_customer_id: Optional[str] = Field(default=None)                  # Lemon Squeezy customer ID
     mor_subscription_id: Optional[str] = Field(default=None)              # Lemon Squeezy subscription ID
-    llm_key_mode: str = Field(default="managed")  # managed | byok
+    llm_key_mode: str = Field(default="managed")  # managed | byok | proxy
+    proxy_url: Optional[str] = Field(default=None)          # antcrew-proxy base URL (e.g. https://proxy.example.com)
+    proxy_token_enc: Optional[str] = Field(default=None)    # Fernet-encrypted UUID token sent to the proxy
     is_trial: bool = Field(default=True)  # workspace is on the free-trial credit; costs at TRIAL_MULTIPLIER
     owner_user_id: Optional[int] = Field(default=None, index=True)  # user.id of the registering user
     created_at: datetime = Field(default_factory=_utcnow)
