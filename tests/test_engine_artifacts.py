@@ -529,7 +529,7 @@ async def test_publish_success(client: AsyncClient, session: AsyncSession):
     session.add(_engine_run_with_artifacts(run_id))
     await session.commit()
 
-    with patch("antcrew.integrations.github.GitHubIntegration") as MockGH:
+    with patch("antcrew.GitHubIntegration") as MockGH:
         mock_instance = MockGH.return_value
         mock_instance.create_engine_pr.return_value = "https://github.com/org/repo/pull/99"
 
@@ -556,7 +556,7 @@ async def test_publish_github_error_returns_502(client: AsyncClient, session: As
     session.add(_engine_run_with_artifacts(run_id))
     await session.commit()
 
-    with patch("antcrew.integrations.github.GitHubIntegration") as MockGH:
+    with patch("antcrew.GitHubIntegration") as MockGH:
         MockGH.return_value.create_engine_pr.side_effect = RuntimeError("API rate limit")
 
         r = await client.post(f"/engine/runs/{run_id}/publish", json={

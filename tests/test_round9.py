@@ -61,32 +61,16 @@ def test_make_team_falls_back_when_team_rejects_llm(monkeypatch):
     sys.modules["fake_team_module_r9"] = fake_module
     runner_mod._TEAM_REGISTRY["_NoLlmTeam"] = ("fake_team_module_r9", "_NoLlmTeam")
 
-    # Mock build_llm so we don't need ANTHROPIC_API_KEY
+    # Mock build_llm so we don't need ANTHROPIC_API_KEY.
+    # runner._make_team does `from antcrew import build_llm` at call time, so
+    # we must patch the antcrew module attribute, not antcrew.config.
     class _FakeLLM:
         max_cost_usd = None
 
-    monkeypatch.setattr(
-        "app.services.runner._make_team.__module__",
-        "app.services.runner",
-        raising=False,
-    )
-
-    original_make_team = runner_mod._make_team
-
-    def patched_make_team(team_name, max_cost_usd=None, model=""):
-        if model:
-            # Temporarily replace build_llm inside the function scope
-            import antcrew.config as _cfg
-            orig_build = _cfg.build_llm
-            _cfg.build_llm = lambda m, **_kw: _FakeLLM()
-            try:
-                return original_make_team(team_name, max_cost_usd=max_cost_usd, model=model)
-            finally:
-                _cfg.build_llm = orig_build
-        return original_make_team(team_name, max_cost_usd=max_cost_usd, model=model)
+    monkeypatch.setattr("antcrew.build_llm", lambda m, **_kw: _FakeLLM())
 
     try:
-        team = patched_make_team("_NoLlmTeam", model="claude", max_cost_usd=1.0)
+        team = runner_mod._make_team("_NoLlmTeam", model="claude", max_cost_usd=1.0)
         assert isinstance(team, _NoLlmTeam)
         assert team.max_cost_usd == 1.0
     finally:
