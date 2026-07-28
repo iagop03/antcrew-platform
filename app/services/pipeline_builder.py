@@ -52,7 +52,8 @@ def build_team_from_definition(
 
     Raises ValueError for unknown agent types or empty edge lists.
     """
-    from antcrew import instantiate_agent, Supervisor, build_llm
+    from antcrew import Supervisor, build_llm
+    from antcrew.agents.registry import instantiate_agent
 
     if isinstance(definition, str):
         definition = json.loads(definition)

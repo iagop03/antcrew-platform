@@ -161,6 +161,7 @@ _CUSTOM_DEFN = {
 def test_build_team_unknown_type_no_cfg_raises(monkeypatch):
     """Unknown agent type without agent_cfg must raise ValueError (no silent failure)."""
     import antcrew
+    import antcrew.agents.registry as _registry
     from unittest.mock import MagicMock
     monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: MagicMock())
     monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
@@ -177,6 +178,7 @@ def test_build_team_unknown_type_no_cfg_raises(monkeypatch):
 def test_build_team_custom_agent_with_system_prompt(monkeypatch):
     """Node with agent_cfg.system_prompt instantiates TemplateAgent instead of raising."""
     import antcrew
+    import antcrew.agents.registry as _registry
     from unittest.mock import MagicMock
     from antcrew.agents.template_agent import TemplateAgent
 
@@ -184,7 +186,7 @@ def test_build_team_custom_agent_with_system_prompt(monkeypatch):
     monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: mock_llm)
     monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
     # pm is a real registered agent — mock it too to avoid real LLM
-    monkeypatch.setattr(antcrew, "instantiate_agent", lambda name, llm: (
+    monkeypatch.setattr(_registry, "instantiate_agent", lambda name, llm: (
         None if name == "custom_1" else MagicMock()
     ))
 
@@ -199,10 +201,11 @@ def test_build_team_custom_agent_with_system_prompt(monkeypatch):
 def test_build_team_custom_agent_missing_system_prompt_raises(monkeypatch):
     """agent_cfg present but system_prompt empty still raises ValueError."""
     import antcrew
+    import antcrew.agents.registry as _registry
     from unittest.mock import MagicMock
     monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: MagicMock())
     monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
-    monkeypatch.setattr(antcrew, "instantiate_agent", lambda name, llm: None)
+    monkeypatch.setattr(_registry, "instantiate_agent", lambda name, llm: None)
 
     from app.services.pipeline_builder import build_team_from_definition
     defn = {
