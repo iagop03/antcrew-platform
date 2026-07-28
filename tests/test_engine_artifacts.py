@@ -6,6 +6,7 @@ Covers:
 - GET /runs/{id}/artifacts backward-compat: MemoryStore run without artifacts
 - GET /engine/runs/{run_id}/progress condition tracking
 - POST /run/compare with team="engine"
+- _run_engine_sync real invocation (regression for Operator → EngineLoop rename)
 """
 from __future__ import annotations
 
@@ -566,3 +567,42 @@ async def test_publish_github_error_returns_502(client: AsyncClient, session: As
 
     assert r.status_code == 502
     assert "rate limit" in r.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
+# _run_engine_sync real invocation
+# Regression for antcrew_engine rename: Operator → EngineLoop.
+# If the import is wrong this test raises ImportError rather than returning.
+# ---------------------------------------------------------------------------
+
+def test_run_engine_sync_imports_engine_loop(monkeypatch):
+    """_run_engine_sync must reach its EngineLoop import without raising.
+
+    Uses SequencedLLM (antcrew_engine's fake LLM) so no real API key is needed.
+    The engine run is expected to fail (bad LLM output) — that's fine; we're
+    testing that the function body executes and returns (bool, float), not that
+    a pipeline succeeds.
+    """
+    from antcrew_engine.testing import SequencedLLM
+
+    # Enough responses to avoid StopIteration before max_iter terminates the loop
+    fake_llm = SequencedLLM(["{}"] * 30)
+    monkeypatch.setattr("antcrew_engine.config.build_llm", lambda *a, **kw: fake_llm)
+
+    from app.services.engine_runner import _run_engine_sync
+
+    result = _run_engine_sync(
+        run_id="test-engine-loop-import",
+        goal_description="hello world CLI",
+        model="claude",
+        tech=[],
+        conditions=["requirements_exists"],
+        full=False,
+        max_iter=1,
+        output_dir=None,
+    )
+
+    assert isinstance(result, tuple) and len(result) == 5
+    success, cost, store, satisfied, expected = result
+    assert isinstance(success, bool)
+    assert isinstance(cost, float)

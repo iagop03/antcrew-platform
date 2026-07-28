@@ -6,7 +6,7 @@ Flow:
             → emits pipeline.start on the global bus (DB row created by listener)
             → spawns _run_engine_sync() in the thread pool
                 → EventLog + EventBusBridge (agent.start/end events)
-                → Operator.run() until goal or error
+                → EngineLoop.run() until goal or error
                 → returns (success, cost_usd)
             → emits pipeline.end with real LLM cost
         ← returns run_id immediately
@@ -441,7 +441,7 @@ def _run_engine_sync(
     from antcrew_engine.capabilities.hitl_reviewer import HitlReviewer
     from antcrew_engine.capabilities.validators import artifact_validators
     from antcrew_engine.config import build_llm
-    from antcrew_engine.engine import ConditionId, EventLog, FilesystemStore, MemoryStore, Operator
+    from antcrew_engine.engine import ConditionId, EngineLoop, EventLog, FilesystemStore, MemoryStore
     from antcrew_engine.engine.bus_bridge import EventBusBridge
 
     hitl_after = hitl_after or []
@@ -506,7 +506,7 @@ def _run_engine_sync(
     total_limits = {"code_regenerator": 2, "review_fixer": 3}
     total_limits.update({f"hitl_{cap}": hitl_max_rejections for cap in hitl_after})
 
-    operator = Operator(
+    operator = EngineLoop(
         registry, validators, event_log,
         max_iterations=max_iter,
         retry_limits={"test_runner": 1, "bug_fixer": fix_attempts, "code_reviewer": 2},
