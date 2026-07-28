@@ -126,22 +126,24 @@ _TEMPLATES: list[dict] = [
 ]
 
 # All available agent types for the palette (from AGENT_REGISTRY)
+# phase: discovery | planning | build | quality | delivery
+# glyph: Unicode char rendered as SVG text inside the node (no external icon lib)
 _AGENT_PALETTE = [
-    {"type": "business_analyst", "label": "Business Analyst",  "color": "#7c3aed"},
-    {"type": "pm",               "label": "Product Manager",   "color": "#7c3aed"},
-    {"type": "sprint_planner",   "label": "Sprint Planner",    "color": "#2563eb"},
-    {"type": "backend_dev",      "label": "Backend Dev",       "color": "#0891b2"},
-    {"type": "frontend_dev",     "label": "Frontend Dev",      "color": "#0891b2"},
-    {"type": "qa",               "label": "QA Engineer",       "color": "#059669"},
-    {"type": "reviewer",         "label": "Code Reviewer",     "color": "#d97706"},
-    {"type": "devops",           "label": "DevOps",            "color": "#dc2626"},
-    {"type": "doc_writer",       "label": "Doc Writer",        "color": "#6b7280"},
-    {"type": "researcher",       "label": "Researcher",        "color": "#7c3aed"},
-    {"type": "idea",             "label": "Idea Generator",    "color": "#ec4899"},
-    {"type": "copywriter",       "label": "Copywriter",        "color": "#ec4899"},
-    {"type": "editor",           "label": "Editor",            "color": "#ec4899"},
-    {"type": "codebase_scanner", "label": "Codebase Scanner",  "color": "#6b7280"},
-    {"type": "feature",          "label": "Feature Agent",     "color": "#0891b2"},
+    {"type": "business_analyst", "label": "Business Analyst",  "color": "#7c3aed", "phase": "discovery", "glyph": "⊙"},
+    {"type": "pm",               "label": "Product Manager",   "color": "#7c3aed", "phase": "planning",  "glyph": "≡"},
+    {"type": "sprint_planner",   "label": "Sprint Planner",    "color": "#2563eb", "phase": "planning",  "glyph": "≡"},
+    {"type": "backend_dev",      "label": "Backend Dev",       "color": "#0891b2", "phase": "build",     "glyph": "</>"},
+    {"type": "frontend_dev",     "label": "Frontend Dev",      "color": "#0891b2", "phase": "build",     "glyph": "</>"},
+    {"type": "qa",               "label": "QA Engineer",       "color": "#059669", "phase": "quality",   "glyph": "✓"},
+    {"type": "reviewer",         "label": "Code Reviewer",     "color": "#059669", "phase": "quality",   "glyph": "✓"},
+    {"type": "devops",           "label": "DevOps",            "color": "#dc2626", "phase": "delivery",  "glyph": "⇧"},
+    {"type": "doc_writer",       "label": "Doc Writer",        "color": "#dc2626", "phase": "delivery",  "glyph": "⇧"},
+    {"type": "researcher",       "label": "Researcher",        "color": "#7c3aed", "phase": "discovery", "glyph": "⊙"},
+    {"type": "idea",             "label": "Idea Generator",    "color": "#7c3aed", "phase": "discovery", "glyph": "⊙"},
+    {"type": "copywriter",       "label": "Copywriter",        "color": "#0891b2", "phase": "build",     "glyph": "</>"},
+    {"type": "editor",           "label": "Editor",            "color": "#059669", "phase": "quality",   "glyph": "✓"},
+    {"type": "codebase_scanner", "label": "Codebase Scanner",  "color": "#7c3aed", "phase": "discovery", "glyph": "⊙"},
+    {"type": "feature",          "label": "Feature Agent",     "color": "#0891b2", "phase": "build",     "glyph": "</>"},
 ]
 
 
