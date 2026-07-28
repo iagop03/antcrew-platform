@@ -751,6 +751,19 @@ async def update_profile(
             raise HTTPException(400, "New password must be at least 8 characters")
         user.password_hash = _hash_password(new_pw)
         changed = True
+        # Revoke all other active sessions so a stolen cookie can't persist
+        # after the owner changes their password.
+        from app.models.run import UserSession
+        other_sessions = (await session.exec(
+            select(UserSession).where(
+                UserSession.user_id == user.id,
+                UserSession.token != token,
+                UserSession.revoked == False,  # noqa: E712
+            )
+        )).all()
+        for s in other_sessions:
+            s.revoked = True
+            session.add(s)
 
     if changed:
         session.add(user)

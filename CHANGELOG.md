@@ -1,5 +1,15 @@
 # Changelog — antcrew-platform
 
+## v0.6.3 (2026-07-28)
+
+### Security fixes
+
+- **Password change now invalidates all other active sessions** (`auth_session.py`). Previously, changing a password updated only `user.password_hash` but left all other `UserSession` rows active — a stolen cookie remained valid for up to 30 days. Fix: after updating the hash, all `UserSession` rows for that user except the current one are marked `revoked=True`. Takes effect on the next request from any other session.
+
+- **Security headers on all responses** (`main.py`). Added `_SecurityHeadersMiddleware` (Starlette `BaseHTTPMiddleware`) that injects `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `X-XSS-Protection: 0` on every response. `Strict-Transport-Security: max-age=31536000; includeSubDomains` is added in non-dev/int environments. Closes the most visible security header gap for enterprise evaluations.
+
+---
+
 ## v0.6.2 (2026-07-28)
 
 ### Critical fix — engine runs were crashing on import
