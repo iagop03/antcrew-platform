@@ -198,6 +198,87 @@ def test_build_team_custom_agent_with_system_prompt(monkeypatch):
     assert agents["custom_1"].name == "custom_1"
 
 
+def test_build_team_parallel_node(monkeypatch):
+    """Node with type='parallel' builds a ParallelGroup with one agent per member."""
+    import antcrew
+    import antcrew.agents.registry as _registry
+    from unittest.mock import MagicMock
+    from antcrew.core.supervisor import ParallelGroup
+
+    monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
+    monkeypatch.setattr(_registry, "instantiate_agent", lambda name, llm: MagicMock())
+
+    from app.services.pipeline_builder import build_team_from_definition
+    defn = {
+        "nodes": [
+            {"id": "pm", "type": "pm", "label": "PM", "model": "claude"},
+            {
+                "id": "coding",
+                "type": "parallel",
+                "label": "Coding",
+                "model": "claude",
+                "members": [
+                    {"type": "backend_dev"},
+                    {"type": "frontend_dev"},
+                ],
+            },
+        ],
+        "edges": [{"from": "pm", "to": "coding"}],
+    }
+    agents, _ = build_team_from_definition(defn)
+
+    assert "pm" in agents
+    assert "coding" in agents
+    assert isinstance(agents["coding"], ParallelGroup)
+    assert len(agents["coding"]._agents) == 2
+
+
+def test_build_team_parallel_node_no_members_raises(monkeypatch):
+    """Parallel node with empty members list must raise ValueError."""
+    import antcrew
+    import antcrew.agents.registry as _registry
+    from unittest.mock import MagicMock
+
+    monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
+    monkeypatch.setattr(_registry, "instantiate_agent", lambda name, llm: MagicMock())
+
+    from app.services.pipeline_builder import build_team_from_definition
+    defn = {
+        "nodes": [
+            {"id": "coding", "type": "parallel", "label": "Coding", "model": "claude", "members": []},
+        ],
+        "edges": [{"from": "coding", "to": "coding"}],
+    }
+    with pytest.raises(ValueError, match="no members"):
+        build_team_from_definition(defn)
+
+
+def test_build_team_parallel_node_unknown_member_type_raises(monkeypatch):
+    """Unknown agent type inside a parallel node must raise ValueError."""
+    import antcrew
+    import antcrew.agents.registry as _registry
+    from unittest.mock import MagicMock
+
+    monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
+    monkeypatch.setattr(_registry, "instantiate_agent", lambda name, llm: None)
+
+    from app.services.pipeline_builder import build_team_from_definition
+    defn = {
+        "nodes": [
+            {
+                "id": "coding", "type": "parallel", "label": "Coding", "model": "claude",
+                "members": [{"type": "unknown_xyz"}],
+            },
+        ],
+        "edges": [{"from": "coding", "to": "coding"}],
+    }
+    with pytest.raises(ValueError, match="Unknown agent type in parallel node"):
+        build_team_from_definition(defn)
+
+
 def test_build_team_custom_agent_missing_system_prompt_raises(monkeypatch):
     """agent_cfg present but system_prompt empty still raises ValueError."""
     import antcrew

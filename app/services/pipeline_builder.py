@@ -16,6 +16,21 @@ Definition schema per node:
     }
   }
 
+  Parallel node (type == "parallel"):
+  {
+    "id":      str,                    # unique graph key
+    "type":    "parallel",
+    "label":   str,
+    "model":   str,                    # default model for members that omit it
+    "members": [                       # at least one member required
+      {"type": str, "model": str},     # model is optional; falls back to group model
+      ...
+    ]
+  }
+
+  Members must be registered agent types (custom agent_cfg is not supported
+  inside parallel groups in the current version).
+
   When instantiate_agent() returns None (type not in AGENT_REGISTRY), the builder
   checks for agent_cfg.system_prompt and instantiates a TemplateAgent instead of
   raising ValueError.  This enables user-defined custom agents created via
@@ -71,7 +86,7 @@ def build_team_from_definition(
         node_id: str = node["id"]
         agent_type: str = node.get("type") or node_id
 
-        # Build a dedicated LLM for this node
+        # Build a dedicated LLM for this node (or as the default for parallel members)
         node_model = node.get("model") or default_model
         _kw: dict = {}
         if byok_api_key is not None:
@@ -80,6 +95,40 @@ def build_team_from_definition(
             _kw["base_url"] = byok_base_url
         node_llm = build_llm(node_model, **_kw)
 
+        # ── Parallel group node ───────────────────────────────────────────
+        if agent_type == "parallel":
+            from antcrew.core.supervisor import ParallelGroup
+
+            members = node.get("members") or []
+            if not members:
+                raise ValueError(
+                    f"Parallel node {node_id!r} has no members. "
+                    "Add at least one entry to 'members'."
+                )
+            member_agents = []
+            for member in members:
+                member_type = member.get("type")
+                if not member_type:
+                    raise ValueError(
+                        f"Parallel node {node_id!r}: each member must have a 'type'."
+                    )
+                member_model = member.get("model") or node_model
+                member_llm = build_llm(member_model, **_kw)
+                member_agent = instantiate_agent(member_type, member_llm)
+                if member_agent is None:
+                    raise ValueError(
+                        f"Unknown agent type in parallel node {node_id!r}: {member_type!r}. "
+                        "Custom agent_cfg is not supported inside parallel groups."
+                    )
+                member_agents.append(member_agent)
+            agents[node_id] = ParallelGroup(*member_agents, name=node_id)
+            log.debug(
+                "pipeline_node id=%s type=parallel members=%s model=%s",
+                node_id, [m.get("type") for m in members], node_model,
+            )
+            continue
+
+        # ── Regular node ─────────────────────────────────────────────────
         agent = instantiate_agent(agent_type, node_llm)
         if agent is None:
             cfg = node.get("agent_cfg") or {}

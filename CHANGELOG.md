@@ -1,5 +1,25 @@
 # Changelog — antcrew-platform
 
+## v0.6.4 (2026-07-28)
+
+### Added
+
+- **Parallel node support in `pipeline_builder.py`** — nodes with `"type": "parallel"` and a `"members"` list now build a `ParallelGroup` (from antcrew 0.33.10). Each member gets its own LLM instance. Members must be registered agent types; custom `agent_cfg` inside parallel nodes is not supported in this version.
+
+  JSON format:
+  ```json
+  {
+    "id": "coding", "type": "parallel", "label": "Coding", "model": "claude",
+    "members": [{"type": "backend_dev"}, {"type": "frontend_dev"}]
+  }
+  ```
+
+### Requires
+
+- `antcrew>=0.33.10` (for `ParallelGroup` with LLM race fix)
+
+---
+
 ## v0.6.3 (2026-07-28)
 
 ### Security fixes
