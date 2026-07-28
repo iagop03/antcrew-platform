@@ -580,8 +580,13 @@ body{overflow:hidden}
       <h3 class="font-semibold text-sm">Condición del edge</h3>
       <p class="text-xs text-gray-500">Evalúa <code class="text-amber-400">state["metadata"][key]</code>. Vacío = siempre.</p>
       <input x-model="editingEdgeCondition" @keydown.enter="saveEdgeCondition()" @keydown.escape="editingEdge=null"
-        placeholder="ej: reviewer_fix_requested"
+        list="condition-opts" placeholder="ej: reviewer_fix_requested"
         class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-amber-500">
+      <datalist id="condition-opts">
+        <template x-for="c in conditionSuggestions" :key="c">
+          <option :value="c"></option>
+        </template>
+      </datalist>
       <label class="flex items-center gap-2 cursor-pointer select-none">
         <input type="checkbox" x-model="editingEdgeIsElse"
           class="w-3.5 h-3.5 rounded bg-gray-800 border-gray-600 accent-amber-500">
@@ -877,6 +882,9 @@ function app() {
     selectedEdgeId: null,
     reconnectingEdge: null,
 
+    // Autocomplete suggestions for edge conditions
+    conditionSuggestions: [],
+
     // Undo/redo
     history: [],
     historyIdx: -1,
@@ -1042,7 +1050,7 @@ function app() {
           e.returnValue = '';
         }
       });
-      await Promise.all([this.loadPipelineList(), this.loadPalette(), this.loadWorkspaces()]);
+      await Promise.all([this.loadPipelineList(), this.loadPalette(), this.loadWorkspaces(), this.loadConditions()]);
       await this.loadCustomAgents();
       this._checkDraft();
     },
@@ -1064,6 +1072,12 @@ function app() {
         // Build lookup map: type → {color, phase, glyph} — single source from backend
         this._paletteMap = Object.fromEntries(this.palette.map(a => [a.type, a]));
       }
+    },
+
+    async loadConditions() {
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const r = await fetch('/pipelines/conditions', { headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin' });
+      if (r.ok) this.conditionSuggestions = await r.json();
     },
 
     async loadWorkspaces() {

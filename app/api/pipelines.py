@@ -129,22 +129,45 @@ _TEMPLATES: list[dict] = [
 # phase: discovery | planning | build | quality | delivery
 # glyph: Unicode char rendered as SVG text inside the node (no external icon lib)
 _AGENT_PALETTE = [
-    {"type": "business_analyst", "label": "Business Analyst",  "color": "#7c3aed", "phase": "discovery", "glyph": "⊙"},
-    {"type": "pm",               "label": "Product Manager",   "color": "#7c3aed", "phase": "planning",  "glyph": "≡"},
-    {"type": "sprint_planner",   "label": "Sprint Planner",    "color": "#2563eb", "phase": "planning",  "glyph": "≡"},
-    {"type": "backend_dev",      "label": "Backend Dev",       "color": "#0891b2", "phase": "build",     "glyph": "</>"},
-    {"type": "frontend_dev",     "label": "Frontend Dev",      "color": "#0891b2", "phase": "build",     "glyph": "</>"},
-    {"type": "qa",               "label": "QA Engineer",       "color": "#059669", "phase": "quality",   "glyph": "✓"},
-    {"type": "reviewer",         "label": "Code Reviewer",     "color": "#059669", "phase": "quality",   "glyph": "✓"},
-    {"type": "devops",           "label": "DevOps",            "color": "#dc2626", "phase": "delivery",  "glyph": "⇧"},
-    {"type": "doc_writer",       "label": "Doc Writer",        "color": "#dc2626", "phase": "delivery",  "glyph": "⇧"},
-    {"type": "researcher",       "label": "Researcher",        "color": "#7c3aed", "phase": "discovery", "glyph": "⊙"},
-    {"type": "idea",             "label": "Idea Generator",    "color": "#7c3aed", "phase": "discovery", "glyph": "⊙"},
-    {"type": "copywriter",       "label": "Copywriter",        "color": "#0891b2", "phase": "build",     "glyph": "</>"},
-    {"type": "editor",           "label": "Editor",            "color": "#059669", "phase": "quality",   "glyph": "✓"},
-    {"type": "codebase_scanner", "label": "Codebase Scanner",  "color": "#7c3aed", "phase": "discovery", "glyph": "⊙"},
-    {"type": "feature",          "label": "Feature Agent",     "color": "#0891b2", "phase": "build",     "glyph": "</>"},
+    {"type": "business_analyst", "label": "Business Analyst",  "color": "#7c3aed", "phase": "discovery", "glyph": "⊙",
+     "role_description": "Analiza requisitos de negocio, define objetivos y produce un PRD estructurado."},
+    {"type": "pm",               "label": "Product Manager",   "color": "#7c3aed", "phase": "planning",  "glyph": "≡",
+     "role_description": "Convierte el PRD en tickets de trabajo priorizados y listos para el sprint."},
+    {"type": "sprint_planner",   "label": "Sprint Planner",    "color": "#2563eb", "phase": "planning",  "glyph": "≡",
+     "role_description": "Organiza los tickets en sprints con estimaciones y dependencias claras."},
+    {"type": "backend_dev",      "label": "Backend Dev",       "color": "#0891b2", "phase": "build",     "glyph": "</>",
+     "role_description": "Implementa APIs, lógica de negocio y modelos de datos según el ticket asignado."},
+    {"type": "frontend_dev",     "label": "Frontend Dev",      "color": "#0891b2", "phase": "build",     "glyph": "</>",
+     "role_description": "Construye interfaces de usuario y consume las APIs del backend."},
+    {"type": "qa",               "label": "QA Engineer",       "color": "#059669", "phase": "quality",   "glyph": "✓",
+     "role_description": "Escribe casos de prueba, detecta regresiones y valida la cobertura del código."},
+    {"type": "reviewer",         "label": "Code Reviewer",     "color": "#059669", "phase": "quality",   "glyph": "✓",
+     "role_description": "Revisa el código en busca de bugs, problemas de seguridad y deuda técnica."},
+    {"type": "devops",           "label": "DevOps",            "color": "#dc2626", "phase": "delivery",  "glyph": "⇧",
+     "role_description": "Automatiza el despliegue, configura CI/CD y gestiona la infraestructura."},
+    {"type": "doc_writer",       "label": "Doc Writer",        "color": "#dc2626", "phase": "delivery",  "glyph": "⇧",
+     "role_description": "Produce documentación técnica, READMEs y guías de usuario a partir de los artefactos del pipeline."},
+    {"type": "researcher",       "label": "Researcher",        "color": "#7c3aed", "phase": "discovery", "glyph": "⊙",
+     "role_description": "Investiga tecnologías, competidores y mejores prácticas relevantes para el problema."},
+    {"type": "idea",             "label": "Idea Generator",    "color": "#7c3aed", "phase": "discovery", "glyph": "⊙",
+     "role_description": "Genera ideas creativas y enfoques alternativos a partir de un brief inicial."},
+    {"type": "copywriter",       "label": "Copywriter",        "color": "#0891b2", "phase": "build",     "glyph": "</>",
+     "role_description": "Redacta textos de producto, marketing y UX copy adaptados al tono de marca."},
+    {"type": "editor",           "label": "Editor",            "color": "#059669", "phase": "quality",   "glyph": "✓",
+     "role_description": "Revisa y mejora textos: claridad, tono, gramática y coherencia editorial."},
+    {"type": "codebase_scanner", "label": "Codebase Scanner",  "color": "#7c3aed", "phase": "discovery", "glyph": "⊙",
+     "role_description": "Analiza el repositorio existente para mapear arquitectura, convenciones y deuda técnica."},
+    {"type": "feature",          "label": "Feature Agent",     "color": "#0891b2", "phase": "build",     "glyph": "</>",
+     "role_description": "Implementa una feature completa de forma autónoma: ficheros, tests y PR description."},
 ]
+
+# Derived from _TEMPLATES — single source of truth for known edge condition strings
+_KNOWN_CONDITIONS: list[str] = sorted({
+    e["condition"]
+    for t in _TEMPLATES
+    for e in t["definition"]["edges"]
+    if e.get("condition")
+})
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +244,12 @@ def _row_to_out(row: PipelineDef) -> PipelineOut:
 async def list_agent_types() -> list[dict]:
     """Return the agent palette used to populate the node picker."""
     return _AGENT_PALETTE
+
+
+@router.get("/conditions")
+async def list_known_conditions() -> list[str]:
+    """Return condition strings derived from built-in templates, for autocomplete."""
+    return _KNOWN_CONDITIONS
 
 
 @router.get("/", response_model=list[PipelineOut])
