@@ -138,6 +138,9 @@ def resolve_engine_review(
 def _make_review_callback(run_id: str, cap_name: str, event_log, timeout: int = 3600):
     """Return a blocking callable for HitlReviewer that integrates with the platform bus."""
     def request_review(content) -> dict:
+        # Internal path: HitlRequested/HitlResolved are Event subclasses required by
+        # EventLog.emit() but not exported in antcrew_engine.__all__. No public
+        # alternative exists — needs upstreaming to antcrew_engine.__all__.
         from antcrew_engine.engine.events import HitlRequested, HitlResolved
 
         review_id = str(_uuid.uuid4())
@@ -439,6 +442,9 @@ def _run_engine_sync(
     manual_action_timeout_s: int = 86400,
 ) -> tuple[bool, float]:
     from antcrew_engine.capabilities.hitl_reviewer import HitlReviewer
+    # Internal path: artifact_validators (and ArtifactExistsValidator it builds) are
+    # not exported in antcrew_engine.__all__. No public alternative exists — needs
+    # upstreaming to antcrew_engine.__all__.
     from antcrew_engine.capabilities.validators import artifact_validators
     from antcrew_engine.config import build_llm
     from antcrew_engine.engine import ConditionId, EngineLoop, EventLog, FilesystemStore, MemoryStore

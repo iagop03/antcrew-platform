@@ -1,5 +1,42 @@
 # Changelog — antcrew-platform
 
+## v0.6.2 (2026-07-28)
+
+### Critical fix — engine runs were crashing on import
+
+`app/services/engine_runner.py` imported `Operator` from `antcrew_engine.engine`. `Operator` was renamed to `EngineLoop` in `antcrew_engine` (same release that renamed `OperatorError → EngineLoopError`), but the platform consumer was not updated.
+
+**Impact**: every engine pipeline run (`dispatch_engine` → `_run_engine_sync`) raised `ImportError` at function entry — before the `try/except` — so the error was never caught and every run silently failed at dispatch. Team-based runs (runner.py) were unaffected.
+
+**Why tests didn't catch it**: all tests that touch `dispatch_engine` mock it completely (`patch("app.api.compare.dispatch_engine", new_callable=AsyncMock)`). The real `_run_engine_sync` body was never executed in CI.
+
+**Fix**:
+- `app/services/engine_runner.py`: import `EngineLoop`; instantiate as `EngineLoop`; update docstring.
+- `tests/test_engine_artifacts.py`: `test_run_engine_sync_imports_engine_loop` — calls `_run_engine_sync` for real with `SequencedLLM` (no mock of the function body). If the import is wrong, the test raises `ImportError` instead of returning.
+
+### Known technical debt (antcrew_engine internal imports)
+
+Two imports in `engine_runner.py` use internal paths not exported in `antcrew_engine.__all__`:
+
+- `from antcrew_engine.engine.events import HitlRequested, HitlResolved` (line ~141) — these are `Event` subclasses required by `EventLog.emit()`; the public `HitlRequestedPayload`/`HitlResolvedPayload` are different types used for the HITL review flow, not for event emission.
+- `from antcrew_engine.capabilities.validators import artifact_validators` (line ~442) — convenience builder for `ArtifactExistsValidator` objects; neither the function nor the class is in `__all__`.
+
+Both are functional today but fragile against internal refactors. Resolution requires upstreaming these to `antcrew_engine.__all__`; marked with inline comments pending that change.
+
+---
+
+## v0.6.1 (2026-07-28)
+
+### Added
+
+- **Alembic migration `031_custom_agents.py`** — creates the `custom_agent_def` table introduced in v0.6.0. Was missing from the v0.6.0 commit, making `CustomAgentDef` a PostgreSQL-only production blocker (SQLite fresh DBs used `create_all` and were unaffected). Migration follows the workspace-scoping pattern of the rest of the schema.
+
+- **Agent palette role descriptions** — all 15 entries in `_AGENT_PALETTE` now carry `role_description` (a one-sentence summary of the agent's job). Surfaced in the editor via the tooltip popover on palette chips; also returned by `GET /pipelines/agents` for any consumer that wants to render agent metadata.
+
+- **Edge condition autocomplete** — the "Condición del edge" modal now offers autocomplete suggestions via an HTML `<datalist>`. Suggestions are derived from `_TEMPLATES` at module load (`_KNOWN_CONDITIONS`) — single source of truth, no duplication — and exposed by a new `GET /pipelines/conditions` endpoint. Frontend calls `loadConditions()` on `init()` and populates `conditionSuggestions: []` state; the datalist is Alpine `x-for`-rendered.
+
+---
+
 ## v0.6.0 (2026-07-28)
 
 ### Critical fix — custom agents now work in pipeline runs
