@@ -455,6 +455,31 @@ class SecurityAuditRun(SQLModel, table=True):
     completed_at: Optional[datetime] = Field(default=None)
 
 
+class CustomAgentDef(SQLModel, table=True):
+    """User-defined agent backed by TemplateAgent — scoped to workspace.
+
+    agent_type is stable (never reused after delete) and matches the ``type``
+    field stored on pipeline nodes — e.g. "custom_3".  The system_prompt is
+    passed directly to TemplateAgent at runtime via node.agent_cfg.
+    """
+
+    __tablename__ = "custom_agent_def"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "agent_type", name="uq_custom_agent_ws_type"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(index=True)
+    agent_type: str = Field(index=True)   # e.g. "custom_3"
+    label: str
+    color: str = Field(default="#7c3aed")
+    system_prompt: str
+    role_description: Optional[str] = Field(default=None)
+    phase: str = Field(default="build")
+    glyph: str = Field(default="✦")
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class EmailVerification(SQLModel, table=True):
     """6-digit email verification code; invalidated on resend or successful use."""
 

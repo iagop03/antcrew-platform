@@ -9,8 +9,18 @@ Definition schema per node:
     "model":        str,   # LLM model string — each node can use a different model
     "hitl":         bool,  # whether this agent requires human approval
     "channel_type": str,   # "platform" | "slack" | "telegram" (default: "platform")
-    "x": int, "y": int
+    "x": int, "y": int,
+    "agent_cfg": {         # optional; required when type is NOT in AGENT_REGISTRY
+      "system_prompt": str,       # required if agent_cfg present
+      "role_description": str     # optional
+    }
   }
+
+  When instantiate_agent() returns None (type not in AGENT_REGISTRY), the builder
+  checks for agent_cfg.system_prompt and instantiates a TemplateAgent instead of
+  raising ValueError.  This enables user-defined custom agents created via
+  POST /pipelines/custom-agents to run without any Python code changes.
+  Existing pipelines without agent_cfg are unaffected — the field is optional.
 
 Edges:
   {"from": str, "to": str, "condition": str | null, "is_else": bool | null}
@@ -71,7 +81,22 @@ def build_team_from_definition(
 
         agent = instantiate_agent(agent_type, node_llm)
         if agent is None:
-            raise ValueError(f"Unknown agent type: {agent_type!r}")
+            cfg = node.get("agent_cfg") or {}
+            system_prompt = cfg.get("system_prompt", "").strip()
+            if not system_prompt:
+                raise ValueError(
+                    f"Unknown agent type: {agent_type!r}. "
+                    "Add agent_cfg.system_prompt to the node to use a custom TemplateAgent."
+                )
+            from antcrew.agents.template_agent import TemplateAgent
+            agent = TemplateAgent(
+                {
+                    "name": node_id,
+                    "system_prompt": system_prompt,
+                    "role_description": cfg.get("role_description", ""),
+                },
+                node_llm,
+            )
 
         # When node_id differs from agent_type (duplicate nodes), align agent.name
         # so current_agent in TeamState matches the agents dict key for HITL lookup.

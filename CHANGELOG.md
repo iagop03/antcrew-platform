@@ -1,5 +1,39 @@
 # Changelog — antcrew-platform
 
+## v0.6.0 (2026-07-28)
+
+### Critical fix — custom agents now work in pipeline runs
+
+Custom agents created via "Crear agente" previously failed silently at run time: `pipeline_builder.py` called `instantiate_agent("custom_N", …)`, got `None` (unregistered type), and raised `ValueError: Unknown agent type` — with no warning in the editor.
+
+**Root cause**: the modal only captured label + color; the type was stored only in `localStorage`; neither reached the backend.
+
+**Fix (3 layers)**:
+
+1. **`CustomAgentDef` table** (`models/run.py`) — new workspace-scoped table storing `agent_type`, `label`, `color`, `system_prompt`, `role_description`, `phase`, `glyph`. Data survives cache clears and is shared across the team.
+
+2. **`/pipelines/custom-agents` API** (`api/pipelines.py`) — `GET/POST/DELETE` endpoints, all scoped to `workspace_id` via `ws_accessible()`. `agent_type` is monotonically generated (`custom_N`), never reused after delete.
+
+3. **`pipeline_builder.py` TemplateAgent fallback** — when `instantiate_agent()` returns `None`, the builder now checks `node.agent_cfg.system_prompt`; if present, it instantiates `TemplateAgent` instead of raising. The `agent_cfg` field is optional on nodes and fully backward-compatible with existing pipelines. New docstring section documents the extended node contract.
+
+4. **`app/static/pipelines.html`** — "Crear agente" modal now requires a `system_prompt` textarea (validated as required, same as label). `saveCustomAgent()` calls `POST /pipelines/custom-agents` instead of `localStorage`. `removeCustomAgent()` calls `DELETE`. `loadCustomAgents()` is called on init (after workspaces are loaded). When dragging a custom agent onto the canvas, `agent_cfg` is embedded in the node so the pipeline definition is self-contained.
+
+5. **`tests/test_pipeline.py`** — three new unit tests: known type succeeds, unknown type without `agent_cfg` still raises `ValueError`, unknown type with valid `agent_cfg.system_prompt` produces a `TemplateAgent`.
+
+### Added
+
+- **Custom agent tooltips** — hovering a palette chip shows a popover with role description and, for custom agents, the first 180 chars of the system prompt.
+- **Confirmation modal** — all 6 `confirm()`/`alert()` calls replaced with a consistent modal (`_showConfirm(msg, fn)` + `_showToast(msg)`). No more browser dialogs.
+- **isDirty flag + "Descartar cambios"** — `_autoSave()` sets `isDirty = true`; `savePipeline()` success calls `_markSaved()` (sets `isDirty = false`); `loadPipeline()` calls `_markSaved()` after loading. An amber "● sin guardar" indicator appears in the toolbar when dirty. "Descartar" button re-fetches from the server. `beforeunload` warns if the user tries to close the tab with unsaved changes. The localStorage draft does NOT clear `isDirty` — it's a local copy, not a server save.
+- **Edge endpoint reconnection** — clicking an edge selects it and shows two indigo handles (⬤) at the from and to endpoints. Dragging a handle to another node or port updates the edge's from/to/fromPort/toPort with live preview (reuses `tempEdgePath`). Escape or clicking empty canvas deselects.
+- **Edge selection state** (`selectedEdgeId`) — tracked in JS state; cleared on Escape, canvas click, and `loadPipeline()`.
+
+### Known technical debt (unchanged)
+- **Accessibility** — still deferred (see v0.5.1 note).
+- **Run pause controls** — deliberately excluded. `ManualActionCapability` is designed for user-defined action items (blocking tickets), not ad-hoc mid-run pause. `antcrew replay` is a CLI checkpoint tool; the platform doesn't use `SqliteSaver`. The existing HITL node flag (`hitl: true`) already covers "pause and wait for human approval at a node". A general pause API endpoint is a separate deliverable requiring a new run status ("paused") and resume endpoint.
+
+---
+
 ## v0.5.1 (2026-07-28)
 
 ### Added — Pipeline editor redesign (phases 1 + 2)

@@ -113,9 +113,16 @@ body{overflow:hidden}
   </div>
 
   <div class="flex items-center gap-1.5">
+    <span x-show="isDirty && activeId && !isTemplate" x-cloak class="text-xs text-amber-500" title="Hay cambios sin guardar">● sin guardar</span>
+
     <span x-show="saveStatus" x-cloak class="text-xs"
       :class="saveStatus==='saved'?'text-emerald-500':saveStatus==='error'?'text-red-400':'text-gray-500'"
       x-text="saveStatus==='saved'?'✓ Guardado':saveStatus==='saving'?'Guardando…':'Error'"></span>
+
+    <button x-show="isDirty && activeId && !isTemplate" x-cloak @click="discardChanges()"
+      class="px-3 py-1.5 text-gray-500 hover:text-red-400 text-xs rounded transition-colors border border-gray-800 hover:border-red-900">
+      Descartar
+    </button>
 
     <button x-show="activeId && !isTemplate" @click="savePipeline()"
       :disabled="saving"
@@ -190,14 +197,28 @@ body{overflow:hidden}
           class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors px-1" title="Crear agente">+ Crear</button>
       </div>
       <div class="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
-        <template x-for="agent in allAgents" :key="agent.type">
-          <div class="palette-chip rounded px-2 py-1.5 bg-gray-800/40 text-xs font-mono select-none flex items-center gap-2"
+        <template x-for="agent in allAgents" :key="agent.agent_type || agent.type">
+          <div class="palette-chip rounded px-2 py-1.5 bg-gray-800/40 text-xs font-mono select-none flex items-center gap-2 relative group"
             :style="`border-left: 3px solid ${agent.color}`"
             draggable="true"
             @dragstart="onPaletteDragStart($event, agent)">
             <span class="text-gray-300 flex-1 truncate" x-text="agent.label"></span>
+            <span x-show="agent.phase" class="text-gray-700 text-xs flex-shrink-0" x-text="agent.glyph || ''"></span>
             <button x-show="agent.custom" @click.stop="removeCustomAgent(agent)"
               class="text-gray-700 hover:text-red-400 transition-colors leading-none flex-shrink-0">✕</button>
+            <!-- Tooltip -->
+            <div class="absolute left-full ml-2 top-0 z-50 w-56 bg-gray-950 border border-gray-700 rounded-lg p-3 shadow-xl
+                        opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 text-left"
+                 style="min-width:200px">
+              <p class="font-semibold text-gray-200 text-xs mb-1" x-text="agent.label"></p>
+              <p x-show="agent.role_description || agent.roleDescription" class="text-gray-400 text-xs mb-1.5"
+                 x-text="agent.role_description || agent.roleDescription || ''"></p>
+              <p x-show="agent.custom && (agent.system_prompt || agent.systemPrompt)"
+                 class="text-gray-600 text-xs font-mono leading-relaxed line-clamp-4"
+                 x-text="(agent.system_prompt || agent.systemPrompt || '').slice(0, 180)"></p>
+              <p x-show="agent.phase" class="text-gray-600 text-xs mt-1.5 capitalize"
+                 x-text="agent.phase ? 'Fase: ' + agent.phase : ''"></p>
+            </div>
           </div>
         </template>
       </div>
@@ -579,13 +600,26 @@ body{overflow:hidden}
 <template x-teleport="body">
   <div x-show="showNewAgentModal" x-cloak class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
     @click.self="showNewAgentModal=false">
-    <div class="bg-gray-900 border border-gray-700 rounded-xl w-80 p-6 space-y-4">
-      <h3 class="font-semibold text-sm">Crear agente</h3>
-      <p class="text-xs text-gray-500">El agente se añadirá a la paleta y podrás arrastrarlo al canvas.</p>
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-96 p-6 space-y-4">
+      <h3 class="font-semibold text-sm">Crear agente personalizado</h3>
+      <p class="text-xs text-gray-500">Define el nombre, prompt de sistema y color. El agente se persiste en el workspace y podrás arrastrarlo al canvas.</p>
 
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5">Nombre / rol</label>
+        <label class="block text-xs text-gray-400 mb-1.5">Nombre / rol <span class="text-red-500">*</span></label>
         <input x-model="newAgent.label" placeholder="ej: Data Analyst"
+          class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+      </div>
+
+      <div>
+        <label class="block text-xs text-gray-400 mb-1.5">System prompt <span class="text-red-500">*</span></label>
+        <textarea x-model="newAgent.systemPrompt" rows="5" placeholder="Eres un agente especializado en… Recibe {request} y produce…"
+          class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+        <p class="text-xs text-gray-600 mt-1">Usa <code class="text-gray-500">{'{'}request{'}'}</code> para interpolar el input del pipeline.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs text-gray-400 mb-1.5">Descripción del rol <span class="text-gray-600">(opcional)</span></label>
+        <input x-model="newAgent.roleDescription" placeholder="ej: Analiza datos y produce informes concisos"
           class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
       </div>
 
@@ -632,6 +666,28 @@ body{overflow:hidden}
       </div>
     </div>
   </div>
+</template>
+
+<!-- ── Confirmation modal ── -->
+<template x-teleport="body">
+  <div x-show="confirmModal.open" x-cloak class="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl w-80 p-5 space-y-4 shadow-2xl">
+      <p class="text-sm text-gray-200" x-text="confirmModal.message"></p>
+      <div class="flex gap-2 justify-end">
+        <button @click="_cancelConfirm()"
+          class="px-3 py-1.5 text-xs text-gray-500 hover:text-white transition-colors">Cancelar</button>
+        <button @click="_doConfirm()"
+          class="px-4 py-1.5 bg-red-700 hover:bg-red-600 text-white text-xs rounded transition-colors">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- ── Toast notification ── -->
+<template x-teleport="body">
+  <div x-show="toast" x-cloak
+    class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] bg-gray-800 border border-gray-600 text-gray-200 text-xs px-4 py-2.5 rounded-lg shadow-xl pointer-events-none"
+    x-text="toast"></div>
 </template>
 
 <!-- ── Comment edit modal ── -->
@@ -804,8 +860,22 @@ function app() {
 
     // New agent modal
     showNewAgentModal: false,
-    newAgent: { label: '', color: '#7c3aed' },
+    newAgent: { label: '', color: '#7c3aed', systemPrompt: '', roleDescription: '' },
     newAgentError: '',
+
+    // Confirmation modal (replaces native confirm/alert)
+    confirmModal: { open: false, message: '', onConfirm: null },
+
+    // Toast notification
+    toast: '',
+    _toastTimer: null,
+
+    // Dirty-tracking (unsaved server changes)
+    isDirty: false,
+
+    // Edge selection & reconnection
+    selectedEdgeId: null,
+    reconnectingEdge: null,
 
     // Undo/redo
     history: [],
@@ -966,15 +1036,15 @@ function app() {
     // ── Init ──────────────────────────────────────────────────────────────
 
     async init() {
-      this._loadCustomAgents();
+      window.addEventListener('beforeunload', (e) => {
+        if (this.isDirty && this.activeId && !this.isTemplate) {
+          e.preventDefault();
+          e.returnValue = '';
+        }
+      });
       await Promise.all([this.loadPipelineList(), this.loadPalette(), this.loadWorkspaces()]);
+      await this.loadCustomAgents();
       this._checkDraft();
-    },
-
-    _loadCustomAgents() {
-      try {
-        this.customAgents = JSON.parse(localStorage.getItem('antcrew_custom_agents') || '[]');
-      } catch { this.customAgents = []; }
     },
 
     async loadPipelineList() {
@@ -1002,30 +1072,110 @@ function app() {
       if (r.ok) this.workspaces = await r.json();
     },
 
+    // ── Confirmation modal & toast ─────────────────────────────────────────
+
+    _showConfirm(message, onConfirm) {
+      this.confirmModal = { open: true, message, onConfirm };
+    },
+
+    _doConfirm() {
+      const fn = this.confirmModal.onConfirm;
+      this.confirmModal = { open: false, message: '', onConfirm: null };
+      if (fn) fn();
+    },
+
+    _cancelConfirm() {
+      this.confirmModal = { open: false, message: '', onConfirm: null };
+    },
+
+    _showToast(msg, ms = 3500) {
+      this.toast = msg;
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => { this.toast = ''; }, ms);
+    },
+
+    // ── isDirty tracking ───────────────────────────────────────────────────
+
+    _markSaved() {
+      this.isDirty = false;
+    },
+
+    async discardChanges() {
+      if (!this.activeId || this.activeId === '__new__') {
+        this.nodes = []; this.edges = []; this.isDirty = false;
+        this.renderCanvas(); return;
+      }
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const r = await fetch(`/pipelines/${this.activeId}`, {
+        headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin',
+      });
+      if (r.ok) this.loadPipeline(await r.json());
+    },
+
     // ── Custom agents ──────────────────────────────────────────────────────
 
-    saveCustomAgent() {
+    async loadCustomAgents() {
+      const ws = this.workspaces[0];
+      if (!ws) return;
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      try {
+        const r = await fetch(`/pipelines/custom-agents?workspace_id=${ws.id}`, {
+          headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin',
+        });
+        if (r.ok) {
+          const agents = await r.json();
+          this.customAgents = agents;  // each has custom:true from backend
+          // Merge into _paletteMap so renderCanvas picks up color/glyph
+          for (const a of agents) this._paletteMap[a.agent_type] = a;
+        }
+      } catch {}
+    },
+
+    async saveCustomAgent() {
       const label = (this.newAgent.label || '').trim();
+      const systemPrompt = (this.newAgent.systemPrompt || '').trim();
       if (!label) { this.newAgentError = 'El nombre es obligatorio.'; return; }
-      const existing = JSON.parse(localStorage.getItem('antcrew_custom_agents') || '[]');
-      const maxN = existing.reduce((m, a) => {
-        const n = parseInt((a.type || '').replace('custom_', ''));
-        return isNaN(n) ? m : Math.max(m, n);
-      }, 0);
-      const agent = { type: `custom_${maxN + 1}`, label, color: this.newAgent.color, custom: true };
-      existing.push(agent);
-      localStorage.setItem('antcrew_custom_agents', JSON.stringify(existing));
-      this.customAgents = existing;
-      this.showNewAgentModal = false;
-      this.newAgent = { label: '', color: '#7c3aed' };
-      this.newAgentError = '';
+      if (!systemPrompt) { this.newAgentError = 'El system prompt es obligatorio.'; return; }
+      const ws = this.workspaces[0];
+      if (!ws) { this.newAgentError = 'Necesitas al menos un workspace.'; return; }
+      const key = localStorage.getItem('antcrew_api_key') || '';
+      const body = {
+        workspace_id: ws.id, label, color: this.newAgent.color,
+        system_prompt: systemPrompt,
+        role_description: (this.newAgent.roleDescription || '').trim() || null,
+      };
+      try {
+        const r = await fetch('/pipelines/custom-agents', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', ...(key?{'X-Api-Key':key}:{})},
+          credentials: 'same-origin', body: JSON.stringify(body),
+        });
+        if (!r.ok) { this.newAgentError = 'Error al crear el agente.'; return; }
+        const created = await r.json();
+        this.customAgents.push(created);
+        this._paletteMap[created.agent_type] = created;
+        this.showNewAgentModal = false;
+        this.newAgent = { label: '', color: '#7c3aed', systemPrompt: '', roleDescription: '' };
+        this.newAgentError = '';
+      } catch { this.newAgentError = 'Error de red.'; }
     },
 
     removeCustomAgent(agent) {
-      if (!confirm(`¿Eliminar el agente "${agent.label}"?`)) return;
-      const updated = this.customAgents.filter(a => a.type !== agent.type);
-      localStorage.setItem('antcrew_custom_agents', JSON.stringify(updated));
-      this.customAgents = updated;
+      const type = agent.agent_type || agent.type;
+      this._showConfirm(`¿Eliminar el agente "${agent.label}"?`, async () => {
+        const ws = this.workspaces[0];
+        if (!ws) { this._showToast('No hay workspace activo.'); return; }
+        const key = localStorage.getItem('antcrew_api_key') || '';
+        const r = await fetch(`/pipelines/custom-agents/${type}?workspace_id=${ws.id}`, {
+          method: 'DELETE', headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin',
+        });
+        if (r.ok || r.status === 404) {
+          this.customAgents = this.customAgents.filter(a => (a.agent_type || a.type) !== type);
+          delete this._paletteMap[type];
+        } else {
+          this._showToast('Error al eliminar el agente.');
+        }
+      });
     },
 
     // ── Pipeline load/save ─────────────────────────────────────────────────
@@ -1070,10 +1220,13 @@ function app() {
       this.zoom = def.zoom || 1;
       this.pan = def.pan ? { ...def.pan } : { x: 40, y: 40 };
       this.saveStatus = '';
+      this.isDirty = false;
+      this.selectedEdgeId = null;
       this.history = [];
       this.historyIdx = -1;
       this.renderCanvas();
       this.pushHistory();
+      this._markSaved();
       // Auto-fit view when loading a pipeline (deferred so SVG layout is ready)
       setTimeout(() => this.zoomToFit(), 0);
       this.loadPipelineRuns();
@@ -1100,7 +1253,7 @@ function app() {
 
     async forkTemplate() {
       const ws = this.workspaces[0];
-      if (!ws) { alert('Necesitas al menos un workspace.'); return; }
+      if (!ws) { this._showToast('Necesitas al menos un workspace para usar este template.'); return; }
       const body = {
         name: this.activeName + ' (copia)',
         workspace_id: ws.id,
@@ -1111,10 +1264,9 @@ function app() {
       const r = await fetch('/pipelines/', {
         method: 'POST',
         headers: {'Content-Type':'application/json', ...(key?{'X-Api-Key':key}:{})},
-        credentials: 'same-origin',
-        body: JSON.stringify(body),
+        credentials: 'same-origin', body: JSON.stringify(body),
       });
-      if (!r.ok) { alert('Error al clonar template'); return; }
+      if (!r.ok) { this._showToast('Error al clonar el template.'); return; }
       const created = await r.json();
       await this.loadPipelineList();
       this.loadPipeline(created);
@@ -1135,7 +1287,7 @@ function app() {
       try {
         if (this.activeId === '__new__') {
           const ws = this.workspaces[0];
-          if (!ws) { this.saveStatus='error'; this.saving=false; return; }
+          if (!ws) { this.saveStatus='error'; this.saving=false; this._showToast('Necesitas al menos un workspace.'); return; }
           const r = await fetch('/pipelines/', {
             method: 'POST', headers, credentials: 'same-origin',
             body: JSON.stringify({ name: this.activeName, description: this.activeDescription || null, workspace_id: ws.id, definition }),
@@ -1151,6 +1303,7 @@ function app() {
           if (!r.ok) throw new Error();
         }
         this.saveStatus = 'saved';
+        this._markSaved();
         await this.loadPipelineList();
         setTimeout(() => { if (this.saveStatus==='saved') this.saveStatus=''; }, 2000);
       } catch {
@@ -1161,17 +1314,16 @@ function app() {
     },
 
     async deletePipeline(p) {
-      if (!confirm(`¿Eliminar "${p.name}"?`)) return;
-      const key = localStorage.getItem('antcrew_api_key') || '';
-      await fetch(`/pipelines/${p.id}`, {
-        method: 'DELETE',
-        headers: key ? {'X-Api-Key': key} : {},
-        credentials: 'same-origin',
+      this._showConfirm(`¿Eliminar el pipeline "${p.name}"?`, async () => {
+        const key = localStorage.getItem('antcrew_api_key') || '';
+        await fetch(`/pipelines/${p.id}`, {
+          method: 'DELETE', headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin',
+        });
+        if (this.activeId === p.id) {
+          this.activeId = null; this.nodes = []; this.edges = []; this.isDirty = false;
+        }
+        await this.loadPipelineList();
       });
-      if (this.activeId === p.id) {
-        this.activeId = null; this.nodes = []; this.edges = [];
-      }
-      await this.loadPipelineList();
     },
 
     // ── Run ────────────────────────────────────────────────────────────────
@@ -1267,6 +1419,11 @@ function app() {
         const g = this._svg('g'); g.classList.add('edge-group');
         // Hit area
         const hit = this._svg('path', { d, fill: 'none', stroke: 'transparent', 'stroke-width': '14', class: 'edge-path' });
+        hit.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          this.selectedEdgeId = (this.selectedEdgeId === edge.id) ? null : edge.id;
+          this.renderCanvas();
+        });
         g.appendChild(hit);
         // Visible stroke
         const visAttrs = { d, fill: 'none', stroke: style.stroke, 'stroke-width': '1.5', 'stroke-opacity': '.8', 'marker-end': style.marker };
@@ -1304,6 +1461,24 @@ function app() {
         dx.textContent = '✕'; dg.appendChild(dx);
         dg.addEventListener('click', (ev) => { ev.stopPropagation(); this.pushHistory(); this.removeEdge(edge); this.renderCanvas(); this._autoSave(); });
         g.appendChild(dg);
+        // Endpoint handles when edge is selected (for reconnection)
+        if (this.selectedEdgeId === edge.id) {
+          const fn2 = this.nodes.find(n => n.id === edge.from);
+          const tn2 = this.nodes.find(n => n.id === edge.to);
+          if (fn2 && tn2) {
+            const [hx1, hy1] = this._portCoords(fn2, edge.fromPort || 'e');
+            const [hx2, hy2] = this._portCoords(tn2, edge.toPort || 'w');
+            for (const [hx, hy, ep] of [[hx1, hy1, 'from'], [hx2, hy2, 'to']]) {
+              const h = this._svg('circle', {
+                cx: hx.toString(), cy: hy.toString(), r: '5',
+                fill: '#6366f1', stroke: '#a5b4fc', 'stroke-width': '1.5',
+              });
+              h.style.cursor = 'crosshair';
+              h.addEventListener('mousedown', (ev) => { ev.stopPropagation(); this.startReconnect(ev, edge, ep); });
+              g.appendChild(h);
+            }
+          }
+        }
         layer.appendChild(g);
       }
     },
@@ -1525,6 +1700,9 @@ function app() {
     onSvgMouseDown(e) {
       if (e.target.closest('.node-group') || e.target.classList.contains('port-handle')) return;
       if (this.drawing) { this.drawing = false; return; }
+      if (this.reconnectingEdge) { this.reconnectingEdge = null; this.tempEdgePath = ''; return; }
+      // Clicking on empty canvas deselects edges
+      if (!e.target.closest('.edge-group')) this.selectedEdgeId = null;
       const c = this._canvasClientCoords(e);
       if (e.shiftKey) {
         // Shift+drag → marquee selection
@@ -1560,6 +1738,21 @@ function app() {
     },
 
     onSvgMouseMove(e) {
+      if (this.reconnectingEdge) {
+        const { edge, endpoint } = this.reconnectingEdge;
+        const fixedNode = endpoint === 'from'
+          ? this.nodes.find(n => n.id === edge.to)
+          : this.nodes.find(n => n.id === edge.from);
+        const fixedPort = endpoint === 'from' ? (edge.toPort || 'w') : (edge.fromPort || 'e');
+        if (fixedNode) {
+          const [wx, wy] = this._portCoords(fixedNode, fixedPort);
+          const sx = wx * this.zoom + this.pan.x;
+          const sy = wy * this.zoom + this.pan.y;
+          const c = this._canvasClientCoords(e);
+          this._updateTempEdge(sx, sy, c.x, c.y);
+        }
+        return;
+      }
       if (this.drawing) {
         const c = this._canvasClientCoords(e);
         const fn = this.nodes.find(n => n.id === this.drawFromId);
@@ -1612,6 +1805,26 @@ function app() {
     },
 
     onSvgMouseUp(e) {
+      if (this.reconnectingEdge) {
+        const { edge, endpoint } = this.reconnectingEdge;
+        this.reconnectingEdge = null;
+        this.tempEdgePath = '';
+        const c = this._canvasCoords(e);
+        const targetNode = this.nodes.find(n =>
+          n.type !== 'comment' &&
+          c.x >= n.x && c.x <= n.x + NODE_W &&
+          c.y >= n.y && c.y <= n.y + NODE_H
+        );
+        if (targetNode) {
+          this.pushHistory();
+          const port = this._nearestPort(targetNode, c.x, c.y);
+          if (endpoint === 'from') { edge.from = targetNode.id; edge.fromPort = port; }
+          else                     { edge.to   = targetNode.id; edge.toPort   = port; }
+          this._autoSave();
+        }
+        this.renderCanvas();
+        return;
+      }
       if (this.drawing) {
         const c = this._canvasCoords(e);
         const toNode = this.nodes.find(n =>
@@ -1669,9 +1882,13 @@ function app() {
     // ── Drag & drop from palette ───────────────────────────────────────────
 
     onPaletteDragStart(e, agent) {
-      e.dataTransfer.setData('agent_type', agent.type);
+      e.dataTransfer.setData('agent_type', agent.agent_type || agent.type);
       e.dataTransfer.setData('agent_label', agent.label);
       e.dataTransfer.setData('agent_color', agent.color || '#4f46e5');
+      if (agent.custom) {
+        e.dataTransfer.setData('agent_system_prompt', agent.system_prompt || '');
+        e.dataTransfer.setData('agent_role_description', agent.role_description || '');
+      }
     },
 
     onCanvasDrop(e) {
@@ -1696,15 +1913,39 @@ function app() {
         nodeId = `${type}_${i}`;
       }
 
+      const node = { id: nodeId, type, label, model: 'claude', hitl: false, channel_type: 'platform', x, y };
+      // Custom agents carry agent_cfg so pipeline_builder can instantiate TemplateAgent
+      const sysPrompt = e.dataTransfer.getData('agent_system_prompt');
+      if (sysPrompt) {
+        node.agent_cfg = {
+          system_prompt: sysPrompt,
+          role_description: e.dataTransfer.getData('agent_role_description') || '',
+        };
+      }
+
       this.pushHistory();
-      this.nodes.push({ id: nodeId, type, label, model: 'claude', hitl: false, channel_type: 'platform', x, y });
+      this.nodes.push(node);
       this.renderCanvas();
       this._autoSave();
     },
 
     // ── Edges ──────────────────────────────────────────────────────────────
 
-    selectEdge() {},
+    startReconnect(e, edge, endpoint) {
+      // endpoint: 'from' | 'to'  — which end the user is dragging
+      this.reconnectingEdge = { edge, endpoint };
+      this.selectedEdgeId = null;
+      const fixedNode = endpoint === 'from'
+        ? this.nodes.find(n => n.id === edge.to)
+        : this.nodes.find(n => n.id === edge.from);
+      const fixedPort = endpoint === 'from' ? (edge.toPort || 'w') : (edge.fromPort || 'e');
+      if (!fixedNode) return;
+      const [wx, wy] = this._portCoords(fixedNode, fixedPort);
+      const sx = wx * this.zoom + this.pan.x;
+      const sy = wy * this.zoom + this.pan.y;
+      const c = this._canvasClientCoords(e);
+      this._updateTempEdge(sx, sy, c.x, c.y);
+    },
 
     removeEdge(edge) {
       this.edges = this.edges.filter(e => e.id !== edge.id);
@@ -1721,6 +1962,9 @@ function app() {
       if (e.key === 'Escape') {
         this.selectedNodeId = null;
         this.selectedNodes = [];
+        this.selectedEdgeId = null;
+        this.reconnectingEdge = null;
+        this.tempEdgePath = '';
         this.marquee = null;
         this.renderCanvas();
         return;
@@ -1829,6 +2073,7 @@ function app() {
 
     _autoSave() {
       if (!this.activeId) return;
+      if (!this.isTemplate) this.isDirty = true;
       clearTimeout(this._autoSaveTimer);
       this._autoSaveTimer = setTimeout(() => {
         try {
@@ -1870,7 +2115,7 @@ function app() {
       const name = (this.saveAsName || '').trim();
       if (!name) return;
       const ws = this.workspaces[0];
-      if (!ws) { alert('Necesitas al menos un workspace.'); return; }
+      if (!ws) { this._showToast('Necesitas al menos un workspace.'); return; }
       const body = {
         name, workspace_id: ws.id,
         description: this.activeDescription || null,
@@ -1882,7 +2127,7 @@ function app() {
         headers: {'Content-Type':'application/json', ...(key?{'X-Api-Key':key}:{})},
         credentials: 'same-origin', body: JSON.stringify(body),
       });
-      if (!r.ok) { alert('Error al guardar'); return; }
+      if (!r.ok) { this._showToast('Error al guardar el pipeline.'); return; }
       const created = await r.json();
       await this.loadPipelineList();
       this.showSaveAsModal = false; this.saveAsName = '';

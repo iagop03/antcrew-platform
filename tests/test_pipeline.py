@@ -129,3 +129,86 @@ def test_available_teams_list():
     assert "FullStackTeam" in AVAILABLE_TEAMS
     assert "ResearchTeam" in AVAILABLE_TEAMS
     assert "ContentTeam" in AVAILABLE_TEAMS
+
+
+# ---------------------------------------------------------------------------
+# pipeline_builder.py unit tests
+# ---------------------------------------------------------------------------
+
+_MINIMAL_DEFN = {
+    "nodes": [
+        {"id": "ba", "type": "business_analyst", "label": "BA", "model": "claude"},
+        {"id": "pm", "type": "pm", "label": "PM", "model": "claude"},
+    ],
+    "edges": [{"from": "ba", "to": "pm", "condition": None}],
+}
+
+_CUSTOM_DEFN = {
+    "nodes": [
+        {
+            "id": "custom_1", "type": "custom_1", "label": "Data Analyst", "model": "claude",
+            "agent_cfg": {
+                "system_prompt": "You are a data analyst. Analyze {request} and produce a report.",
+                "role_description": "Analyzes data and produces concise reports",
+            },
+        },
+        {"id": "pm", "type": "pm", "label": "PM", "model": "claude"},
+    ],
+    "edges": [{"from": "custom_1", "to": "pm", "condition": None}],
+}
+
+
+def test_build_team_unknown_type_no_cfg_raises(monkeypatch):
+    """Unknown agent type without agent_cfg must raise ValueError (no silent failure)."""
+    import antcrew
+    from unittest.mock import MagicMock
+    monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
+
+    from app.services.pipeline_builder import build_team_from_definition
+    defn = {
+        "nodes": [{"id": "unknown_xyz", "type": "unknown_xyz", "label": "X", "model": "claude"}],
+        "edges": [{"from": "unknown_xyz", "to": "unknown_xyz"}],
+    }
+    with pytest.raises(ValueError, match="Unknown agent type"):
+        build_team_from_definition(defn)
+
+
+def test_build_team_custom_agent_with_system_prompt(monkeypatch):
+    """Node with agent_cfg.system_prompt instantiates TemplateAgent instead of raising."""
+    import antcrew
+    from unittest.mock import MagicMock
+    from antcrew.agents.template_agent import TemplateAgent
+
+    mock_llm = MagicMock()
+    monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: mock_llm)
+    monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
+    # pm is a real registered agent — mock it too to avoid real LLM
+    monkeypatch.setattr(antcrew, "instantiate_agent", lambda name, llm: (
+        None if name == "custom_1" else MagicMock()
+    ))
+
+    from app.services.pipeline_builder import build_team_from_definition
+    agents, _ = build_team_from_definition(_CUSTOM_DEFN)
+
+    assert "custom_1" in agents
+    assert isinstance(agents["custom_1"], TemplateAgent)
+    assert agents["custom_1"].name == "custom_1"
+
+
+def test_build_team_custom_agent_missing_system_prompt_raises(monkeypatch):
+    """agent_cfg present but system_prompt empty still raises ValueError."""
+    import antcrew
+    from unittest.mock import MagicMock
+    monkeypatch.setattr(antcrew, "build_llm", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr(antcrew, "Supervisor", lambda **kw: MagicMock())
+    monkeypatch.setattr(antcrew, "instantiate_agent", lambda name, llm: None)
+
+    from app.services.pipeline_builder import build_team_from_definition
+    defn = {
+        "nodes": [{"id": "custom_1", "type": "custom_1", "label": "X", "model": "claude",
+                   "agent_cfg": {"system_prompt": "   "}}],
+        "edges": [{"from": "custom_1", "to": "custom_1"}],
+    }
+    with pytest.raises(ValueError, match="Unknown agent type"):
+        build_team_from_definition(defn)

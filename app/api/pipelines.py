@@ -14,9 +14,9 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import require_api_key, require_role
+from app.core.auth import WorkspaceContext, require_api_key, require_role, ws_accessible
 from app.core.database import get_session
-from app.models.run import PipelineDef
+from app.models.run import CustomAgentDef, PipelineDef
 
 router = APIRouter(
     prefix="/pipelines",
@@ -176,6 +176,31 @@ class PipelineUpdate(BaseModel):
     definition: Optional[dict] = None
 
 
+class CustomAgentCreate(BaseModel):
+    workspace_id: int
+    label: str
+    color: str = "#7c3aed"
+    system_prompt: str
+    role_description: Optional[str] = None
+    phase: str = "build"
+    glyph: str = "✦"
+
+
+class CustomAgentOut(BaseModel):
+    id: int
+    workspace_id: int
+    agent_type: str
+    label: str
+    color: str
+    system_prompt: str
+    role_description: Optional[str]
+    phase: str
+    glyph: str
+    custom: bool = True   # always True — tells frontend this is a user-defined agent
+
+    model_config = {"from_attributes": True}
+
+
 def _row_to_out(row: PipelineDef) -> PipelineOut:
     return PipelineOut(
         id=row.id,
@@ -288,5 +313,87 @@ async def delete_pipeline(
         raise HTTPException(404, "Pipeline not found")
     if row.is_template:
         raise HTTPException(400, "Cannot delete a built-in template")
+    await session.delete(row)
+    await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Custom agent definitions — workspace-scoped, backed by TemplateAgent at runtime
+# ---------------------------------------------------------------------------
+
+@router.get("/custom-agents", response_model=list[CustomAgentOut])
+async def list_custom_agents(
+    workspace_id: int,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(require_api_key),
+) -> list[CustomAgentOut]:
+    """Return all custom agent definitions for the given workspace."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Workspace not accessible")
+    rows = (await session.exec(
+        select(CustomAgentDef).where(CustomAgentDef.workspace_id == workspace_id)
+    )).all()
+    return [CustomAgentOut.model_validate(r) for r in rows]
+
+
+@router.post("/custom-agents", response_model=CustomAgentOut, status_code=201)
+async def create_custom_agent(
+    body: CustomAgentCreate,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(require_api_key),
+) -> CustomAgentOut:
+    """Create a custom agent definition scoped to the workspace."""
+    if not ws_accessible(body.workspace_id, ctx):
+        raise HTTPException(403, "Workspace not accessible")
+    if not body.system_prompt.strip():
+        raise HTTPException(422, "system_prompt is required")
+
+    # Determine next stable agent_type (monotonically increasing, never reused)
+    existing = (await session.exec(
+        select(CustomAgentDef).where(CustomAgentDef.workspace_id == body.workspace_id)
+    )).all()
+    max_n = 0
+    for r in existing:
+        if r.agent_type.startswith("custom_"):
+            try:
+                max_n = max(max_n, int(r.agent_type[7:]))
+            except ValueError:
+                pass
+    agent_type = f"custom_{max_n + 1}"
+
+    row = CustomAgentDef(
+        workspace_id=body.workspace_id,
+        agent_type=agent_type,
+        label=body.label,
+        color=body.color,
+        system_prompt=body.system_prompt,
+        role_description=body.role_description,
+        phase=body.phase,
+        glyph=body.glyph,
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return CustomAgentOut.model_validate(row)
+
+
+@router.delete("/custom-agents/{agent_type}", status_code=204)
+async def delete_custom_agent(
+    agent_type: str,
+    workspace_id: int,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(require_api_key),
+) -> None:
+    """Delete a custom agent definition."""
+    row = (await session.exec(
+        select(CustomAgentDef).where(
+            CustomAgentDef.agent_type == agent_type,
+            CustomAgentDef.workspace_id == workspace_id,
+        )
+    )).first()
+    if not row:
+        raise HTTPException(404, "Custom agent not found")
+    if not ws_accessible(row.workspace_id, ctx):
+        raise HTTPException(403, "Workspace not accessible")
     await session.delete(row)
     await session.commit()
