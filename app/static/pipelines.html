@@ -520,10 +520,9 @@ body{overflow:hidden}
           <label class="block text-xs text-gray-400 mb-1.5">Modelo global</label>
           <select x-model="runModel"
             class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
-            <option value="claude">claude (default)</option>
-            <option value="gpt-4o">gpt-4o</option>
-            <option value="groq:llama-3.3-70b-versatile">groq:llama3.3</option>
-            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+            <template x-for="m in allModels" :key="m.value">
+              <option :value="m.value" x-text="m.label"></option>
+            </template>
           </select>
         </div>
       </div>
@@ -562,6 +561,12 @@ body{overflow:hidden}
       <input x-model="editingEdgeCondition" @keydown.enter="saveEdgeCondition()" @keydown.escape="editingEdge=null"
         placeholder="ej: reviewer_fix_requested"
         class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-amber-500">
+      <label class="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" x-model="editingEdgeIsElse"
+          class="w-3.5 h-3.5 rounded bg-gray-800 border-gray-600 accent-amber-500">
+        <span class="text-xs text-gray-400">Rama else / alternativa</span>
+        <span class="text-xs text-gray-600 italic">(amber dashed)</span>
+      </label>
       <div class="flex gap-2 justify-end">
         <button @click="editingEdge=null" class="px-3 py-1.5 text-xs text-gray-500 hover:text-white transition-colors">Cancelar</button>
         <button @click="saveEdgeCondition()" class="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs rounded transition-colors">Guardar</button>
@@ -729,7 +734,27 @@ const AGENT_PALETTE_COLORS = [
   '#0d9488', '#7c6f00', '#9333ea', '#e11d48',
 ];
 
-// ── Alpine app ────────────────────────────────────────────────────────────
+// ── Canvas architecture note ──────────────────────────────────────────────
+// The pipeline canvas uses Alpine.js + imperative SVG rendering (renderCanvas →
+// _renderEdges / _renderNodes via document.createElementNS). This was a deliberate
+// choice evaluated against React Flow / Svelte Flow at the start of phase 2:
+//
+//   • Hard constraint: no build step — the entire platform ships from Python as
+//     plain HTML + CDN scripts. React Flow requires Vite/webpack; Svelte Flow
+//     requires the Svelte compiler. Both are disqualifying.
+//   • Zero migration cost: 8 other pages already use Alpine; no new dependency.
+//   • All phase-2 features (multi-select marquee, dagre-lite auto-layout, minimap,
+//     scroll-zoom, validation badges) were implemented in ~700 LOC of vanilla JS.
+//
+// The cost is DOM complexity: _renderNodes() + _renderEdges() are ~350 LOC of
+// manual SVG DOM juggling. If the canvas grows beyond ~5 more interactive features,
+// introducing a build step and migrating to a library would become the better call.
+//
+// Accessibility (ARIA roles, tabindex on nodes/edges, keyboard graph navigation)
+// is MISSING and is accepted as conscious technical debt. A proper implementation
+// would require ARIA live-region updates on every render or a shadow accessible
+// tree mirroring the graph — deferred until there is a confirmed user need.
+// ─────────────────────────────────────────────────────────────────────────────
 function app() {
   return {
     PROVIDERS,
@@ -761,6 +786,7 @@ function app() {
 
     editingEdge: null,
     editingEdgeCondition: '',
+    editingEdgeIsElse: false,
 
     pipelineRuns: [],
     loadingPipelineRuns: false,
@@ -812,6 +838,9 @@ function app() {
     // Palette map — populated by loadPalette(); keyed by agent type
     _paletteMap: {},
 
+    // Autosave debounce timer
+    _autoSaveTimer: null,
+
     // ── Computed ───────────────────────────────────────────────────────────
 
     get selectedNode() {
@@ -821,6 +850,11 @@ function app() {
 
     get allAgents() {
       return [...this.palette, ...this.customAgents];
+    },
+
+    // Flat list of all models from PROVIDERS — used by run modal to avoid duplication
+    get allModels() {
+      return PROVIDERS.flatMap(pv => pv.models);
     },
 
     // ── Helpers ────────────────────────────────────────────────────────────
@@ -1040,6 +1074,8 @@ function app() {
       this.historyIdx = -1;
       this.renderCanvas();
       this.pushHistory();
+      // Auto-fit view when loading a pipeline (deferred so SVG layout is ready)
+      setTimeout(() => this.zoomToFit(), 0);
       this.loadPipelineRuns();
     },
 
@@ -1195,9 +1231,11 @@ function app() {
       this._renderNodes(); // _renderNodes calls _renderMinimap at the end
     },
 
-    _isElseEdge(condition) {
-      if (!condition) return false;
-      const c = condition.toLowerCase();
+    _isElseEdge(edge) {
+      // Explicit field takes priority over heuristic
+      if (typeof edge.is_else === 'boolean') return edge.is_else;
+      // Heuristic fallback for existing edges that pre-date the field
+      const c = (edge.condition || '').toLowerCase();
       return c.startsWith('else') || c.includes('_fix_') || c.includes('fix_requested') || c.includes('_retry');
     },
 
@@ -1207,7 +1245,7 @@ function app() {
         return { stroke: '#f59e0b', dasharray: null, marker: 'url(#arrow-hitl)', isHitl: true };
       }
       if (edge.condition) {
-        const isElse = this._isElseEdge(edge.condition);
+        const isElse = this._isElseEdge(edge);
         return {
           stroke: isElse ? '#d97706' : '#059669',
           dasharray: isElse ? '6,3' : null,
@@ -1246,8 +1284,8 @@ function app() {
         }
         // Condition label
         if (edge.condition) {
-          const labelColor = this._isElseEdge(edge.condition) ? '#d97706' : '#059669';
-          const borderColor = this._isElseEdge(edge.condition) ? '#d97706' : '#059669';
+          const labelColor = this._isElseEdge(edge) ? '#d97706' : '#059669';
+          const borderColor = this._isElseEdge(edge) ? '#d97706' : '#059669';
           const lg = this._svg('g', { transform: `translate(${mid.x},${mid.y})` });
           const bg = this._svg('rect', { x: '-44', y: '-10', width: '88', height: '20', rx: '4', fill: '#1c1917', stroke: borderColor, 'stroke-width': '1', class: 'edge-label-bg' });
           bg.addEventListener('click', () => this.editEdgeCondition(edge));
@@ -1719,12 +1757,14 @@ function app() {
     editEdgeCondition(edge) {
       this.editingEdge = edge;
       this.editingEdgeCondition = edge.condition || '';
+      this.editingEdgeIsElse = !!edge.is_else;
     },
 
     saveEdgeCondition() {
       if (this.editingEdge) {
         this.pushHistory();
         this.editingEdge.condition = this.editingEdgeCondition.trim() || null;
+        this.editingEdge.is_else = this.editingEdgeIsElse;
       }
       this.editingEdge = null;
       this.renderCanvas();
@@ -1785,17 +1825,20 @@ function app() {
       this.renderCanvas(); this._autoSave();
     },
 
-    // ── Auto-save draft ───────────────────────────────────────────────────────
+    // ── Auto-save draft (debounced 600ms) ────────────────────────────────────
 
     _autoSave() {
       if (!this.activeId) return;
-      try {
-        localStorage.setItem('ac_pipeline_draft', JSON.stringify({
-          activeId: this.activeId, activeName: this.activeName,
-          activeDescription: this.activeDescription, isTemplate: this.isTemplate,
-          nodes: this.nodes, edges: this.edges, zoom: this.zoom, pan: this.pan, ts: Date.now(),
-        }));
-      } catch {}
+      clearTimeout(this._autoSaveTimer);
+      this._autoSaveTimer = setTimeout(() => {
+        try {
+          localStorage.setItem('ac_pipeline_draft', JSON.stringify({
+            activeId: this.activeId, activeName: this.activeName,
+            activeDescription: this.activeDescription, isTemplate: this.isTemplate,
+            nodes: this.nodes, edges: this.edges, zoom: this.zoom, pan: this.pan, ts: Date.now(),
+          }));
+        } catch {}
+      }, 600);
     },
 
     _checkDraft() {

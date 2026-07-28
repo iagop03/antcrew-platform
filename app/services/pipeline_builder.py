@@ -13,7 +13,10 @@ Definition schema per node:
   }
 
 Edges:
-  {"from": str, "to": str, "condition": str | null}
+  {"from": str, "to": str, "condition": str | null, "is_else": bool | null}
+
+  is_else marks an edge as an alternative / else branch (visual-only; ignored by the
+  builder — it only reads "from", "to", and "condition" to construct the flow).
 """
 from __future__ import annotations
 

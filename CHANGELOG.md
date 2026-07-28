@@ -1,5 +1,48 @@
 # Changelog — antcrew-platform
 
+## v0.5.1 (2026-07-28)
+
+### Added — Pipeline editor redesign (phases 1 + 2)
+
+#### Phase 1 (UX baseline)
+- **4-port connection system** — arrows can originate from any of the 4 cardinal port handles (N/E/S/W) instead of fixed left/right. Stored as `fromPort`/`toPort` on edges; existing edges without these fields default to E/W for backward compatibility.
+- **Undo/redo** — Ctrl+Z / Ctrl+Y up to 60 history snapshots (JSON diff of `{nodes, edges}`).
+- **Comment nodes** — type `"comment"`, rendered as yellow dashed sticky-note, skipped by the builder, double-click to edit text. Ctrl+M to add.
+- **Save-as dialog** — opening a built-in template now shows "Guardar como…" instead of "Guardar", cloning it into a user pipeline before saving.
+- **Autosave draft** — every mutation writes `{nodes, edges, zoom, pan}` to `localStorage` (debounced 600ms). On next load, an amber banner offers to restore.
+- **Snap-to-grid** — 24px alignment toggle (Ctrl+G / ⊞ button).
+- **Duplicate node** — Ctrl+D copies the selected node with a 24px offset.
+
+#### Phase 2 (symbology + interaction)
+- **5-phase symbology** — all 15 agent types grouped into Discovery / Planning / Build / Quality / Delivery, each with a Unicode glyph (`⊙ ≡ </> ✓ ⇧`) rendered as SVG text inside nodes. Color and glyph sourced from `_AGENT_PALETTE` in `pipelines.py` (single source); frontend builds a `_paletteMap` from the `/pipelines/agents` response.
+- **Extended arrow language** — four visually distinct edge types: normal (slate), conditional-if (green solid), conditional-else (amber dashed), HITL-gate (gold + ⏸ badge). Else classification uses an explicit `is_else: bool` field on the edge (visual-only; ignored by `pipeline_builder.py`), with a substring heuristic as fallback for existing edges.
+- **Entry / terminal node marks** — auto-detected (0 in-edges = entry → left triangle + dashed outer ring; 0 out-edges = terminal → bottom bar). No schema change.
+- **Canvas validation badges** — `⟲ ciclo` (red) and `⚠ huérfano` (amber) badges appear directly on problem nodes after each render.
+- **Multi-select** — Shift+drag on empty canvas opens a marquee; Shift+click toggles a node; Ctrl+A selects all. Dragging a selected node moves all selected nodes together. Delete clears selection.
+- **Auto-layout** (`⊟` / Ctrl+L) — topological Sugiyama-lite in ~40 lines of vanilla JS; no external library.
+- **Zoom-to-fit** (`⤢` / Ctrl+F) — fits all nodes into the viewport with 60px padding. Also called automatically when loading a pipeline.
+- **Scroll-wheel zoom** — zooms toward the cursor.
+- **Minimap** — 156×96px secondary SVG in the bottom-right corner with a viewport indicator.
+- **Collapsible legend** — bottom-left overlay listing phases and arrow types.
+- **Run modal model list** — now driven by the same `PROVIDERS` constant used by the per-node model selector; eliminates the previously hardcoded subset of 4 models.
+
+### Changed
+- `_AGENT_PALETTE` in `pipelines.py` enriched with `phase` and `glyph` fields; endpoint `/pipelines/agents` returns them.
+- `reviewer` color `#d97706` → `#059669` (Quality phase). Amber is now reserved for else/fix edges.
+- `codebase_scanner`, `idea` colors `#6b7280` / `#ec4899` → `#7c3aed` (Discovery phase).
+- `copywriter` color `#ec4899` → `#0891b2` (Build phase).
+- `editor` color `#ec4899` → `#059669` (Quality phase).
+- `doc_writer` color `#6b7280` → `#dc2626` (Delivery phase).
+- Autosave is now debounced (600ms) instead of firing synchronously on every mutation.
+
+### Architecture note (SVG-imperative vs diagram library)
+The pipeline canvas deliberately stays with Alpine.js + imperative SVG (no build step, no extra bundle). The decision was evaluated before phase 2 against React Flow / Svelte Flow: both require a bundler, which violates the project's CDN-only constraint. All phase-2 features (multi-select, auto-layout, minimap) were implemented in vanilla JS at a cost of ~700 LOC. The tradeoff is increased DOM-juggling complexity (`renderCanvas()` / `_renderNodes()` / `_renderEdges()` are now ~350 LOC combined). If the canvas grows beyond ~5 interactive features more, migrating to a diagram library with a build step would become the better call.
+
+### Known technical debt
+- **Accessibility** — the canvas has no ARIA roles, no `tabindex` on nodes/edges, and no keyboard graph navigation. A screen-reader user or someone without a pointer device cannot operate the editor today. Deferred consciously; would require either ARIA live-region updates on every render or a separate accessible tree mirroring the graph structure.
+
+---
+
 ## v0.5.0 (2026-07-27)
 
 ### Added
