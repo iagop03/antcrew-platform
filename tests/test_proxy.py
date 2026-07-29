@@ -104,7 +104,7 @@ async def test_generate_proxy_token(client: AsyncClient, session):
     assert r.status_code == 201
     data = r.json()
     assert "token" in data
-    assert len(data["token"]) == 36   # UUID
+    assert len(data["token"]) == 43   # secrets.token_urlsafe(32)
     assert data["proxy_url"] == "https://proxy.example.com"
     assert "docker" in data["docker_command"].lower()
 
