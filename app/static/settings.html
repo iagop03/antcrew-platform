@@ -357,6 +357,18 @@
           <p x-show="llmMode==='byok'" class="text-emerald-500 text-xs mt-2.5">Usando tus claves — multiplicador ×0.4 activo</p>
           <p x-show="llmMode==='managed'" class="text-gray-600 text-xs mt-2.5">Usando claves de la plataforma — multiplicador ×3.0</p>
           <p x-show="llmMode==='proxy'" class="text-violet-400 text-xs mt-2.5">Modo proxy activo — la plataforma nunca ve tu clave Anthropic · multiplicador ×0.7</p>
+
+          <!-- Per-model managed fallback (only relevant for byok / proxy) -->
+          <div x-show="llmMode !== 'managed'" x-cloak class="mt-4 pt-4 border-t border-gray-800">
+            <label class="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" x-model="byokManagedFallback" @change="saveByokFallback()"
+                class="mt-0.5 w-4 h-4 rounded border-gray-600 bg-gray-800 accent-indigo-500 shrink-0">
+              <div>
+                <p class="text-sm text-gray-200 select-none">Usar claves de la plataforma como respaldo</p>
+                <p class="text-xs text-gray-500 mt-0.5">Si un modelo no tiene clave configurada, antcrew usa su propia clave (×3.0 solo para esos modelos).</p>
+              </div>
+            </label>
+          </div>
         </div>
 
         <!-- Proxy configuration -->
@@ -831,7 +843,7 @@ function settings() {
     editKeyForm: { role: 'reviewer', email: '', slack_user_id: '', telegram_chat_id: '' },
     newKeyValue: '', keyFormError: '',
 
-    llmWsId: '', llmMode: 'managed', llmKeys: [],
+    llmWsId: '', llmMode: 'managed', llmKeys: [], byokManagedFallback: false,
     llmLoading: false, llmError: '',
     showAddKey: false,
     proxyConfigured: false, proxyUrl: '', proxyUrlInput: '', proxyToken: '', proxyDockerCmd: '',
@@ -1076,6 +1088,7 @@ function settings() {
       try {
         const ws = this.workspaces.find(w => w.id == this.llmWsId);
         this.llmMode = ws?.llm_key_mode || 'managed';
+        this.byokManagedFallback = ws?.byok_managed_fallback || false;
         const r = await fetch(`/workspaces/${this.llmWsId}/llm-keys`, { headers: this.apiHeaders() });
         if (!r.ok) throw new Error(await r.text());
         this.llmKeys = await r.json();
@@ -1094,6 +1107,19 @@ function settings() {
         if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al cambiar modo'; return; }
         this.llmMode = mode;
         await this.loadWorkspaces();
+      } catch(e) { this.llmError = e.message; }
+    },
+
+    async saveByokFallback() {
+      this.llmError = '';
+      try {
+        const r = await fetch(`/workspaces/${this.llmWsId}/llm-mode`, {
+          method: 'PATCH',
+          headers: this.apiHeaders(),
+          body: JSON.stringify({ mode: this.llmMode, byok_managed_fallback: this.byokManagedFallback }),
+        });
+        if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al guardar'; }
+        else await this.loadWorkspaces();
       } catch(e) { this.llmError = e.message; }
     },
 

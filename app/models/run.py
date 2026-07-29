@@ -34,6 +34,7 @@ class Workspace(SQLModel, table=True):
     mor_customer_id: Optional[str] = Field(default=None)                  # Lemon Squeezy customer ID
     mor_subscription_id: Optional[str] = Field(default=None)              # Lemon Squeezy subscription ID
     llm_key_mode: str = Field(default="managed")  # managed | byok | proxy
+    byok_managed_fallback: bool = Field(default=False)  # fall back to platform key when no BYOK key for a model
     proxy_url: Optional[str] = Field(default=None)          # antcrew-proxy base URL (e.g. https://proxy.example.com)
     proxy_token_enc: Optional[str] = Field(default=None)    # Fernet-encrypted UUID token sent to the proxy
     is_trial: bool = Field(default=True)  # workspace is on the free-trial credit; costs at TRIAL_MULTIPLIER

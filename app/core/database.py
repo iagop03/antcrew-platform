@@ -418,6 +418,20 @@ async def _migrate_workspace_owner_user_id(eng) -> None:
         pass  # PostgreSQL handled by Alembic
 
 
+async def _migrate_byok_managed_fallback(eng) -> None:
+    """Idempotent migration: add byok_managed_fallback column to workspace if absent."""
+    try:
+        async with eng.begin() as conn:
+            cols = (await conn.execute(text("PRAGMA table_info(workspace)"))).fetchall()
+            col_names = {row[1] for row in cols}
+            if "byok_managed_fallback" not in col_names:
+                await conn.execute(text(
+                    "ALTER TABLE workspace ADD COLUMN byok_managed_fallback BOOLEAN NOT NULL DEFAULT 0"
+                ))
+    except Exception:
+        pass  # PostgreSQL handled by Alembic
+
+
 async def _migrate_pipeline_def(eng) -> None:
     """Idempotent migration: create pipeline_def table if absent."""
     try:
@@ -469,6 +483,7 @@ async def init_db() -> None:
     await _migrate_apikey_user_id(engine)
     await _migrate_apikey_notification_fields(engine)
     await _migrate_workspace_owner_user_id(engine)
+    await _migrate_byok_managed_fallback(engine)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

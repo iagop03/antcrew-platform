@@ -60,7 +60,7 @@
   <!-- ── STEP 1 ── Cuenta ────────────────────────────────────────────── -->
   <div x-show="step === 1" x-cloak>
     <h2 class="text-lg font-semibold mb-1">Crea tu cuenta</h2>
-    <p class="text-gray-400 text-sm mb-6">Se creará un workspace personal asociado a tu email.</p>
+    <p class="text-gray-400 text-sm mb-6">Email y contraseña para acceder a la plataforma.</p>
 
     <div class="space-y-4">
       <div>
@@ -83,7 +83,7 @@
       :disabled="step1Loading || !email.trim() || password.length < 8"
       class="mt-6 w-full py-2.5 rounded-lg font-medium text-sm transition
         bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-      <span x-show="!step1Loading">Crear cuenta →</span>
+      <span x-show="!step1Loading">Continuar →</span>
       <span x-show="step1Loading">Creando…</span>
     </button>
 
@@ -100,7 +100,6 @@
       Hemos enviado un código de 6 dígitos a <strong x-text="email"></strong>.
     </p>
 
-    <!-- Code input -->
     <div class="mb-4">
       <label class="block text-xs text-gray-400 mb-1.5">Código de verificación</label>
       <input x-model="verifyCode" type="text" inputmode="numeric" maxlength="6"
@@ -129,8 +128,120 @@
     </div>
   </div>
 
-  <!-- ── STEP 3 ── Listo ──────────────────────────────────────────────── -->
+  <!-- ── STEP 3 ── Workspace ────────────────────────────────────────── -->
   <div x-show="step === 3" x-cloak>
+    <h2 class="text-lg font-semibold mb-1">Tu workspace</h2>
+    <p class="text-gray-400 text-sm mb-6">Dale un nombre a tu espacio de trabajo. Podrás cambiarlo más tarde desde Settings.</p>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs text-gray-400 mb-1.5">Nombre del workspace</label>
+        <input x-model="wsName" type="text" placeholder="Acme Corp"
+          @input="autoSlug()"
+          @keydown.enter="saveWorkspace()"
+          class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-400 mb-1.5">Slug <span class="text-gray-700">(URL-friendly, solo minúsculas y guiones)</span></label>
+        <div class="flex items-center gap-2">
+          <span class="text-gray-600 text-sm font-mono shrink-0">antcrew.io/</span>
+          <input x-model="wsSlug" type="text" placeholder="acme-corp"
+            @keydown.enter="saveWorkspace()"
+            class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500 placeholder-gray-600">
+        </div>
+        <p x-show="slugError" class="text-red-400 text-xs mt-1.5" x-text="slugError"></p>
+      </div>
+    </div>
+
+    <p x-show="step3Error" x-cloak class="text-red-400 text-xs mt-3" x-text="step3Error"></p>
+
+    <button @click="saveWorkspace()"
+      :disabled="step3Loading || !wsName.trim() || !wsSlug.trim()"
+      class="mt-6 w-full py-2.5 rounded-lg font-medium text-sm transition
+        bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+      <span x-show="!step3Loading">Continuar →</span>
+      <span x-show="step3Loading">Guardando…</span>
+    </button>
+  </div>
+
+  <!-- ── STEP 4 ── API Keys ─────────────────────────────────────────── -->
+  <div x-show="step === 4" x-cloak>
+    <h2 class="text-lg font-semibold mb-1">Configuración LLM</h2>
+    <p class="text-gray-400 text-sm mb-6">¿Cómo quieres que antcrew acceda a los modelos de lenguaje?</p>
+
+    <!-- Mode selector -->
+    <div class="space-y-3 mb-5">
+      <!-- Managed -->
+      <label class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
+        :class="llmMode === 'managed' ? 'border-indigo-500 bg-indigo-950/40' : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'">
+        <input type="radio" x-model="llmMode" value="managed" class="mt-0.5 accent-indigo-500 shrink-0">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium">Claves de la plataforma</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-500 font-mono">×3.0</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">antcrew gestiona las claves. Empieza sin configuración, ideal para equipos pequeños.</p>
+        </div>
+      </label>
+
+      <!-- BYOK -->
+      <label class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
+        :class="llmMode === 'byok' ? 'border-emerald-600 bg-emerald-950/30' : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'">
+        <input type="radio" x-model="llmMode" value="byok" class="mt-0.5 accent-emerald-500 shrink-0">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium">Mis propias claves (BYOK)</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-emerald-900/60 text-emerald-400 font-mono">×0.4</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Aportas tus claves de Anthropic, OpenAI, etc. Máximo control y coste mínimo.</p>
+        </div>
+      </label>
+
+      <!-- Proxy -->
+      <label class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
+        :class="llmMode === 'proxy' ? 'border-violet-600 bg-violet-950/30' : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'">
+        <input type="radio" x-model="llmMode" value="proxy" class="mt-0.5 accent-violet-500 shrink-0">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium">Proxy local</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-violet-900/60 text-violet-400 font-mono">×0.7</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Ejecutas <code class="text-gray-400 bg-gray-800 px-1 rounded">antcrew-proxy</code> en tu infraestructura. La plataforma nunca ve tu clave.</p>
+        </div>
+      </label>
+    </div>
+
+    <!-- BYOK / Proxy: info note -->
+    <div x-show="llmMode !== 'managed'" x-cloak
+      class="mb-4 p-3 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-400 leading-relaxed">
+      <span x-show="llmMode === 'byok'">Añade tus claves en <strong class="text-gray-200">Settings → LLM Mode</strong> después de crear la cuenta. Puedes hacerlo ahora o más tarde.</span>
+      <span x-show="llmMode === 'proxy'">Configura el endpoint de proxy en <strong class="text-gray-200">Settings → LLM Mode</strong> después de crear la cuenta.</span>
+    </div>
+
+    <!-- Per-model fallback toggle (visible for byok and proxy) -->
+    <div x-show="llmMode !== 'managed'" x-cloak
+      class="mb-5 flex items-start gap-3 p-4 rounded-xl bg-gray-900 border border-gray-800">
+      <input type="checkbox" id="fallback-toggle" x-model="byokManagedFallback"
+        class="mt-0.5 w-4 h-4 rounded border-gray-600 bg-gray-800 accent-indigo-500 shrink-0 cursor-pointer">
+      <label for="fallback-toggle" class="cursor-pointer">
+        <p class="text-sm text-gray-200 select-none">Usar claves de la plataforma como respaldo</p>
+        <p class="text-xs text-gray-500 mt-0.5">Si un modelo no tiene clave configurada, antcrew usa su propia clave (×3.0 para esos modelos).</p>
+      </label>
+    </div>
+
+    <p x-show="step4Error" x-cloak class="text-red-400 text-xs mb-3" x-text="step4Error"></p>
+
+    <button @click="saveLlmMode()"
+      :disabled="step4Loading"
+      class="w-full py-2.5 rounded-lg font-medium text-sm transition
+        bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+      <span x-show="!step4Loading">Continuar →</span>
+      <span x-show="step4Loading">Guardando…</span>
+    </button>
+  </div>
+
+  <!-- ── STEP 5 ── Listo ──────────────────────────────────────────────── -->
+  <div x-show="step === 5" x-cloak>
     <div class="text-center mb-6">
       <div class="text-5xl mb-3">✓</div>
       <h2 class="text-lg font-semibold mb-1">¡Todo listo!</h2>
@@ -142,6 +253,16 @@
       <div class="flex justify-between items-center">
         <span class="text-xs text-gray-500">Cuenta</span>
         <span class="text-sm font-medium" x-text="email"></span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-xs text-gray-500">Workspace</span>
+        <span class="text-sm font-mono text-gray-300" x-text="wsName || email.split('@')[0]"></span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-xs text-gray-500">Modo LLM</span>
+        <span class="text-xs font-mono px-2 py-0.5 rounded"
+          :class="llmMode === 'byok' ? 'bg-emerald-900/50 text-emerald-400' : llmMode === 'proxy' ? 'bg-violet-900/50 text-violet-400' : 'bg-gray-800 text-gray-400'"
+          x-text="llmMode === 'managed' ? 'managed ×3.0' : llmMode === 'byok' ? 'byok ×0.4' : 'proxy ×0.7'"></span>
       </div>
       <div class="flex justify-between items-center">
         <span class="text-xs text-gray-500">Tu API key (admin)</span>
@@ -209,9 +330,9 @@
         class="flex-1 py-2.5 rounded-lg font-medium text-sm text-center transition bg-indigo-600 hover:bg-indigo-500 text-white">
         Ir al dashboard
       </a>
-      <a href="/reviews"
+      <a href="/settings?tab=llm"
         class="flex-1 py-2.5 rounded-lg font-medium text-sm text-center transition bg-gray-800 hover:bg-gray-700 text-gray-200">
-        Cola de revisiones
+        Configurar LLM
       </a>
     </div>
   </div>
@@ -222,7 +343,7 @@
 function onboard() {
   return {
     step: 1,
-    steps: ['Cuenta', 'Verificar email', 'Listo'],
+    steps: ['Cuenta', 'Verificar email', 'Workspace', 'API Keys', 'Listo'],
 
     // Step 1
     email: '',
@@ -238,7 +359,20 @@ function onboard() {
     step2Error: '',
     resendCooldown: 0,
 
-    // Step 3
+    // Step 3 — workspace
+    wsName: '',
+    wsSlug: '',
+    slugError: '',
+    step3Loading: false,
+    step3Error: '',
+
+    // Step 4 — LLM
+    llmMode: 'managed',
+    byokManagedFallback: false,
+    step4Loading: false,
+    step4Error: '',
+
+    // Step 5
     inviteEmail: '',
     inviteRole: 'write',
     inviteLoading: false,
@@ -296,11 +430,90 @@ function onboard() {
           this.step2Error = d.detail || `Error ${r.status}`;
           return;
         }
+        // Pre-fill slug from email prefix
+        const prefix = this.email.split('@')[0].replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40);
+        this.wsName = '';
+        this.wsSlug = prefix;
         this.step = 3;
       } catch (e) {
         this.step2Error = e.message;
       } finally {
         this.step2Loading = false;
+      }
+    },
+
+    autoSlug() {
+      this.wsSlug = this.wsName
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48);
+      this.slugError = '';
+    },
+
+    async saveWorkspace() {
+      this.slugError = '';
+      this.step3Error = '';
+      const slug = this.wsSlug.trim().toLowerCase();
+      if (!/^[a-z0-9-]+$/.test(slug)) {
+        this.slugError = 'Solo minúsculas, números y guiones';
+        return;
+      }
+      if (!this.wsName.trim()) {
+        this.step3Error = 'El nombre no puede estar vacío';
+        return;
+      }
+      this.step3Loading = true;
+      try {
+        const r = await fetch(`/workspaces/${this.workspaceId}/name`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey },
+          body: JSON.stringify({ name: this.wsName.trim(), slug }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          if (r.status === 409) {
+            this.slugError = 'Ese slug ya está en uso, elige otro';
+          } else {
+            this.step3Error = d.detail || `Error ${r.status}`;
+          }
+          return;
+        }
+        this.step = 4;
+      } catch (e) {
+        this.step3Error = e.message;
+      } finally {
+        this.step3Loading = false;
+      }
+    },
+
+    async saveLlmMode() {
+      this.step4Error = '';
+      this.step4Loading = true;
+      try {
+        // Only set managed mode via API (byok/proxy require keys configured first)
+        if (this.llmMode === 'managed') {
+          await fetch(`/workspaces/${this.workspaceId}/llm-mode`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey },
+            body: JSON.stringify({ mode: 'managed', byok_managed_fallback: false }),
+          });
+        } else {
+          // For byok/proxy: just save the fallback preference; keys/proxy set in Settings
+          await fetch(`/workspaces/${this.workspaceId}/llm-mode`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey },
+            body: JSON.stringify({ mode: 'managed', byok_managed_fallback: this.byokManagedFallback }),
+          }).catch(() => {});
+          // Store intent in localStorage to prompt Settings config
+          localStorage.setItem('antcrew_llm_intent', this.llmMode);
+        }
+        this.step = 5;
+      } catch (e) {
+        this.step4Error = e.message;
+      } finally {
+        this.step4Loading = false;
       }
     },
 

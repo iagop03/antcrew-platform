@@ -56,6 +56,29 @@ class CreateWorkspace(BaseModel):
         return v
 
 
+class UpdateWorkspaceName(BaseModel):
+    name: str
+    slug: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("name cannot be empty")
+        return v
+
+    @field_validator("slug")
+    @classmethod
+    def slug_valid(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip().lower()
+        if not _re.match(r"^[a-z0-9-]+$", v):
+            raise ValueError("slug must be lowercase alphanumeric with hyphens only")
+        return v
+
+
 class UpdateBudget(BaseModel):
     max_cost_usd: Optional[float] = None  # None removes the limit
 
@@ -148,6 +171,7 @@ class WorkspacePublic(BaseModel):
     subscription_status: Optional[str] = None
     billing_provider: str = "mor"
     llm_key_mode: str = "managed"
+    byok_managed_fallback: bool = False
     is_trial: bool = True
     byok_providers: list[str] = []
     created_at: datetime
@@ -177,6 +201,7 @@ class WorkspacePublic(BaseModel):
                 "subscription_status": getattr(data, "subscription_status", None),
                 "billing_provider": getattr(data, "billing_provider", "mor"),
                 "llm_key_mode": getattr(data, "llm_key_mode", "managed"),
+                "byok_managed_fallback": getattr(data, "byok_managed_fallback", False),
                 "is_trial": getattr(data, "is_trial", True),
                 "byok_providers": getattr(data, "_byok_providers", []),
                 "created_at": data.created_at,
@@ -230,6 +255,32 @@ async def get_workspace(workspace_id: int, session: AsyncSession = Depends(get_s
     ws = result.first()
     if not ws:
         raise WorkspaceNotFoundError(workspace_id)
+    return ws
+
+
+@router.patch("/{workspace_id}/name", response_model=WorkspacePublic,
+              dependencies=[Depends(require_role("admin"))])
+async def update_workspace_name(
+    workspace_id: int,
+    body: UpdateWorkspaceName,
+    session: AsyncSession = Depends(get_session),
+):
+    """Update a workspace's display name and optionally its slug."""
+    result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
+    ws = result.first()
+    if not ws:
+        raise WorkspaceNotFoundError(workspace_id)
+    ws.name = body.name
+    if body.slug is not None:
+        existing = await session.exec(
+            select(Workspace).where(Workspace.slug == body.slug, Workspace.id != workspace_id)
+        )
+        if existing.first():
+            raise HTTPException(409, f"Slug {body.slug!r} already taken")
+        ws.slug = body.slug
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
     return ws
 
 

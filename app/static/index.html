@@ -76,11 +76,6 @@
           x-text="'€' + budget.total_spend_usd.toFixed(2) + ' / €' + budget.budget_usd.toFixed(2) + ' este mes'"></span>
       </div>
     </template>
-    <button @click="showRunModal = true"
-      class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-1.5"
-      data-i18n="runs.new">
-      <i class="ti ti-plus text-sm"></i> New Run
-    </button>
   </div>
 </div>
 
@@ -173,73 +168,6 @@
   </div>
 </div>
 
-<!-- New Run Modal (same as runs.html) -->
-<div x-show="showRunModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-  <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
-    <h2 class="text-lg font-semibold mb-4" data-i18n="runs.modal.title">New Run</h2>
-    <div class="flex gap-1 mb-5 bg-gray-800 rounded-lg p-1">
-      <button type="button" @click="form.mode = 'team'"
-        class="flex-1 text-sm py-1.5 rounded-md transition font-medium"
-        :class="form.mode === 'team' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'"
-        data-i18n="runs.modal.team_run">Team run</button>
-      <button type="button" @click="form.mode = 'engine'"
-        class="flex-1 text-sm py-1.5 rounded-md transition font-medium"
-        :class="form.mode === 'engine' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'"
-        data-i18n="runs.modal.engine_run">Engine run</button>
-    </div>
-    <form @submit.prevent="triggerRun()">
-      <template x-if="form.mode === 'team'">
-        <div>
-          <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.team_run">Team</label>
-            <select x-model="form.team" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-              <template x-for="t in teamOptions" :key="t">
-                <option :value="t" x-text="t"></option>
-              </template>
-            </select>
-          </div>
-          <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.goal">Request</label>
-            <textarea x-model="form.request" rows="3" placeholder="Build an auth module with JWT…"
-              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
-          </div>
-          <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.max_cost">Max cost (USD, optional)</label>
-            <input type="number" step="0.01" min="0.01" x-model.number="form.max_cost_usd" placeholder="e.g. 2.00"
-              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-          </div>
-          <div class="mb-5 flex items-center gap-2.5">
-            <input type="checkbox" id="hitl-toggle" x-model="form.hitl"
-              class="w-4 h-4 rounded border-gray-600 bg-gray-800">
-            <label for="hitl-toggle" class="text-sm text-gray-300 select-none cursor-pointer" data-i18n="runs.modal.hitl">Enable HITL</label>
-          </div>
-        </div>
-      </template>
-      <template x-if="form.mode === 'engine'">
-        <div>
-          <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.goal">Goal</label>
-            <textarea x-model="form.goal" rows="3" placeholder="Build a REST API for a task manager…"
-              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
-          </div>
-          <div class="mb-5">
-            <label class="block text-sm text-gray-400 mb-1">Output dir (optional)</label>
-            <input type="text" x-model="form.outputDir" placeholder="/srv/antcrew/my-project"
-              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-          </div>
-        </div>
-      </template>
-      <div class="flex gap-3 mt-1">
-        <button type="button" @click="showRunModal = false"
-          class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition" data-i18n="common.cancel">Cancel</button>
-        <button type="submit" :disabled="submitting"
-          class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
-          x-text="submitting ? window.__i18n?.t('runs.modal.starting') || 'Starting…' : window.__i18n?.t('runs.modal.start') || 'Start Run'"></button>
-      </div>
-      <p x-show="formError" class="text-red-400 text-xs mt-3" x-text="formError"></p>
-    </form>
-  </div>
-</div>
 
 <script>
 function dashFeed() {

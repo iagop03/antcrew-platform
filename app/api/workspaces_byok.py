@@ -27,6 +27,7 @@ _KEYLESS_PROVIDERS = frozenset({"ollama"})
 
 class SetLLMModeRequest(BaseModel):
     mode: str  # "managed" | "byok"
+    byok_managed_fallback: Optional[bool] = None  # when byok: fall back to platform key for unconfigured models
 
     @field_validator("mode")
     @classmethod
@@ -98,6 +99,8 @@ async def set_llm_mode(
             )
 
     ws.llm_key_mode = body.mode
+    if body.byok_managed_fallback is not None:
+        ws.byok_managed_fallback = body.byok_managed_fallback
     session.add(ws)
     await session.commit()
     await session.refresh(ws)

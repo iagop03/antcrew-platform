@@ -98,9 +98,11 @@ body{overflow:hidden}
   <!-- Undo/redo + extra tools -->
   <div x-show="activeId" x-cloak class="flex items-center gap-0.5 border-r border-gray-700/50 pr-2 mr-0.5">
     <button @click="undo()" :disabled="historyIdx <= 0" title="Deshacer (Ctrl+Z)"
-      class="px-1.5 py-1 text-gray-600 hover:text-gray-300 text-sm transition-colors disabled:opacity-25 rounded">↩</button>
+      class="px-1.5 py-1 text-gray-600 hover:text-gray-300 transition-colors disabled:opacity-25 rounded flex items-center">
+      <i class="ti ti-arrow-back-up text-base leading-none"></i></button>
     <button @click="redo()" :disabled="historyIdx >= history.length - 1" title="Rehacer (Ctrl+Y)"
-      class="px-1.5 py-1 text-gray-600 hover:text-gray-300 text-sm transition-colors disabled:opacity-25 rounded">↪</button>
+      class="px-1.5 py-1 text-gray-600 hover:text-gray-300 transition-colors disabled:opacity-25 rounded flex items-center">
+      <i class="ti ti-arrow-forward-up text-base leading-none"></i></button>
     <button @click="addComment()" title="Añadir comentario (Ctrl+M)"
       class="px-1.5 py-1 text-gray-600 hover:text-yellow-400 text-xs transition-colors rounded">💬</button>
     <button @click="snapToGrid = !snapToGrid" title="Encajar a cuadrícula (Ctrl+G)"
