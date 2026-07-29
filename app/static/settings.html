@@ -845,25 +845,36 @@
           <select x-model="addKeyForm.provider" @change="onProviderChange()"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
             <option value="anthropic">Anthropic (Claude)</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="mistral">Mistral AI</option>
+            <option value="xai">xAI (Grok)</option>
+            <option value="cerebras">Cerebras</option>
+            <option value="together">Together AI</option>
+            <option value="fireworks">Fireworks AI</option>
             <option value="openai">OpenAI (GPT / o-series)</option>
             <option value="groq">Groq</option>
             <option value="gemini">Google Gemini</option>
             <option value="moonshot">Moonshot AI (Kimi)</option>
             <option value="ollama">Ollama (local)</option>
+            <option value="lmstudio">LM Studio (local)</option>
+            <option value="vllm">vLLM (self-hosted)</option>
           </select>
         </div>
-        <div x-show="addKeyForm.provider !== 'ollama'">
+        <div x-show="!['ollama','lmstudio','vllm'].includes(addKeyForm.provider)">
           <label class="block text-xs text-gray-500 mb-1.5">API key</label>
           <input x-model="addKeyForm.api_key" type="password"
             :placeholder="apiKeyPlaceholder(addKeyForm.provider)"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
-        <div x-show="addKeyForm.provider === 'ollama' || addKeyForm.provider === 'openai' || addKeyForm.provider === 'moonshot'">
+        <div x-show="true">
           <label class="block text-xs text-gray-500 mb-1.5">
             Base URL
             <span x-show="addKeyForm.provider === 'ollama'" class="text-gray-600"> (URL de tu servidor Ollama)</span>
+            <span x-show="addKeyForm.provider === 'lmstudio'" class="text-gray-600"> (LM Studio local)</span>
+            <span x-show="addKeyForm.provider === 'vllm'" class="text-gray-600"> (endpoint de vLLM)</span>
             <span x-show="addKeyForm.provider === 'openai'" class="text-gray-600"> (opcional, para endpoints compatibles)</span>
             <span x-show="addKeyForm.provider === 'moonshot'" class="text-gray-600"> (API de Moonshot AI)</span>
+            <span x-show="!['ollama','lmstudio','vllm','openai','moonshot'].includes(addKeyForm.provider)" class="text-gray-600"> (opcional)</span>
           </label>
           <input x-model="addKeyForm.base_url" type="text"
             :placeholder="addKeyForm.provider === 'ollama' ? 'http://localhost:11434' : addKeyForm.provider === 'moonshot' ? 'https://api.moonshot.cn/v1' : 'https://api.openai.com/v1'"
@@ -883,7 +894,7 @@
           <button @click="showAddKey=false"
             class="px-4 py-2 text-sm text-gray-500 hover:text-white transition-colors">Cancelar</button>
           <button @click="addLlmKey()"
-            :disabled="addKeyForm.provider !== 'ollama' && !addKeyForm.api_key.trim()"
+            :disabled="!['ollama','lmstudio','vllm'].includes(addKeyForm.provider) && !addKeyForm.api_key.trim()"
             class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors">
             Guardar clave
           </button>
@@ -1002,13 +1013,19 @@ function settings() {
     },
 
     onProviderChange() {
-      if (this.addKeyForm.provider === 'moonshot') {
-        this.addKeyForm.base_url = 'https://api.moonshot.cn/v1';
-      } else if (this.addKeyForm.provider === 'ollama') {
-        this.addKeyForm.base_url = 'http://localhost:11434';
-      } else {
-        this.addKeyForm.base_url = '';
-      }
+      const defaults = {
+        moonshot:  'https://api.moonshot.cn/v1',
+        deepseek:  'https://api.deepseek.com/v1',
+        mistral:   'https://api.mistral.ai/v1',
+        xai:       'https://api.x.ai/v1',
+        together:  'https://api.together.xyz/v1',
+        fireworks: 'https://api.fireworks.ai/inference/v1',
+        cerebras:  'https://api.cerebras.ai/v1',
+        ollama:    'http://localhost:11434',
+        lmstudio:  'http://localhost:1234/v1',
+        vllm:      'http://localhost:8000/v1',
+      };
+      this.addKeyForm.base_url = defaults[this.addKeyForm.provider] || '';
     },
 
     async loadMatrix() {
@@ -1023,7 +1040,7 @@ function settings() {
           )
         );
         this.matrixData = results;
-        const providers = ['anthropic', 'openai', 'groq', 'gemini', 'moonshot', 'ollama'];
+        const providers = ['anthropic', 'openai', 'groq', 'gemini', 'moonshot', 'deepseek', 'mistral', 'xai', 'cerebras', 'together', 'fireworks', 'ollama', 'lmstudio', 'vllm'];
         const rows = [];
         for (const { ws, keys } of results) {
           const keyMap = Object.fromEntries(keys.map(k => [k.provider, k]));
