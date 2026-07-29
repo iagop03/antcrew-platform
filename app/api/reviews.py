@@ -12,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from sqlmodel import select, col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from antcrew import bus as _bus
+
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible
 from app.core.exceptions import ReviewNotFoundError
 from app.core.channel import resolve_review
@@ -213,7 +215,6 @@ async def create_review(
     await session.refresh(review)
 
     try:
-        from antcrew import bus as _bus
         artifact_data: object = {}
         try:
             artifact_data = json.loads(body.artifact_json)
