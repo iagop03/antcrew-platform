@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import os
 
+# Must be set before app.main is imported — _TESTING is evaluated at module level.
+os.environ.setdefault("ANTCREW_TESTING", "1")
+
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine

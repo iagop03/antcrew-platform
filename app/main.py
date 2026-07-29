@@ -548,38 +548,48 @@ async def _check_cors_config() -> None:
     )
 
 
+_TESTING = os.environ.get("ANTCREW_TESTING") == "1"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _webhook_task, _scheduler_task
     _setup_logging()
     await _check_app_env()
-    await init_db()
-    await _check_database_url()
-    await _check_auth_mode()
-    await _check_cors_config()
-    await _check_sandbox_mode()
-    await _check_stripe_config()
-    await _check_stripe_key_mode()
-    await _check_mor_config()
-    await _check_slack_config()
-    await _check_byok_config()
-    await _check_proxy_config()
-    start_listening()
-    from app.core.slack_hitl import maybe_start_from_env as _slack_start
-    _slack_start()
-    from app.core.slack_hitl import set_main_loop as _set_loop
-    _set_loop(asyncio.get_event_loop())
-    from app.services.webhook import start_webhook_retry_loop
-    _webhook_task = asyncio.create_task(start_webhook_retry_loop(), name="webhook-retry")
-    _scheduler_task = asyncio.create_task(_eval_scheduler_loop(), name="eval-scheduler")
-    _hitl_cleanup_task = asyncio.create_task(_hitl_cleanup_loop(), name="hitl-cleanup")
-    _retention_task = asyncio.create_task(_data_retention_loop(), name="data-retention")
-    _security_scheduler_task = asyncio.create_task(
-        security_audit_api.run_schedule_loop(), name="security-audit-scheduler"
-    )
+    if not _TESTING:
+        await init_db()
+    if not _TESTING:
+        await _check_database_url()
+        await _check_auth_mode()
+        await _check_cors_config()
+        await _check_sandbox_mode()
+        await _check_stripe_config()
+        await _check_stripe_key_mode()
+        await _check_mor_config()
+        await _check_slack_config()
+        await _check_byok_config()
+        await _check_proxy_config()
+    if not _TESTING:
+        start_listening()
+    _security_scheduler_task: Optional[asyncio.Task] = None
+    if not _TESTING:
+        from app.core.slack_hitl import maybe_start_from_env as _slack_start
+        _slack_start()
+        from app.core.slack_hitl import set_main_loop as _set_loop
+        _set_loop(asyncio.get_event_loop())
+        from app.services.webhook import start_webhook_retry_loop
+        _webhook_task = asyncio.create_task(start_webhook_retry_loop(), name="webhook-retry")
+        _scheduler_task = asyncio.create_task(_eval_scheduler_loop(), name="eval-scheduler")
+        _hitl_cleanup_task = asyncio.create_task(_hitl_cleanup_loop(), name="hitl-cleanup")
+        _retention_task = asyncio.create_task(_data_retention_loop(), name="data-retention")
+        _security_scheduler_task = asyncio.create_task(
+            security_audit_api.run_schedule_loop(), name="security-audit-scheduler"
+        )
     yield
-    stop_listening()
-    for task in (_webhook_task, _scheduler_task, _hitl_cleanup_task, _retention_task, _security_scheduler_task):
+    if not _TESTING:
+        stop_listening()
+    for task in (_webhook_task, _scheduler_task, _hitl_cleanup_task, _retention_task,
+                 _security_scheduler_task):
         if task and not task.done():
             task.cancel()
             try:
