@@ -189,36 +189,33 @@ async def test_create_review_no_stub_when_run_exists(client: AsyncClient, sessio
 # P1.3 — EvalRun linked to Run
 # ---------------------------------------------------------------------------
 
-# @pytest.mark.asyncio
-# async def test_eval_creates_linked_run(client: AsyncClient, session):
-#     """POST /evals/ creates an EvalRun and a linked stub Run."""
-#     from unittest.mock import patch, MagicMock
-#     await _make_key(session, label="eval-r15", raw="eval-r15-raw", role="write")
-#
-#     with patch("app.api.evals._executor") as mock_exec, \
-#          patch("app.api.evals.asyncio.get_running_loop") as mock_loop:
-#         mock_loop.return_value = MagicMock()
-#         mock_exec.submit = MagicMock()
-#         # Prevent actual eval execution
-#         mock_loop.return_value.run_in_executor = MagicMock(return_value=None)
-#
-#         r = await client.post(
-#             "/evals/",
-#             json={"team": "DevTeam", "request": "Build JWT auth", "name": "test-eval"},
-#             headers={"X-Api-Key": "eval-r15-raw"},
-#         )
-#
-#     assert r.status_code == 202
-#     eval_id = r.json()["eval_id"]
-#
-#     eval_row = (await session.exec(select(EvalRun).where(EvalRun.eval_id == eval_id))).first()
-#     assert eval_row is not None
-#     assert eval_row.run_id is not None
-#
-#     run_row = (await session.exec(select(Run).where(Run.run_id == eval_row.run_id))).first()
-#     assert run_row is not None
-#     assert run_row.team == "DevTeam"
-#     assert run_row.status == "running"
+@pytest.mark.asyncio
+async def test_eval_creates_linked_run(client: AsyncClient, session):
+    """POST /evals/ creates an EvalRun and a linked stub Run."""
+    from unittest.mock import patch
+    await _make_key(session, label="eval-r15", raw="eval-r15-raw", role="write")
+
+    # Patch run_eval_sync (the actual callable submitted to the thread pool) instead of
+    # mocking asyncio.get_running_loop globally — the latter patches the real asyncio module
+    # and corrupts background-task state that shares the same event loop.
+    with patch("app.api.evals.run_eval_sync"):
+        r = await client.post(
+            "/evals/",
+            json={"team": "DevTeam", "request": "Build JWT auth", "name": "test-eval"},
+            headers={"X-Api-Key": "eval-r15-raw"},
+        )
+
+    assert r.status_code == 202
+    eval_id = r.json()["eval_id"]
+
+    eval_row = (await session.exec(select(EvalRun).where(EvalRun.eval_id == eval_id))).first()
+    assert eval_row is not None
+    assert eval_row.run_id is not None
+
+    run_row = (await session.exec(select(Run).where(Run.run_id == eval_row.run_id))).first()
+    assert run_row is not None
+    assert run_row.team == "DevTeam"
+    assert run_row.status == "running"
 
 
 @pytest.mark.asyncio
