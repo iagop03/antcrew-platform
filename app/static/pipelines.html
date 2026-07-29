@@ -1076,8 +1076,13 @@ function app() {
 
     async loadConditions() {
       const key = localStorage.getItem('antcrew_api_key') || '';
-      const r = await fetch('/pipelines/conditions', { headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin' });
-      if (r.ok) this.conditionSuggestions = await r.json();
+      try {
+        const r = await fetch('/pipelines/conditions', { headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin' });
+        if (r.ok) this.conditionSuggestions = await r.json();
+        else console.warn('pipelines: could not load condition suggestions, autocomplete unavailable');
+      } catch (e) {
+        console.warn('pipelines: could not load condition suggestions', e);
+      }
     },
 
     async loadWorkspaces() {

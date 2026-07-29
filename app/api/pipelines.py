@@ -247,9 +247,22 @@ async def list_agent_types() -> list[dict]:
 
 
 @router.get("/conditions")
-async def list_known_conditions() -> list[str]:
-    """Return condition strings derived from built-in templates, for autocomplete."""
-    return _KNOWN_CONDITIONS
+async def list_known_conditions(
+    session: AsyncSession = Depends(get_session),
+) -> list[str]:
+    """Return condition strings for autocomplete: built-in templates + user pipelines."""
+    conditions: set[str] = set(_KNOWN_CONDITIONS)
+    rows = (await session.exec(select(PipelineDef))).all()
+    for row in rows:
+        try:
+            defn = json.loads(row.definition) if isinstance(row.definition, str) else row.definition
+            for edge in defn.get("edges", []):
+                c = edge.get("condition")
+                if c and isinstance(c, str):
+                    conditions.add(c)
+        except Exception:
+            pass
+    return sorted(conditions)
 
 
 @router.get("/", response_model=list[PipelineOut])
