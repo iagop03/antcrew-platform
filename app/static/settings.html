@@ -861,13 +861,17 @@
         <div x-show="addKeyForm.provider === 'ollama' || addKeyForm.provider === 'openai' || addKeyForm.provider === 'moonshot'">
           <label class="block text-xs text-gray-500 mb-1.5">
             Base URL
-            <span x-show="addKeyForm.provider === 'ollama'" class="text-gray-600"> (p.ej. http://localhost:11434)</span>
+            <span x-show="addKeyForm.provider === 'ollama'" class="text-gray-600"> (URL de tu servidor Ollama)</span>
             <span x-show="addKeyForm.provider === 'openai'" class="text-gray-600"> (opcional, para endpoints compatibles)</span>
             <span x-show="addKeyForm.provider === 'moonshot'" class="text-gray-600"> (API de Moonshot AI)</span>
           </label>
           <input x-model="addKeyForm.base_url" type="text"
             :placeholder="addKeyForm.provider === 'ollama' ? 'http://localhost:11434' : addKeyForm.provider === 'moonshot' ? 'https://api.moonshot.cn/v1' : 'https://api.openai.com/v1'"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+          <p x-show="addKeyForm.provider === 'ollama'" class="mt-1.5 text-xs text-gray-500">
+            Plataforma en la nube con Ollama local: ejecuta el proxy en tu máquina y usa
+            <code class="bg-gray-700 px-1 rounded">https://tu-proxy.com/ollama</code> como URL.
+          </p>
         </div>
         <label x-show="llmProviderConfigured(addKeyForm.provider)" class="flex items-center gap-2.5 text-sm cursor-pointer">
           <input type="checkbox" x-model="addKeyForm.confirm_overwrite"
@@ -1000,6 +1004,8 @@ function settings() {
     onProviderChange() {
       if (this.addKeyForm.provider === 'moonshot') {
         this.addKeyForm.base_url = 'https://api.moonshot.cn/v1';
+      } else if (this.addKeyForm.provider === 'ollama') {
+        this.addKeyForm.base_url = 'http://localhost:11434';
       } else {
         this.addKeyForm.base_url = '';
       }
