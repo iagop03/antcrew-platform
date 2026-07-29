@@ -113,8 +113,11 @@ async def generate_proxy_token(
     docker_cmd = (
         f"docker run -d --name antcrew-proxy \\\n"
         f"  -p 8080:8080 \\\n"
-        f"  -e ANTHROPIC_API_KEY=sk-ant-YOUR_KEY \\\n"
         f"  -e PROXY_TOKEN={token} \\\n"
+        f"  -e ANTHROPIC_API_KEY=sk-ant-...  `# set only the keys you use` \\\n"
+        f"  -e OPENAI_API_KEY=sk-proj-... \\\n"
+        f"  -e GROQ_API_KEY=gsk_... \\\n"
+        f"  -e MOONSHOT_API_KEY=sk-... \\\n"
         f"  ghcr.io/iagop03/antcrew-proxy:latest"
     )
     return ProxyTokenOut(token=token, proxy_url=body.proxy_url, docker_command=docker_cmd)
