@@ -24,7 +24,7 @@ TRIAL_MULTIPLIER: float = 1.0  # trial runs at raw cost (no margin); change via 
 # Credit granted to new workspaces in trial mode. Configurable at runtime — no redeploy needed.
 TRIAL_CREDIT_USD: float = float(os.environ.get("TRIAL_CREDIT_USD", "5.0"))
 
-_VALID_PROVIDERS = frozenset({"anthropic", "openai", "groq", "gemini", "ollama"})
+_VALID_PROVIDERS = frozenset({"anthropic", "openai", "groq", "gemini", "ollama", "moonshot"})
 
 _IS_DEV = os.environ.get("APP_ENV", "production").lower() in ("dev", "development", "local")
 
@@ -47,6 +47,8 @@ def _provider_for_model(model_str: str) -> str:
         return "gemini"
     if s.startswith("ollama:"):
         return "ollama"
+    if s.startswith("moonshot:"):
+        return "moonshot"
     return "anthropic"
 
 

@@ -33,6 +33,13 @@ def _key_prefix(raw_key: str) -> str:
     return hashlib.sha256(raw_key.encode()).hexdigest()[:16]
 
 
+def _hash_token(raw: str) -> str:
+    """One-way SHA-256 hash for high-entropy session/client tokens (192+ bits).
+    Stored in DB instead of plaintext — DB read access no longer grants token access.
+    """
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
 def _hash(key: str) -> str:
     """Hash a new API key with bcrypt (cost factor 12)."""
     import bcrypt
@@ -168,13 +175,23 @@ async def _session_context(token: str, session) -> Optional[WorkspaceContext]:
     from app.models.run import UserSession, ApiKey, WorkspaceMembership  # lazy — avoids circular
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+    token_hash = _hash_token(token)
+    # New sessions are indexed by token_hash; legacy sessions by plaintext token.
     user_session = (await session.exec(
         select(UserSession).where(
-            UserSession.token == token,
+            UserSession.token_hash == token_hash,
             UserSession.revoked == False,  # noqa: E712
             UserSession.expires_at > now,
         )
     )).first()
+    if user_session is None:  # fallback for sessions created before migration 033
+        user_session = (await session.exec(
+            select(UserSession).where(
+                UserSession.token == token,
+                UserSession.revoked == False,  # noqa: E712
+                UserSession.expires_at > now,
+            )
+        )).first()
 
     if user_session is None or user_session.api_key_id is None:
         return None
@@ -292,13 +309,22 @@ def require_verified_session():
             return  # API-key or open-mode — no restriction
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
+        _th = _hash_token(cookie)
         user_session = (await session.exec(
             _select(UserSession).where(
-                UserSession.token == cookie,
+                UserSession.token_hash == _th,
                 UserSession.revoked == False,  # noqa: E712
                 UserSession.expires_at > now,
             )
         )).first()
+        if user_session is None:  # fallback for pre-033 sessions
+            user_session = (await session.exec(
+                _select(UserSession).where(
+                    UserSession.token == cookie,
+                    UserSession.revoked == False,  # noqa: E712
+                    UserSession.expires_at > now,
+                )
+            )).first()
         if user_session is None or user_session.user_id is None:
             return  # not a user session
 
@@ -344,13 +370,22 @@ async def check_ws_session_token(token: str) -> bool:
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         async with AsyncSession(engine, expire_on_commit=False) as session:
+            _th = _hash_token(token)
             user_session = (await session.exec(
                 select(UserSession).where(
-                    UserSession.token == token,
+                    UserSession.token_hash == _th,
                     UserSession.revoked == False,  # noqa: E712
                     UserSession.expires_at > now,
                 )
             )).first()
+            if user_session is None:  # fallback for pre-033 sessions
+                user_session = (await session.exec(
+                    select(UserSession).where(
+                        UserSession.token == token,
+                        UserSession.revoked == False,  # noqa: E712
+                        UserSession.expires_at > now,
+                    )
+                )).first()
             if user_session is None or user_session.api_key_id is None:
                 return False
             key = (await session.exec(

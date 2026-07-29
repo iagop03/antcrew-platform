@@ -24,6 +24,8 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+import hashlib as _hl
+
 from app.core.channel import resolve_review
 from app.core.database import get_session
 from app.models.run import HitlReview, HitlAuditEntry, Run
@@ -242,9 +244,14 @@ async def client_review_page(
     session: AsyncSession = Depends(get_session),
 ):
     """Public review page — no authentication required. Token is a URL-safe UUID."""
+    _th = _hl.sha256(token.encode()).hexdigest()
     review = (await session.exec(
-        select(HitlReview).where(HitlReview.client_token == token)
+        select(HitlReview).where(HitlReview.client_token_hash == _th)
     )).first()
+    if review is None:  # fallback for pre-033 reviews
+        review = (await session.exec(
+            select(HitlReview).where(HitlReview.client_token == token)
+        )).first()
     if not review:
         raise HTTPException(404, "Review not found or link has expired.")
 
@@ -269,9 +276,14 @@ async def submit_client_decision(
     if body.decision not in ("approve", "reject"):
         raise HTTPException(422, "decision must be 'approve' or 'reject'")
 
+    _th = _hl.sha256(token.encode()).hexdigest()
     review = (await session.exec(
-        select(HitlReview).where(HitlReview.client_token == token)
+        select(HitlReview).where(HitlReview.client_token_hash == _th)
     )).first()
+    if review is None:  # fallback for pre-033 reviews
+        review = (await session.exec(
+            select(HitlReview).where(HitlReview.client_token == token)
+        )).first()
     if not review:
         raise HTTPException(404, "Review not found or link has expired.")
     if review.status != "pending":

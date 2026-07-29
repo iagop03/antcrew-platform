@@ -105,11 +105,21 @@ async def export_targets() -> dict:
 async def index(
     status: Optional[str] = None,
     search: Optional[str] = Query(None, description="Filter by title, description, or PRD"),
-    limit: int = Query(200, le=500),
+    run_id: Optional[str] = Query(None, description="Filter tickets by run ID"),
+    limit: int = Query(100, le=500),
+    offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
 ):
-    return await list_tickets(session, status=status, search=search, limit=limit, workspace_ids=ctx.workspace_ids)
+    return await list_tickets(
+        session,
+        status=status,
+        search=search,
+        run_id=run_id,
+        limit=limit,
+        offset=offset,
+        workspace_ids=ctx.workspace_ids,
+    )
 
 
 @router.patch("/{ticket_id}/status", response_model=Ticket)

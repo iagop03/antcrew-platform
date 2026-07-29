@@ -124,12 +124,72 @@
                   x-text="hook.enabled ? 'active' : 'disabled'"></span>
               </td>
               <td class="px-4 py-3 text-gray-500 text-xs" x-text="fmtDate(hook.created_at)"></td>
-              <td class="px-4 py-3 text-right">
+              <td class="px-4 py-3 text-right flex items-center justify-end gap-2">
+                <button @click="toggleHook(hook.id)"
+                  class="text-xs px-2 py-1 rounded transition"
+                  :class="hook.enabled
+                    ? 'text-yellow-400 hover:text-yellow-300 hover:bg-yellow-950'
+                    : 'text-green-400 hover:text-green-300 hover:bg-green-950'"
+                  :title="hook.enabled ? 'Disable' : 'Enable'"
+                  x-text="hook.enabled ? 'Disable' : 'Enable'"></button>
+                <button @click="loadDeliveries(hook.id)"
+                  class="text-xs text-gray-400 hover:text-white transition px-2 py-1 rounded hover:bg-gray-800"
+                  :class="deliveriesHookId === hook.id ? 'text-indigo-400' : ''"
+                  title="Delivery log">Log</button>
                 <button @click="deleteHook(hook.id)"
                   class="text-xs text-red-400 hover:text-red-300 transition px-2 py-1 rounded hover:bg-red-950">
                   <span data-i18n="whk.delete">Delete</span>
                 </button>
               </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </template>
+  </div>
+</div>
+
+<!-- Delivery log -->
+<div class="px-6 mb-6" x-show="selectedWsId && (deliveriesHookId || deliveriesLoading)" x-cloak>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+      <span class="text-sm font-medium text-gray-300">Delivery log</span>
+      <button @click="deliveries = []; deliveriesHookId = null" class="text-xs text-gray-500 hover:text-gray-300">✕ Close</button>
+    </div>
+    <template x-if="deliveriesLoading">
+      <div class="px-4 py-6 text-center text-gray-500 text-sm animate-pulse">Loading…</div>
+    </template>
+    <template x-if="!deliveriesLoading && deliveries.length === 0">
+      <div class="px-4 py-6 text-center text-gray-500 text-sm">No deliveries recorded yet.</div>
+    </template>
+    <template x-if="!deliveriesLoading && deliveries.length > 0">
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-800">
+          <tr class="text-gray-400 text-xs uppercase tracking-wide">
+            <th class="px-4 py-2 text-left">Run</th>
+            <th class="px-4 py-2 text-left">Status</th>
+            <th class="px-4 py-2 text-right">Attempts</th>
+            <th class="px-4 py-2 text-left">Error</th>
+            <th class="px-4 py-2 text-right">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="d in deliveries" :key="d.id">
+            <tr class="border-t border-gray-800 hover:bg-gray-800/30 transition">
+              <td class="px-4 py-2 font-mono text-xs text-gray-400" x-text="(d.run_id || '').slice(0,12) + '…'"></td>
+              <td class="px-4 py-2">
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                  :class="{
+                    'bg-green-900/50 text-green-300': d.status === 'delivered',
+                    'bg-red-900/50 text-red-300': d.status === 'failed',
+                    'bg-yellow-900/50 text-yellow-300': d.status === 'retrying',
+                    'bg-gray-800 text-gray-400': d.status === 'pending'
+                  }"
+                  x-text="d.status"></span>
+              </td>
+              <td class="px-4 py-2 text-right text-gray-500 text-xs" x-text="d.attempts"></td>
+              <td class="px-4 py-2 text-xs text-red-400 truncate max-w-xs" :title="d.last_error" x-text="d.last_error || '—'"></td>
+              <td class="px-4 py-2 text-right text-gray-500 text-xs" x-text="fmtDate(d.created_at)"></td>
             </tr>
           </template>
         </tbody>
@@ -203,10 +263,20 @@ function webhooks() {
     formError: null,
     availableEvents: ['pipeline.end', 'hitl.review_required', '*'],
     form: { url: '', events: ['pipeline.end'], label: '' },
+    deliveries: [],
+    deliveriesLoading: false,
+    deliveriesHookId: null,
+
+    apiHeaders(extra = {}) {
+      const k = localStorage.getItem('antcrew_api_key');
+      const h = { 'Content-Type': 'application/json', ...extra };
+      if (k) h['X-Api-Key'] = k;
+      return h;
+    },
 
     async init() {
       try {
-        const r = await fetch('/workspaces/', { headers: apiHeaders() });
+        const r = await fetch('/workspaces/', { headers: this.apiHeaders() });
         if (!r.ok) throw new Error(`${r.status}`);
         this.workspaces = await r.json();
         if (this.workspaces.length === 1) {
@@ -222,8 +292,10 @@ function webhooks() {
       if (!this.selectedWsId) return;
       this.loading = true;
       this.hooks = [];
+      this.deliveries = [];
+      this.deliveriesHookId = null;
       try {
-        const r = await fetch(`/workspaces/${this.selectedWsId}/webhooks`, { headers: apiHeaders() });
+        const r = await fetch(`/workspaces/${this.selectedWsId}/webhooks`, { headers: this.apiHeaders() });
         if (!r.ok) throw new Error(`${r.status}`);
         this.hooks = await r.json();
       } catch (e) {
@@ -247,7 +319,7 @@ function webhooks() {
       try {
         const r = await fetch(`/workspaces/${this.selectedWsId}/webhooks`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+          headers: this.apiHeaders(),
           body: JSON.stringify({
             url: this.form.url,
             events: this.form.events,
@@ -269,17 +341,54 @@ function webhooks() {
       }
     },
 
+    async toggleHook(id) {
+      try {
+        const r = await fetch(`/workspaces/${this.selectedWsId}/webhooks/${id}/toggle`, {
+          method: 'PATCH',
+          headers: this.apiHeaders(),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const updated = await r.json();
+        const idx = this.hooks.findIndex(h => h.id === id);
+        if (idx !== -1) this.hooks[idx] = updated;
+      } catch (e) {
+        this.error = 'Toggle failed: ' + e.message;
+      }
+    },
+
     async deleteHook(id) {
       if (!confirm('Delete this webhook?')) return;
       try {
         const r = await fetch(`/workspaces/${this.selectedWsId}/webhooks/${id}`, {
           method: 'DELETE',
-          headers: apiHeaders(),
+          headers: this.apiHeaders(),
         });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         this.hooks = this.hooks.filter(h => h.id !== id);
+        if (this.deliveriesHookId === id) { this.deliveries = []; this.deliveriesHookId = null; }
       } catch (e) {
         this.error = 'Failed to delete webhook: ' + e.message;
+      }
+    },
+
+    async loadDeliveries(hookId) {
+      if (this.deliveriesHookId === hookId) {
+        this.deliveries = [];
+        this.deliveriesHookId = null;
+        return;
+      }
+      this.deliveriesLoading = true;
+      this.deliveriesHookId = hookId;
+      try {
+        const url = `/workspaces/${this.selectedWsId}/webhook-deliveries?webhook_id=${hookId}&limit=20`;
+        const r = await fetch(url, { headers: this.apiHeaders() });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        this.deliveries = await r.json();
+      } catch (e) {
+        this.error = 'Failed to load deliveries: ' + e.message;
+        this.deliveriesHookId = null;
+      } finally {
+        this.deliveriesLoading = false;
       }
     },
 
@@ -288,11 +397,6 @@ function webhooks() {
       try { return new Date(iso).toLocaleString(); } catch { return iso; }
     },
   };
-}
-
-function apiHeaders() {
-  const key = localStorage.getItem('antcrew_api_key') || '';
-  return key ? { 'X-Api-Key': key } : {};
 }
 </script>
 </body>

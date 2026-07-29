@@ -75,14 +75,37 @@ def _make_verification_code() -> str:
     return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
+def _hash_session_token(raw: str) -> str:
+    """SHA-256 of a high-entropy session token. Stored instead of plaintext."""
+    import hashlib
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _hash_verification_code(code: str) -> str:
+    """HMAC-SHA256 of a low-entropy code using SECRET_KEY.
+    Prevents brute-force enumeration even if the DB is read by an attacker.
+    """
+    import hashlib as _hl
+    import hmac as _hmac
+    secret = os.environ.get("SECRET_KEY", "")
+    if not secret:
+        return _hl.sha256(code.encode()).hexdigest()
+    return _hmac.new(secret.encode(), code.encode(), _hl.sha256).hexdigest()
+
+
 async def _create_session(user_id: Optional[int], api_key_id: Optional[int], session) -> str:
-    """Insert a UserSession row and return the raw token."""
+    """Insert a UserSession row and return the raw token.
+
+    Stores token_hash (SHA-256) instead of plaintext — the raw token lives only
+    in the HttpOnly cookie and never touches the DB.
+    """
     from app.models.run import UserSession
 
     token = _make_token()
     now = _utcnow()
     user_session = UserSession(
-        token=token,
+        token=None,                           # plaintext never stored
+        token_hash=_hash_session_token(token),
         user_id=user_id,
         api_key_id=api_key_id,
         created_at=now,
@@ -99,13 +122,22 @@ async def _resolve_session(token: str, session) -> Optional[tuple]:
     from app.models.run import UserSession, ApiKey
 
     now = _utcnow()
+    token_hash = _hash_session_token(token)
     user_session = (await session.exec(
         select(UserSession).where(
-            UserSession.token == token,
+            UserSession.token_hash == token_hash,
             UserSession.revoked == False,  # noqa: E712
             UserSession.expires_at > now,
         )
     )).first()
+    if user_session is None:  # fallback for pre-033 sessions
+        user_session = (await session.exec(
+            select(UserSession).where(
+                UserSession.token == token,
+                UserSession.revoked == False,  # noqa: E712
+                UserSession.expires_at > now,
+            )
+        )).first()
 
     if user_session is None:
         return None
@@ -275,7 +307,8 @@ async def register(
         code = _make_verification_code()
         verification = EmailVerification(
             user_id=user.id,
-            code=code,
+            code=None,                                 # plaintext never stored
+            code_hash=_hash_verification_code(code),
             expires_at=_utcnow() + timedelta(minutes=15),
         )
         # Use a fresh mini-session so errors don't touch the committed data
@@ -487,13 +520,22 @@ async def revoke_session(
     token = request.cookies.get(COOKIE_NAME)
     if token:
         now = _utcnow()
+        token_hash = _hash_session_token(token)
         user_session = (await session.exec(
             select(UserSession).where(
-                UserSession.token == token,
+                UserSession.token_hash == token_hash,
                 UserSession.revoked == False,  # noqa: E712
                 UserSession.expires_at > now,
             )
         )).first()
+        if user_session is None:  # fallback for pre-033 sessions
+            user_session = (await session.exec(
+                select(UserSession).where(
+                    UserSession.token == token,
+                    UserSession.revoked == False,  # noqa: E712
+                    UserSession.expires_at > now,
+                )
+            )).first()
         if user_session:
             user_session.revoked = True
             session.add(user_session)
@@ -537,7 +579,12 @@ async def verify_email(
         )
     )).first()
 
-    if verification is None or verification.code != code:
+    # Compare by hash (new) or plaintext fallback (pre-033 rows)
+    code_matches = (
+        (verification.code_hash is not None and verification.code_hash == _hash_verification_code(code))
+        or (verification.code is not None and verification.code == code)
+    )
+    if verification is None or not code_matches:
         raise HTTPException(400, "Invalid or expired verification code")
 
     verification.used = True
@@ -592,7 +639,8 @@ async def resend_verification_code(
     code = _make_verification_code()
     verification = EmailVerification(
         user_id=user.id,
-        code=code,
+        code=None,
+        code_hash=_hash_verification_code(code),
         expires_at=_utcnow() + timedelta(minutes=15),
     )
     session.add(verification)

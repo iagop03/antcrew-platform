@@ -170,6 +170,21 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Pagination -->
+  <div class="flex items-center justify-between mt-3 px-1" x-show="runsOffset > 0 || hasMore">
+    <button @click="prevPage()" :disabled="runsOffset === 0"
+      class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition"
+      :class="runsOffset === 0 ? 'border-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'">
+      ← Anterior
+    </button>
+    <span class="text-xs text-gray-500" x-text="`Mostrando ${runsOffset + 1}–${runsOffset + runs.length}`"></span>
+    <button @click="nextPage()" :disabled="!hasMore"
+      class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition"
+      :class="!hasMore ? 'border-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'">
+      Siguiente →
+    </button>
+  </div>
 </div>
 
 <!-- New Run Modal -->
@@ -344,6 +359,9 @@ function dashboard() {
       goal: '', tech: '', full: true, outputDir: '', sourceDir: '', resume: false,
     },
     activeFilter: '',
+    runsOffset: 0,
+    runsLimit: 50,
+    hasMore: false,
     ws: null,
     wsConnected: false,
     _wsBackoff: 1000,
@@ -396,6 +414,7 @@ function dashboard() {
 
     setFilter(val) {
       this.activeFilter = val;
+      this.runsOffset = 0;
       this.loadRuns();
     },
 
@@ -403,23 +422,36 @@ function dashboard() {
       this.loadingRuns = true;
       this.loadError = '';
       try {
-        let qs = '/runs/?limit=50';
+        let limit = this.runsLimit;
+        let qs = `/runs/?limit=${limit}&offset=${this.runsOffset}`;
         if (this.activeFilter === 'pipelines') qs += '&team_prefix=pipeline%3A';
-        else if (this.activeFilter === 'engine')  qs += '&team=engine';
-        else if (this.activeFilter === 'teams')   qs += '&team_prefix=';  // handled client-side below
+        else if (this.activeFilter === 'engine') qs += '&team=engine';
+        // 'teams': no server-side team filter; exclude pipelines and engine client-side
         const r = await fetch(qs, { headers: this.apiHeaders() });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         let data = await r.json();
-        // "teams" filter: exclude pipeline: and engine rows client-side
         if (this.activeFilter === 'teams') {
           data = data.filter(r => r.team !== 'engine' && !r.team?.startsWith('pipeline:'));
         }
         this.runs = data;
+        this.hasMore = data.length >= limit;
       } catch (err) {
         this.loadError = `Failed to load runs: ${err.message}`;
       } finally {
         this.loadingRuns = false;
       }
+    },
+
+    prevPage() {
+      if (this.runsOffset === 0) return;
+      this.runsOffset = Math.max(0, this.runsOffset - this.runsLimit);
+      this.loadRuns();
+    },
+
+    nextPage() {
+      if (!this.hasMore) return;
+      this.runsOffset += this.runsLimit;
+      this.loadRuns();
     },
 
     async loadStats() {

@@ -614,6 +614,13 @@ function comparePage() {
     formLoading: false,
     formError: '',
 
+    apiHeaders(extra = {}) {
+      const k = localStorage.getItem('antcrew_api_key');
+      const h = { 'Content-Type': 'application/json', ...extra };
+      if (k) h['X-Api-Key'] = k;
+      return h;
+    },
+
     async init() {
       const hash = window.location.hash.slice(1);
       if (hash) {
@@ -626,7 +633,7 @@ function comparePage() {
     async loadList() {
       this.loading = true;
       try {
-        const r = await fetch('/run/compare');
+        const r = await fetch('/run/compare', { headers: this.apiHeaders() });
         if (r.ok) this.compares = await r.json();
       } catch(e) {}
       this.loading = false;
@@ -644,7 +651,7 @@ function comparePage() {
 
     async fetchDetail(id) {
       try {
-        const r = await fetch(`/run/compare/${id}`);
+        const r = await fetch(`/run/compare/${id}`, { headers: this.apiHeaders() });
         if (r.ok) {
           this.current = await r.json();
           if (this.current.status !== 'running') this.stopPolling();
@@ -675,7 +682,7 @@ function comparePage() {
 
         const r = await fetch('/run/compare', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: this.apiHeaders(),
           body: JSON.stringify(body),
         });
         if (!r.ok) {

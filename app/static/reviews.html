@@ -97,6 +97,13 @@
       class="px-4 py-1.5 rounded-md text-sm font-medium transition">
       <span data-i18n="reviews.tab.analytics">Analytics</span>
     </button>
+    <button @click="setTab('history')"
+      :class="activeTab === 'history'
+        ? 'bg-gray-800 text-white'
+        : 'text-gray-400 hover:text-gray-200'"
+      class="px-4 py-1.5 rounded-md text-sm font-medium transition">
+      Historial
+    </button>
   </div>
 </div>
 
@@ -181,8 +188,44 @@
   </template>
 </div>
 
+<!-- History panel -->
+<div x-show="activeTab === 'history'" x-cloak class="px-6 pb-8">
+  <template x-if="historyLoading">
+    <div class="space-y-3 mt-2">
+      <div class="h-12 bg-gray-900 border border-gray-800 rounded-xl animate-pulse"></div>
+      <div class="h-12 bg-gray-900 border border-gray-800 rounded-xl animate-pulse"></div>
+    </div>
+  </template>
+  <template x-if="!historyLoading && history.length === 0">
+    <p class="text-gray-500 text-sm mt-4">No resolved reviews yet.</p>
+  </template>
+  <template x-if="!historyLoading && history.length > 0">
+    <div class="space-y-2 mt-2">
+      <template x-for="rev in history" :key="rev.review_id">
+        <div class="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="text-sm text-gray-200 font-medium truncate" x-text="rev.agent_name || rev.review_id.slice(0,12)"></div>
+            <div class="text-xs text-gray-500 mt-0.5">
+              <span class="font-mono" x-text="'run:' + (rev.run_id || '').slice(0,12)"></span>
+              <span class="mx-1">·</span>
+              <span x-text="timeAgo(rev.created_at)"></span>
+            </div>
+          </div>
+          <span class="shrink-0 text-xs px-2 py-0.5 rounded-full font-medium"
+            :class="{
+              'bg-green-900/50 text-green-300': rev.status === 'approved',
+              'bg-red-900/50 text-red-300': rev.status === 'rejected',
+              'bg-gray-800 text-gray-400': !['approved','rejected'].includes(rev.status)
+            }"
+            x-text="rev.status"></span>
+        </div>
+      </template>
+    </div>
+  </template>
+</div>
+
 <!-- Loading -->
-<template x-if="loading && activeTab !== 'analytics'">
+<template x-if="loading && activeTab !== 'analytics' && activeTab !== 'history'">
   <div class="px-6 space-y-4">
     <template x-for="i in [1,2]" :key="i">
       <div class="bg-gray-900 rounded-xl border border-gray-800 p-5 animate-pulse">
@@ -198,7 +241,7 @@
 </template>
 
 <!-- Empty state -->
-<template x-if="!loading && reviews.length === 0 && activeTab !== 'analytics'">
+<template x-if="!loading && reviews.length === 0 && activeTab !== 'analytics' && activeTab !== 'history'">
   <div class="px-6">
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
       <div class="text-4xl mb-3">✓</div>
@@ -214,7 +257,7 @@
 </template>
 
 <!-- Review cards -->
-<div class="px-6 space-y-5" x-show="!loading && reviews.length > 0 && activeTab !== 'analytics'">
+<div class="px-6 space-y-5" x-show="!loading && reviews.length > 0 && activeTab !== 'analytics' && activeTab !== 'history'">
   <template x-for="review in reviews" :key="review.review_id">
     <div class="bg-gray-900 border border-amber-800/50 rounded-xl overflow-hidden">
 
@@ -245,12 +288,25 @@
             </div>
           </template>
 
-          <!-- Unassigned: claim button -->
+          <!-- Unassigned: claim button or inline label input -->
           <template x-if="!review.assignees || review.assignees.length === 0">
-            <button @click="claimReview(review)"
-              class="text-xs text-gray-600 hover:text-blue-400 transition">
-              Claim
-            </button>
+            <div>
+              <template x-if="claimingReviewId !== review.review_id">
+                <button @click="startClaim(review)"
+                  class="text-xs text-gray-600 hover:text-blue-400 transition">
+                  Claim
+                </button>
+              </template>
+              <template x-if="claimingReviewId === review.review_id">
+                <div class="flex items-center gap-1.5">
+                  <input x-model="inlineLabel" @keydown.enter="submitInlineClaim(review)" @keydown.escape="claimingReviewId = null"
+                    placeholder="Your label…" autofocus
+                    class="bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-xs text-white w-28 focus:outline-none focus:border-indigo-500">
+                  <button @click="submitInlineClaim(review)" class="text-xs text-indigo-400 hover:text-indigo-200">OK</button>
+                  <button @click="claimingReviewId = null" class="text-xs text-gray-600 hover:text-gray-400">✕</button>
+                </div>
+              </template>
+            </div>
           </template>
         </div>
         <span class="text-xs text-gray-500 shrink-0 ml-3" x-text="timeAgo(review.created_at)"></span>
@@ -455,6 +511,10 @@ function reviewQueue() {
     toast: '',
     myLabel: localStorage.getItem('antcrew_api_key_label') || '',
     myDisplayName: '',
+    claimingReviewId: null,
+    inlineLabel: '',
+    history: [],
+    historyLoading: false,
 
     async init() {
       const meR = await fetch('/auth/me', { credentials: 'same-origin' }).catch(() => null);
@@ -470,9 +530,25 @@ function reviewQueue() {
       this.activeTab = tab;
       if (tab === 'analytics') {
         this.loadAnalytics();
+      } else if (tab === 'history') {
+        this.loadHistory();
       } else {
         this.loadReviews();
       }
+    },
+
+    async loadHistory() {
+      this.historyLoading = true;
+      try {
+        const [approvedR, rejectedR] = await Promise.all([
+          fetch('/reviews/?status=approved&limit=50', { headers: this.apiHeaders() }),
+          fetch('/reviews/?status=rejected&limit=50', { headers: this.apiHeaders() }),
+        ]);
+        const approved = approvedR.ok ? await approvedR.json() : [];
+        const rejected = rejectedR.ok ? await rejectedR.json() : [];
+        this.history = [...approved, ...rejected].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      } catch {}
+      this.historyLoading = false;
     },
 
     async loadAnalytics() {
@@ -548,16 +624,30 @@ function reviewQueue() {
       return review.options?.length ? review.options : ['approve', 'reject'];
     },
 
-    async claimReview(review) {
-      const label = this.myLabel || prompt('Your API key label (saved locally):');
-      if (!label?.trim()) return;
-      this.myLabel = label.trim();
+    startClaim(review) {
+      if (this.myLabel) {
+        this.claimReview(review, this.myLabel);
+      } else {
+        this.claimingReviewId = review.review_id;
+        this.inlineLabel = '';
+      }
+    },
+
+    async submitInlineClaim(review) {
+      if (!this.inlineLabel.trim()) return;
+      this.myLabel = this.inlineLabel.trim();
       localStorage.setItem('antcrew_api_key_label', this.myLabel);
+      this.claimingReviewId = null;
+      await this.claimReview(review, this.myLabel);
+    },
+
+    async claimReview(review, label) {
+      if (!label?.trim()) return;
       try {
         const r = await fetch(`/reviews/${review.review_id}/assign`, {
           method: 'PATCH',
           headers: this.apiHeaders(),
-          body: JSON.stringify({ assigned_to: this.myLabel }),
+          body: JSON.stringify({ assigned_to: label.trim() }),
         });
         if (r.ok) {
           const updated = await r.json();

@@ -182,12 +182,6 @@ function dashFeed() {
     wsConnected: false,
     _wsBackoff: 1000,
     ws: null,
-    showRunModal: false,
-    submitting: false,
-    formError: '',
-    teamOptions: [],
-    form: { mode: 'team', team: 'DevTeam', request: '', max_cost_usd: null, hitl: false, goal: '', outputDir: '' },
-
     apiHeaders(extra = {}) {
       const k = localStorage.getItem('antcrew_api_key');
       const h = { 'Content-Type': 'application/json', ...extra };
@@ -206,7 +200,7 @@ function dashFeed() {
           if (!me.workspace_id) { window.location.replace('/onboard'); return; }
         } catch { window.location.replace('/'); return; }
       }
-      await Promise.all([this.loadWorkspace(), this.loadStats(), this.loadTeams(), this.loadFeed()]);
+      await Promise.all([this.loadWorkspace(), this.loadStats(), this.loadFeed()]);
       this.connectWs();
     },
 
@@ -227,16 +221,6 @@ function dashFeed() {
       try {
         const r = await fetch('/runs/stats', { headers: this.apiHeaders() });
         if (r.ok) this.stats = await r.json();
-      } catch {}
-    },
-
-    async loadTeams() {
-      try {
-        const r = await fetch('/run/teams', { headers: this.apiHeaders() });
-        if (!r.ok) return;
-        const d = await r.json();
-        this.teamOptions = d.teams.filter(t => t !== 'engine' && t !== 'custom');
-        this.form.team = this.teamOptions[0] || 'DevTeam';
       } catch {}
     },
 
@@ -320,30 +304,6 @@ function dashFeed() {
         setTimeout(() => this.connectWs(), this._wsBackoff);
         this._wsBackoff = Math.min(this._wsBackoff * 2, 30000);
       };
-    },
-
-    async triggerRun() {
-      this.submitting = true; this.formError = '';
-      try {
-        let url, body;
-        if (this.form.mode === 'engine') {
-          url = '/engine/run';
-          body = { goal: this.form.goal.trim(), full: true };
-          if (this.form.outputDir.trim()) body.output_dir = this.form.outputDir.trim();
-        } else {
-          url = '/run/';
-          body = { team: this.form.team, request: this.form.request };
-          if (this.form.max_cost_usd) body.max_cost_usd = this.form.max_cost_usd;
-          if (this.form.hitl) body.hitl = true;
-        }
-        const r = await fetch(url, { method: 'POST', headers: this.apiHeaders(), body: JSON.stringify(body) });
-        if (!r.ok) { this.formError = (await r.json()).detail || `Error ${r.status}`; return; }
-        const d = await r.json();
-        this.showRunModal = false;
-        if (d.run_id) window.location = '/run/' + d.run_id;
-        else this.loadFeed();
-      } catch (err) { this.formError = err.message; }
-      finally { this.submitting = false; }
     },
 
     timeAgo(iso) {

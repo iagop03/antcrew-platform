@@ -115,7 +115,7 @@
           </span>
         </span>
       </span>
-      <button @click="showCreateWs=true; wsFormError=''"
+      <button @click="openCreateWs()"
         class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         <span data-i18n="ws.new">New</span>
@@ -306,7 +306,69 @@
 
   <!-- ── MODO LLM ── -->
   <div x-show="tab==='llm'">
-    <div class="mb-6">
+    <div class="flex items-center gap-2 mb-6">
+      <span class="text-xs text-gray-600 mr-1">Vista:</span>
+      <button @click="llmView='detail'"
+        :class="llmView==='detail' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'"
+        class="px-3 py-1.5 text-xs rounded transition-colors">Individual</button>
+      <button @click="llmView='matrix'; loadMatrix()"
+        :class="llmView==='matrix' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'"
+        class="px-3 py-1.5 text-xs rounded transition-colors">Matriz de proveedores</button>
+    </div>
+
+    <!-- Matrix view -->
+    <div x-show="llmView==='matrix'">
+      <div x-show="matrixLoading" class="text-gray-600 text-sm py-8 text-center">Loading…</div>
+      <div x-show="!matrixLoading && matrixData.length === 0" class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm">
+        No hay workspaces. Crea uno primero.
+      </div>
+      <div x-show="!matrixLoading && matrixData.length > 0" class="overflow-x-auto rounded-lg border border-gray-800">
+        <table class="w-full text-xs" style="font-variant-numeric:tabular-nums">
+          <thead>
+            <tr class="border-b border-gray-800 text-gray-600 uppercase tracking-wider">
+              <th class="px-4 py-2.5 text-left font-medium">Workspace</th>
+              <th class="px-4 py-2.5 text-left font-medium">Proveedor</th>
+              <th class="px-4 py-2.5 text-center font-medium text-indigo-400">Managed</th>
+              <th class="px-4 py-2.5 text-center font-medium text-emerald-400">BYOK</th>
+              <th class="px-4 py-2.5 text-center font-medium text-violet-400">Proxy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="row in matrixRows" :key="`${row.wsId}-${row.provider}`">
+              <tr :class="row.isFirst ? 'border-t-2 border-gray-700' : (row.isLast ? 'border-b border-gray-700/40' : 'border-b border-gray-800/20')"
+                  class="hover:bg-gray-900/30 transition-colors">
+                <td class="px-4 py-2 align-top" :style="row.isFirst ? '' : 'color:transparent;user-select:none'">
+                  <template x-if="row.isFirst">
+                    <div>
+                      <div class="font-medium text-gray-200" x-text="row.wsName"></div>
+                      <div :class="row.wsMode==='byok' ? 'text-emerald-500' : row.wsMode==='proxy' ? 'text-violet-400' : 'text-gray-600'"
+                           class="font-mono mt-0.5" x-text="row.wsMode"></div>
+                    </div>
+                  </template>
+                </td>
+                <td class="px-4 py-2 text-gray-500" x-text="row.provider"></td>
+                <td class="px-4 py-2 text-center">
+                  <span x-show="row.mode==='managed'" class="text-indigo-400 text-base">●</span>
+                  <span x-show="row.mode==='managed*'" class="text-indigo-300 text-base" title="Fallback managed (sin clave BYOK)">◐</span>
+                  <span x-show="row.mode!=='managed' && row.mode!=='managed*'" class="text-gray-800">○</span>
+                </td>
+                <td class="px-4 py-2 text-center">
+                  <span x-show="row.mode==='byok'" class="text-emerald-400 text-base">●</span>
+                  <span x-show="row.mode!=='byok'" class="text-gray-800">○</span>
+                </td>
+                <td class="px-4 py-2 text-center">
+                  <span x-show="row.mode==='proxy'" class="text-violet-400 text-base">●</span>
+                  <span x-show="row.mode!=='proxy'" class="text-gray-800">○</span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <p class="px-4 py-2 text-xs text-gray-700">◐ = fallback a managed (sin clave BYOK para ese proveedor)</p>
+      </div>
+    </div>
+
+    <div x-show="llmView==='detail'" class="mb-6">
       <label class="block text-sm text-gray-400 mb-2">Workspace</label>
       <select x-model="llmWsId" @change="selectLlmWs()"
         class="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 w-72">
@@ -317,9 +379,9 @@
       </select>
     </div>
 
-    <div x-show="!llmWsId" class="text-gray-700 text-sm">Selecciona un workspace para ver su configuración.</div>
+    <div x-show="llmView==='detail' && !llmWsId" class="text-gray-700 text-sm">Selecciona un workspace para ver su configuración.</div>
 
-    <div x-show="llmWsId">
+    <div x-show="llmView==='detail' && !!llmWsId">
       <p x-show="llmError" class="text-red-400 text-sm mb-4" x-text="llmError"></p>
       <div x-show="llmLoading" class="text-gray-600 text-sm" data-i18n="loading">Loading…</div>
 
@@ -408,16 +470,22 @@
             </div>
           </div>
 
-          <div x-show="proxyToken" class="mt-4 p-3 bg-gray-800 border border-violet-700/40 rounded-lg">
-            <p class="text-xs text-violet-400 font-medium mb-2">Token generado — cópialo ahora, no se volverá a mostrar</p>
+          <div x-show="proxyToken" class="mt-4 p-3 bg-gray-800 border border-violet-700/40 rounded-lg space-y-3">
+            <p class="text-xs text-violet-400 font-medium">Token generado — cópialo ahora, no se volverá a mostrar</p>
             <div class="flex items-start gap-2">
-              <code class="text-xs text-gray-300 break-all flex-1" x-text="proxyToken"></code>
+              <code class="text-xs text-gray-300 break-all flex-1 font-mono" x-text="proxyToken"></code>
               <button @click="copyProxyToken()" class="shrink-0 text-xs text-gray-500 hover:text-white px-2 py-1 rounded hover:bg-gray-700 transition-colors">Copiar</button>
             </div>
-            <details class="mt-3">
-              <summary class="text-xs text-gray-600 cursor-pointer hover:text-gray-400">Ver comando Docker</summary>
-              <pre class="mt-2 text-xs text-gray-400 whitespace-pre-wrap break-all" x-text="proxyDockerCmd"></pre>
-            </details>
+            <div class="border-t border-gray-700/50 pt-3">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs text-gray-500 uppercase tracking-wider">Comando Docker</p>
+                <div class="flex items-center gap-2">
+                  <button @click="copyDockerCmd()" class="text-xs text-gray-500 hover:text-white px-2 py-1 rounded hover:bg-gray-700 transition-colors">Copiar cmd</button>
+                  <button @click="downloadEnv()" class="text-xs text-violet-400 hover:text-violet-300 px-2 py-1 rounded border border-violet-700/50 hover:bg-violet-900/20 transition-colors">↓ Descargar .env</button>
+                </div>
+              </div>
+              <pre class="text-xs text-gray-300 bg-gray-900 rounded-md p-3 whitespace-pre-wrap break-all font-mono leading-relaxed" x-text="proxyDockerCmd"></pre>
+            </div>
           </div>
         </div>
 
@@ -774,12 +842,13 @@
       <div class="flex flex-col gap-4">
         <div>
           <label class="block text-xs text-gray-500 mb-1.5">Proveedor</label>
-          <select x-model="addKeyForm.provider"
+          <select x-model="addKeyForm.provider" @change="onProviderChange()"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
             <option value="anthropic">Anthropic (Claude)</option>
             <option value="openai">OpenAI (GPT / o-series)</option>
             <option value="groq">Groq</option>
             <option value="gemini">Google Gemini</option>
+            <option value="moonshot">Moonshot AI (Kimi)</option>
             <option value="ollama">Ollama (local)</option>
           </select>
         </div>
@@ -789,14 +858,15 @@
             :placeholder="apiKeyPlaceholder(addKeyForm.provider)"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
-        <div x-show="addKeyForm.provider === 'ollama' || addKeyForm.provider === 'openai'">
+        <div x-show="addKeyForm.provider === 'ollama' || addKeyForm.provider === 'openai' || addKeyForm.provider === 'moonshot'">
           <label class="block text-xs text-gray-500 mb-1.5">
             Base URL
             <span x-show="addKeyForm.provider === 'ollama'" class="text-gray-600"> (p.ej. http://localhost:11434)</span>
             <span x-show="addKeyForm.provider === 'openai'" class="text-gray-600"> (opcional, para endpoints compatibles)</span>
+            <span x-show="addKeyForm.provider === 'moonshot'" class="text-gray-600"> (API de Moonshot AI)</span>
           </label>
           <input x-model="addKeyForm.base_url" type="text"
-            :placeholder="addKeyForm.provider === 'ollama' ? 'http://localhost:11434' : 'https://api.openai.com/v1'"
+            :placeholder="addKeyForm.provider === 'ollama' ? 'http://localhost:11434' : addKeyForm.provider === 'moonshot' ? 'https://api.moonshot.cn/v1' : 'https://api.openai.com/v1'"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <label x-show="llmProviderConfigured(addKeyForm.provider)" class="flex items-center gap-2.5 text-sm cursor-pointer">
@@ -845,9 +915,11 @@ function settings() {
 
     llmWsId: '', llmMode: 'managed', llmKeys: [], byokManagedFallback: false,
     llmLoading: false, llmError: '',
+    llmView: 'detail',
     showAddKey: false,
     proxyConfigured: false, proxyUrl: '', proxyUrlInput: '', proxyToken: '', proxyDockerCmd: '',
-    addKeyForm: { provider: 'anthropic', api_key: '', confirm_overwrite: false },
+    addKeyForm: { provider: 'anthropic', api_key: '', base_url: '', confirm_overwrite: false },
+    matrixData: [], matrixRows: [], matrixLoading: false,
 
     apiHeaders() {
       const h = { 'Content-Type': 'application/json' };
@@ -911,6 +983,80 @@ function settings() {
     isMyKey(key) {
       if (!this.me) return false;
       return key.email && key.email === this.me.email;
+    },
+
+    openCreateWs() {
+      this.wsFormError = '';
+      const first = this.workspaces[0];
+      this.createWsForm = {
+        name: '',
+        slug: '',
+        max_cost_usd: first?.max_cost_usd != null ? String(first.max_cost_usd) : '',
+        hitl_default: first?.hitl_default ?? false,
+      };
+      this.showCreateWs = true;
+    },
+
+    onProviderChange() {
+      if (this.addKeyForm.provider === 'moonshot') {
+        this.addKeyForm.base_url = 'https://api.moonshot.cn/v1';
+      } else {
+        this.addKeyForm.base_url = '';
+      }
+    },
+
+    async loadMatrix() {
+      if (!this.workspaces.length) return;
+      this.matrixLoading = true;
+      try {
+        const results = await Promise.all(
+          this.workspaces.map(ws =>
+            fetch(`/workspaces/${ws.id}/llm-keys`, { headers: this.apiHeaders() })
+              .then(r => r.ok ? r.json() : [])
+              .then(keys => ({ ws, keys }))
+          )
+        );
+        this.matrixData = results;
+        const providers = ['anthropic', 'openai', 'groq', 'gemini', 'moonshot', 'ollama'];
+        const rows = [];
+        for (const { ws, keys } of results) {
+          const keyMap = Object.fromEntries(keys.map(k => [k.provider, k]));
+          for (let i = 0; i < providers.length; i++) {
+            const provider = providers[i];
+            const hasKey = !!keyMap[provider];
+            let mode;
+            if (ws.llm_key_mode === 'proxy') mode = 'proxy';
+            else if (ws.llm_key_mode === 'byok' && hasKey) mode = 'byok';
+            else if (ws.llm_key_mode === 'managed') mode = 'managed';
+            else mode = ws.byok_managed_fallback ? 'managed*' : '—';
+            rows.push({
+              wsId: ws.id, wsName: ws.name, wsMode: ws.llm_key_mode,
+              provider, isFirst: i === 0, isLast: i === providers.length - 1,
+              mode, hasKey,
+            });
+          }
+        }
+        this.matrixRows = rows;
+      } catch(e) {}
+      this.matrixLoading = false;
+    },
+
+    copyDockerCmd() {
+      if (this.proxyDockerCmd) navigator.clipboard.writeText(this.proxyDockerCmd).catch(() => {});
+    },
+
+    downloadEnv() {
+      const content = [
+        '# antcrew-proxy configuration',
+        `PROXY_TOKEN=${this.proxyToken}`,
+        '# Replace with your actual Anthropic API key:',
+        'ANTHROPIC_API_KEY=sk-ant-YOUR_KEY_HERE',
+      ].join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+      a.download = 'antcrew-proxy.env';
+      a.click();
+      URL.revokeObjectURL(a.href);
     },
 
     /* ── Workspaces ── */
@@ -1190,7 +1336,7 @@ function settings() {
     },
 
     apiKeyPlaceholder(provider) {
-      const map = { anthropic: 'sk-ant-api03-…', openai: 'sk-proj-…', groq: 'gsk_…', gemini: 'AIza…' };
+      const map = { anthropic: 'sk-ant-api03-…', openai: 'sk-proj-…', groq: 'gsk_…', gemini: 'AIza…', moonshot: 'sk-…' };
       return map[provider] || 'api-key…';
     },
 

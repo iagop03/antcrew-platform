@@ -154,9 +154,12 @@ async def _persist_event(event: "Event") -> None:
                 if review_id:
                     stmt = select(HitlReview).where(HitlReview.review_id == review_id)
                     if not (await session.exec(stmt)).first():
+                        _ct = secrets.token_urlsafe(32)
+                        import hashlib as _hl
                         session.add(HitlReview(
                             review_id=review_id,
-                            client_token=secrets.token_urlsafe(32),
+                            client_token=_ct,
+                            client_token_hash=_hl.sha256(_ct.encode()).hexdigest(),
                             run_id=event.run_id,
                             agent_name=event.payload.get("agent_name", ""),
                             artifact_json=json.dumps(artifact),

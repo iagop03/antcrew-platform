@@ -185,9 +185,12 @@ async def create_review(
 
     # First assignee becomes the legacy assigned_to field for backward compat
     primary = body.assignees[0] if body.assignees else None
+    _raw_ct = secrets.token_urlsafe(32)
+    import hashlib as _hl
     review = HitlReview(
         review_id=review_id,
-        client_token=secrets.token_urlsafe(32),
+        client_token=_raw_ct,
+        client_token_hash=_hl.sha256(_raw_ct.encode()).hexdigest(),
         run_id=body.run_id,
         agent_name=body.agent_name,
         artifact_json=body.artifact_json,

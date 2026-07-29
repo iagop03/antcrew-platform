@@ -9,7 +9,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.exceptions import WorkspaceNotFoundError
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
-from sqlmodel import col, select
+from sqlmodel import col, desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from sqlalchemy import func, select as sa_select
@@ -17,7 +17,7 @@ from sqlalchemy import func, select as sa_select
 from app.core.auth import require_api_key, require_role, get_workspace_context, WorkspaceContext, ws_accessible
 from app.core.database import get_session
 from app.core.security import validate_external_url
-from app.models.run import Workspace, Run, HitlReview, WebhookConfig, WebhookEvent
+from app.models.run import Workspace, Run, HitlReview, WebhookConfig, WebhookEvent, WebhookDelivery
 
 router = APIRouter(
     prefix="/workspaces",
@@ -704,6 +704,82 @@ async def delete_webhook_config(
         await session.delete(ev)
     await session.delete(hook)
     await session.commit()
+
+
+@router.patch("/{workspace_id}/webhooks/{webhook_id}/toggle",
+              response_model=WebhookConfigOut,
+              dependencies=[Depends(require_role("admin"))])
+async def toggle_webhook_config(
+    workspace_id: int,
+    webhook_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """Flip enabled/disabled on a webhook without deleting it."""
+    result = await session.exec(
+        select(WebhookConfig)
+        .where(WebhookConfig.id == webhook_id)
+        .where(WebhookConfig.workspace_id == workspace_id)
+    )
+    hook = result.first()
+    if not hook:
+        raise HTTPException(404, f"Webhook {webhook_id} not found in workspace {workspace_id}")
+    hook.enabled = not hook.enabled
+    session.add(hook)
+    await session.commit()
+    await session.refresh(hook)
+    events = [e.event_type for e in (await session.exec(
+        select(WebhookEvent).where(WebhookEvent.webhook_id == hook.id)
+    )).all()]
+    return WebhookConfigOut(
+        id=hook.id,
+        workspace_id=hook.workspace_id,
+        url=hook.url,
+        events=events,
+        label=hook.label,
+        enabled=hook.enabled,
+        created_at=hook.created_at,
+    )
+
+
+class WebhookDeliveryOut(BaseModel):
+    id: int
+    run_id: str
+    url: str
+    status: str
+    attempts: int
+    last_error: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/{workspace_id}/webhook-deliveries",
+            response_model=list[WebhookDeliveryOut],
+            dependencies=[Depends(require_role("admin", "read"))])
+async def list_webhook_deliveries(
+    workspace_id: int,
+    webhook_id: Optional[int] = Query(None, description="Filter to a specific webhook"),
+    limit: int = Query(50, le=200),
+    session: AsyncSession = Depends(get_session),
+):
+    """Return recent webhook delivery attempts for this workspace."""
+    # Get the URLs of webhooks in this workspace (deliveries joined by URL)
+    hook_query = select(WebhookConfig.url).where(WebhookConfig.workspace_id == workspace_id)
+    if webhook_id is not None:
+        hook_query = hook_query.where(WebhookConfig.id == webhook_id)
+    hook_urls_result = await session.exec(hook_query)
+    hook_urls = [r for r in hook_urls_result.all()]
+    if not hook_urls:
+        return []
+    stmt = (
+        select(WebhookDelivery)
+        .where(WebhookDelivery.url.in_(hook_urls))
+        .order_by(desc(WebhookDelivery.created_at))
+        .limit(limit)
+    )
+    result = await session.exec(stmt)
+    return list(result.all())
 
 
 @router.delete("/{workspace_id}", status_code=204,

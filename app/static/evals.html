@@ -755,6 +755,13 @@ function evalsPage() {
     timeAgo(iso) {
       if (!iso) return '';
       const diff = (Date.now() - new Date(iso)) / 1000;
+      if (diff < 0) {
+        const abs = -diff;
+        if (abs < 60) return 'in ' + Math.floor(abs) + 's';
+        if (abs < 3600) return 'in ' + Math.floor(abs / 60) + 'm';
+        if (abs < 86400) return 'in ' + Math.floor(abs / 3600) + 'h';
+        return 'in ' + Math.floor(abs / 86400) + 'd';
+      }
       if (diff < 60) return Math.floor(diff) + 's ago';
       if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
       if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';

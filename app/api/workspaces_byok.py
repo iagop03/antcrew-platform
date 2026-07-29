@@ -21,7 +21,7 @@ router = APIRouter(
     dependencies=[Depends(require_api_key)],
 )
 
-_BYOK_PROVIDERS = frozenset({"anthropic", "openai", "groq", "gemini", "ollama"})
+_BYOK_PROVIDERS = frozenset({"anthropic", "openai", "groq", "gemini", "ollama", "moonshot"})
 _KEYLESS_PROVIDERS = frozenset({"ollama"})
 
 

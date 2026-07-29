@@ -66,6 +66,13 @@
     </div>
   </div>
 
+  <!-- Run filter banner -->
+  <div x-show="runIdFilter" class="mb-4 bg-indigo-950 border border-indigo-800 rounded-lg px-4 py-2.5 flex items-center gap-3 text-sm">
+    <span class="text-indigo-300">Filtered to run <span class="font-mono text-indigo-200" x-text="runIdFilter ? runIdFilter.slice(0,16) + '…' : ''"></span></span>
+    <a :href="'/run/' + runIdFilter" class="text-indigo-400 hover:underline text-xs">View run →</a>
+    <button @click="runIdFilter = null; ticketsOffset = 0; load()" class="ml-auto text-indigo-500 hover:text-indigo-300 text-xs">✕ Clear filter</button>
+  </div>
+
   <!-- Error banner -->
   <div x-show="loadError" class="mb-4">
     <div class="bg-red-950 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300 flex items-center gap-3">
@@ -120,6 +127,21 @@
         </div>
       </div>
     </template>
+  </div>
+
+  <!-- Pagination -->
+  <div class="flex items-center justify-between mt-4 px-1" x-show="ticketsOffset > 0 || hasMore">
+    <button @click="prevPage()" :disabled="ticketsOffset === 0"
+      class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition"
+      :class="ticketsOffset === 0 ? 'border-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'">
+      ← Anterior
+    </button>
+    <span class="text-xs text-gray-500" x-text="`${ticketsOffset + 1}–${ticketsOffset + tickets.length} tickets`"></span>
+    <button @click="nextPage()" :disabled="!hasMore"
+      class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition"
+      :class="!hasMore ? 'border-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'">
+      Siguiente →
+    </button>
   </div>
 </div>
 
@@ -213,6 +235,10 @@ function kanban() {
     exportTargets: [],
     exporting: false,
     exportResult: null,
+    runIdFilter: new URLSearchParams(location.search).get('run_id') || null,
+    ticketsOffset: 0,
+    ticketsLimit: 100,
+    hasMore: false,
     columns: [
       { status: 'open',        label: 'Open',        headerClass: 'bg-gray-800 text-gray-300' },
       { status: 'in_progress', label: 'In Progress',  headerClass: 'bg-yellow-900/50 text-yellow-300' },
@@ -245,14 +271,30 @@ function kanban() {
       this.loading = true;
       this.loadError = '';
       try {
-        const r = await fetch('/tickets/', { headers: this.apiHeaders() });
+        let url = `/tickets/?limit=${this.ticketsLimit}&offset=${this.ticketsOffset}`;
+        if (this.runIdFilter) url += `&run_id=${encodeURIComponent(this.runIdFilter)}`;
+        const r = await fetch(url, { headers: this.apiHeaders() });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        this.tickets = await r.json();
+        const data = await r.json();
+        this.tickets = data;
+        this.hasMore = data.length >= this.ticketsLimit;
       } catch (err) {
         this.loadError = `Failed to load tickets: ${err.message}`;
       } finally {
         this.loading = false;
       }
+    },
+
+    prevPage() {
+      if (this.ticketsOffset === 0) return;
+      this.ticketsOffset = Math.max(0, this.ticketsOffset - this.ticketsLimit);
+      this.load();
+    },
+
+    nextPage() {
+      if (!this.hasMore) return;
+      this.ticketsOffset += this.ticketsLimit;
+      this.load();
     },
 
     get filteredTickets() {

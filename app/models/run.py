@@ -140,7 +140,8 @@ class HitlReview(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     review_id: str = Field(index=True, unique=True)  # UUID from PlatformChannel
-    client_token: Optional[str] = Field(default=None, index=True, unique=True)  # public URL token for no-auth client reviews
+    client_token: Optional[str] = Field(default=None, index=True, unique=True)      # legacy plaintext — NULL for new reviews
+    client_token_hash: Optional[str] = Field(default=None, index=True, unique=True)  # sha256(client_token)
     run_id: str = Field(index=True)
     agent_name: str
     artifact_json: str = Field(default="null")   # JSON-serialized artifact
@@ -386,7 +387,8 @@ class UserSession(SQLModel, table=True):
     __tablename__ = "user_session"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    token: str = Field(unique=True, index=True)   # UUID4 — this IS the cookie value
+    token: Optional[str] = Field(default=None, unique=True, index=True)  # legacy plaintext — NULL for new sessions
+    token_hash: Optional[str] = Field(default=None, unique=True, index=True)  # sha256(raw_token) — primary lookup
     user_id: Optional[int] = Field(default=None, index=True)
     api_key_id: Optional[int] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=_utcnow)
@@ -488,7 +490,8 @@ class EmailVerification(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True)
-    code: str                              # 6-digit string
+    code: Optional[str] = Field(default=None)      # legacy plaintext — NULL for new codes
+    code_hash: Optional[str] = Field(default=None, index=True)  # HMAC-SHA256(SECRET_KEY, code)
     expires_at: datetime
     used: bool = Field(default=False)
     created_at: datetime = Field(default_factory=_utcnow)

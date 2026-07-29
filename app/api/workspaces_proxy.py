@@ -14,7 +14,7 @@ Endpoints:
 """
 from __future__ import annotations
 
-import uuid
+import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -41,8 +41,8 @@ class ProxyConfigRequest(BaseModel):
     @classmethod
     def url_valid(cls, v: str) -> str:
         v = v.strip().rstrip("/")
-        if not v.startswith(("http://", "https://")):
-            raise ValueError("proxy_url must start with http:// or https://")
+        if not v.startswith("https://"):
+            raise ValueError("proxy_url must use HTTPS")
         return v
 
 
@@ -102,9 +102,9 @@ async def generate_proxy_token(
 
     ws = await _get_ws(session, workspace_id, ctx)
 
-    validate_external_url(body.proxy_url, allow_http=True)
+    validate_external_url(body.proxy_url, allow_http=False)
 
-    token = str(uuid.uuid4())
+    token = secrets.token_urlsafe(32)
     ws.proxy_url = body.proxy_url
     ws.proxy_token_enc = _encrypt(token)
     session.add(ws)

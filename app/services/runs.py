@@ -257,13 +257,17 @@ async def list_tickets(
     *,
     status: Optional[str] = None,
     search: Optional[str] = None,
+    run_id: Optional[str] = None,
     limit: int = 200,
+    offset: int = 0,
     workspace_id: Optional[int] = None,
     workspace_ids: Optional[list[int]] = None,
 ) -> list[Ticket]:
-    stmt = select(Ticket).order_by(desc(Ticket.updated_at)).limit(limit)
+    stmt = select(Ticket).order_by(desc(Ticket.updated_at)).limit(limit).offset(offset)
     if status:
         stmt = stmt.where(Ticket.status == status)
+    if run_id:
+        stmt = stmt.where(Ticket.run_id == run_id)
     if workspace_ids is not None:
         subq = sa_select(Run.run_id).where(Run.workspace_id.in_(workspace_ids)) if len(workspace_ids) != 1 else sa_select(Run.run_id).where(Run.workspace_id == workspace_ids[0])
         stmt = stmt.where(Ticket.run_id.in_(subq))

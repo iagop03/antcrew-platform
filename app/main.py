@@ -623,6 +623,18 @@ _cors_origins = (
     else ["http://localhost:3000", "http://localhost:8000",
           "http://127.0.0.1:3000", "http://127.0.0.1:8000"]
 )
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "  # Alpine.js requires inline; tighten with nonce if CSP Level 3 is added
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; "
+    "object-src 'none'; "
+    "base-uri 'self'"
+)
+
+
 class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Inject standard security headers on every response."""
     async def dispatch(self, request: Request, call_next):
@@ -631,6 +643,7 @@ class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-XSS-Protection"] = "0"
+        response.headers["Content-Security-Policy"] = _CSP
         if APP_ENV not in ("dev", "int"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
@@ -639,8 +652,8 @@ app.add_middleware(_SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Api-Key", "X-CSRF-Token"],
 )
 
 _csrf = [Depends(_require_csrf)]
