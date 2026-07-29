@@ -365,6 +365,57 @@ The provided `fly.toml` builds a Docker image from `Dockerfile`, runs Alembic mi
 
 ---
 
+## Security & compliance FAQ
+
+**Does generated code leave my network?**
+
+Depends on the model. With Ollama (any model string starting with `ollama:`), all inference runs locally — no data leaves your machine. With Claude, GPT-4, Gemini, or Groq, prompts and responses go to the respective provider's API. The workspace owner controls which model is used per run; BYOK mode routes through the provider directly without the platform acting as a middleman.
+
+**Where is my data stored?**
+
+All run state (prompts, responses, artifacts, tickets) is stored in your PostgreSQL database. The platform does not retain or replicate data externally. With self-hosted deployment, you own the DB.
+
+**How are BYOK API keys protected?**
+
+BYOK keys are encrypted at rest using Fernet (AES-128-CBC) under a `BYOK_ENCRYPTION_KEY` you supply at deploy time. The key is an environment variable on your Fly/Cloud Run instance — it is never transmitted over the network. A single encryption key protects all workspaces on the same instance; for workspaces requiring HSM-grade key isolation, self-hosted deployment with a KMS is recommended.
+
+**What exact model version does `"claude"` use?**
+
+`claude-sonnet-4-6` (configured in `antcrew_engine/config.py`). To pin a different version, set `model` in the run request body (e.g. `"model": "claude-3-5-haiku-20241022"`).
+
+**Is there audit logging of agent actions?**
+
+Yes — every run is recorded as a `Run` row with full artifact history. For deep replay, `antcrew` includes `TraceLog`: SQLite-backed call-level tracing with `antcrew trace replay <run-id>`. TraceLog is available via the CLI, not via the platform REST API in this version.
+
+**Is there MFA?**
+
+No — email + password authentication only. MFA (TOTP/passkeys) is on the roadmap. If your compliance requirements mandate MFA today, deploy behind an SSO/IdP proxy (Cloudflare Access, Tailscale, Authentik).
+
+**Is there a formal SLA?**
+
+Not for open-source self-hosted deployments. The managed instance at `antcrew-prod.fly.dev` targets 99.5% uptime on a best-effort basis. Enterprise SLA contracts are available on request.
+
+---
+
+## Licensing & self-hosting
+
+antcrew-platform is MIT licensed. You can self-host it — the code is public, the Docker image builds from this repo.
+
+**Why is it open source if the managed service charges money?**
+
+We compete on operational excellence, not code exclusivity. You self-host; you own ops, monitoring, scaling, and migrations. We operate the managed version; you pay for that. This is the same model as Metabase, Supabase, and Plausible — and it's a conscious choice, not an oversight.
+
+What the managed service adds that the code alone doesn't give you:
+- Zero-maintenance Fly.io deploy with Alembic migrations on release
+- Managed Postgres with backups
+- Pre-configured BYOK encryption key rotation
+- Incident response and uptime monitoring
+- Priority support channel
+
+If those are worth the cost to you, use the managed version. If you'd rather run it yourself, the MIT license means you can — no strings attached.
+
+---
+
 ## Related
 
 - [antcrew](https://github.com/iagop03/antcrew) — the multi-agent framework this platform orchestrates (Layer 1: LangGraph pipeline)

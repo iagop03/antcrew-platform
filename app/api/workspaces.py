@@ -431,6 +431,11 @@ async def set_slack_webhook(
     ws = result.first()
     if not ws:
         raise WorkspaceNotFoundError(workspace_id)
+    if body.slack_webhook_url is not None:
+        try:
+            validate_external_url(body.slack_webhook_url)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
     ws.slack_webhook_url = body.slack_webhook_url
     if body.slack_channel_id is not None:
         ws.slack_channel_id = body.slack_channel_id

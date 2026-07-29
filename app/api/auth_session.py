@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlmodel import select
 
+from app.core.csrf import require_csrf
 from app.core.database import get_session
 
 log = logging.getLogger(__name__)
@@ -717,6 +718,7 @@ async def me(
 async def update_profile(
     request: Request,
     session=Depends(get_session),
+    _csrf: None = Depends(require_csrf),
 ):
     """Update display_name and/or password for the authenticated user."""
     from app.models.run import User

@@ -430,3 +430,60 @@ def test_hitl_timeout_env_var(monkeypatch):
     import app.core.channel as ch_mod
     importlib.reload(ch_mod)
     assert ch_mod._REVIEW_TIMEOUT_S == 300.0
+
+
+# ---------------------------------------------------------------------------
+# Security: SSRF guard on slack_webhook_url
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_slack_webhook_ssrf_rejected(client: AsyncClient, session):
+    """PATCH /workspaces/{id}/slack must reject URLs targeting private/internal hosts."""
+    ws = Workspace(name="SSRF WS", slug="ssrf-ws")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    for bad_url in [
+        "http://169.254.169.254/latest/meta-data/",
+        "http://localhost/admin",
+        "http://127.0.0.1:6379/",
+        "ftp://example.com/",
+    ]:
+        r = await client.patch(
+            f"/workspaces/{ws.id}/slack",
+            json={"slack_webhook_url": bad_url},
+        )
+        assert r.status_code == 400, f"Expected 400 for {bad_url!r}, got {r.status_code}"
+
+
+@pytest.mark.asyncio
+async def test_slack_webhook_valid_url_accepted(client: AsyncClient, session):
+    """A valid HTTPS Slack webhook URL must be accepted."""
+    ws = Workspace(name="Slack WS", slug="slack-ws")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    r = await client.patch(
+        f"/workspaces/{ws.id}/slack",
+        json={"slack_webhook_url": "https://hooks.slack.com/services/T00/B00/abc"},
+    )
+    assert r.status_code == 200
+    assert r.json()["slack_webhook_url"] == "https://hooks.slack.com/services/T00/B00/abc"
+
+
+@pytest.mark.asyncio
+async def test_slack_webhook_null_clears_without_validation(client: AsyncClient, session):
+    """Passing null must clear the webhook URL without triggering URL validation."""
+    ws = Workspace(name="Clear WS", slug="clear-ws", slack_webhook_url="https://hooks.slack.com/old")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    r = await client.patch(
+        f"/workspaces/{ws.id}/slack",
+        json={"slack_webhook_url": None},
+    )
+    assert r.status_code == 200
+    assert r.json()["slack_webhook_url"] is None

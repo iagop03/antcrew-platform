@@ -1,5 +1,22 @@
 # Changelog — antcrew-platform
 
+## v0.6.5 (2026-07-29)
+
+### Security
+
+- **SSRF in `slack_webhook_url` endpoint fixed** (`app/api/workspaces.py`) — `PUT /workspaces/{id}/slack` now calls `validate_external_url()` on any non-null `slack_webhook_url` before persisting it. Previously a workspace admin could store an SSRF URL (e.g. `http://169.254.169.254/...`) that the HITL listener would fetch on every approval notification. Fix: raises HTTP 400 with the validation error message; `null` (clearing the webhook) bypasses validation as intended.
+
+- **CSRF protection extended to `PATCH /auth/profile`** (`app/api/auth_session.py`) — password changes were not protected by the double-submit CSRF check because `auth_session.router` was included globally without the `_csrf` dependency list. Fix: `require_csrf` imported from `app.core.csrf` and added as an explicit `Depends` on the `update_profile` endpoint only, leaving unauthenticated endpoints (`/register`, `/login`, `/verify-email`) correctly exempt. The `require_csrf` dependency is a no-op for API-key requests, so no breakage for programmatic clients.
+
+- **Production Fly.io config locked to single instance** (`fly.prod.toml`) — changed `auto_start_machines` from `true` to `false`. With the in-memory rate limiter (`app/core/rate_limit.py`) and per-process `ThreadPoolExecutor` pools, a second Fly machine would have a separate rate-limit bucket and 4 additional worker slots — making both controls ineffective under burst traffic. `min_machines_running = 1` guarantees one machine is always warm; `auto_start_machines = false` prevents Fly from spawning a second instance that would violate the single-instance assumption until Redis-backed rate limiting is implemented.
+
+### Deferred debt declared
+
+- Rate limiting (`app/core/rate_limit.py`) uses in-memory token buckets — must be replaced with a Redis-backed implementation before horizontal scaling. Tracked explicitly; `auto_start_machines = false` is the interim guard.
+- MFA (TOTP/passkeys) not yet implemented. Flagged for Q3 evaluation when the first enterprise customer formally requires it.
+
+---
+
 ## v0.6.4 (2026-07-28)
 
 ### Added
