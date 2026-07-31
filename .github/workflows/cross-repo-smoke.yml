@@ -1,0 +1,80 @@
+name: Cross-repo smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    name: Import smoke (engine + antcrew + platform + proxy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout antcrew-platform
+        uses: actions/checkout@v4
+        with:
+          path: antcrew-platform
+
+      - name: Checkout antcrew-engine
+        uses: actions/checkout@v4
+        with:
+          repository: iagop03/antcrew-engine
+          path: antcrew-engine
+
+      - name: Checkout antcrew
+        uses: actions/checkout@v4
+        with:
+          repository: iagop03/antcrew
+          path: antcrew
+
+      - name: Checkout antcrew-proxy
+        uses: actions/checkout@v4
+        with:
+          repository: iagop03/antcrew-proxy
+          path: antcrew-proxy
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install all packages from local source
+        run: |
+          pip install -e antcrew-engine
+          pip install -e antcrew
+          pip install -e "antcrew-platform[dev]"
+          pip install -r antcrew-proxy/requirements.txt
+
+      - name: Smoke — antcrew-engine build_llm
+        run: |
+          python -c "
+          from antcrew_engine.config import build_llm
+          from antcrew_engine.models.anthropic_model import AnthropicModel
+          from antcrew_engine.models.openai_model import OpenAIModel
+          print('antcrew-engine: OK')
+          "
+
+      - name: Smoke — platform critical imports
+        run: |
+          python -c "
+          from app.core.auth import resolve_ws_api_key, resolve_ws_session_token, WsAuth
+          from app.api.stream import register_run, deregister_run
+          from app.services.runner_base import resolve_workspace_llm_config
+          from app.api.security_audit import router as audit_router
+          print('antcrew-platform: OK')
+          "
+        env:
+          PYTHONPATH: antcrew-platform
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          SECRET_KEY: ci-test-key
+
+      - name: Smoke — antcrew-proxy imports
+        run: |
+          python -c "
+          import os, sys
+          os.environ['PROXY_TOKEN'] = 'ci-smoke'
+          sys.path.insert(0, 'antcrew-proxy')
+          import main
+          assert main.__version__ == '1.0.0'
+          print('antcrew-proxy: OK')
+          "

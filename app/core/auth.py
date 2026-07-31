@@ -359,14 +359,20 @@ def ws_accessible(workspace_id: Optional[int], ctx: WorkspaceContext) -> bool:
     return workspace_id in ids
 
 
-async def check_ws_session_token(token: str) -> bool:
-    """Validate an antcrew_session cookie token for WebSocket connections (no DI)."""
+@dataclass(frozen=True)
+class WsAuth:
+    """WebSocket auth result. workspace_ids=None means unrestricted global access."""
+    workspace_ids: Optional[frozenset]  # frozenset[int] | None
+
+
+async def resolve_ws_session_token(token: str) -> Optional[WsAuth]:
+    """Validate a session cookie token for WebSocket auth. Returns WsAuth or None if invalid."""
     try:
         from datetime import datetime, timezone
         from sqlmodel import select
         from sqlmodel.ext.asyncio.session import AsyncSession
         from app.core.database import engine
-        from app.models.run import UserSession, ApiKey
+        from app.models.run import UserSession, ApiKey, WorkspaceMembership
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         async with AsyncSession(engine, expire_on_commit=False) as session:
@@ -387,38 +393,49 @@ async def check_ws_session_token(token: str) -> bool:
                     )
                 )).first()
             if user_session is None or user_session.api_key_id is None:
-                return False
+                return None
             key = (await session.exec(
                 select(ApiKey).where(
                     ApiKey.id == user_session.api_key_id,
                     ApiKey.revoked_at == None,  # noqa: E711
                 )
             )).first()
-            return key is not None
+            if key is None:
+                return None
+            memberships = (await session.exec(
+                select(WorkspaceMembership).where(WorkspaceMembership.api_key_id == key.id)
+            )).all()
+            ws_ids: set[int] = set()
+            if key.workspace_id is not None:
+                ws_ids.add(key.workspace_id)
+            ws_ids.update(m.workspace_id for m in memberships)
+            return WsAuth(workspace_ids=frozenset(ws_ids) if ws_ids else None)
     except Exception:
-        return False  # fail closed
+        return None  # fail closed
 
 
-async def check_ws_api_key(api_key: str | None) -> bool:
-    """Validate an API key for WebSocket connections (no DI — uses engine directly)."""
+async def resolve_ws_api_key(api_key: str | None) -> Optional[WsAuth]:
+    """Validate an API key for WebSocket auth. Returns WsAuth or None if invalid."""
     env_key = os.environ.get("PLATFORM_API_KEY")
     if env_key:
-        return hmac.compare_digest(api_key or "", env_key)
+        if hmac.compare_digest(api_key or "", env_key):
+            return WsAuth(workspace_ids=None)  # global access
+        return None
 
     try:
         from sqlmodel import select
         from sqlmodel.ext.asyncio.session import AsyncSession
         from app.core.database import engine
-        from app.models.run import ApiKey
+        from app.models.run import ApiKey, WorkspaceMembership
 
         async with AsyncSession(engine, expire_on_commit=False) as session:
             any_key = (await session.exec(
                 select(ApiKey).where(ApiKey.revoked_at == None).limit(1)  # noqa: E711
             )).first()
             if any_key is None:
-                return True  # open mode
+                return WsAuth(workspace_ids=None)  # open mode — global access
             if not api_key:
-                return False
+                return None
 
             prefix = _key_prefix(api_key)
 
@@ -441,7 +458,10 @@ async def check_ws_api_key(api_key: str | None) -> bool:
                 )).all()
                 matched = next((k for k in legacy if _verify(api_key, k.key_hash)), None)
 
-            if matched is not None and (matched.key_prefix is None or _is_legacy_hash(matched.key_hash)):
+            if matched is None:
+                return None
+
+            if matched.key_prefix is None or _is_legacy_hash(matched.key_hash):
                 try:
                     matched.key_prefix = prefix
                     if _is_legacy_hash(matched.key_hash):
@@ -450,6 +470,22 @@ async def check_ws_api_key(api_key: str | None) -> bool:
                     await session.commit()
                 except Exception:
                     pass
-            return matched is not None
+
+            memberships = (await session.exec(
+                select(WorkspaceMembership).where(WorkspaceMembership.api_key_id == matched.id)
+            )).all()
+            ws_ids: set[int] = set()
+            if matched.workspace_id is not None:
+                ws_ids.add(matched.workspace_id)
+            ws_ids.update(m.workspace_id for m in memberships)
+            return WsAuth(workspace_ids=frozenset(ws_ids) if ws_ids else None)
     except Exception:
-        return False  # fail closed for WebSocket auth
+        return None  # fail closed
+
+
+async def check_ws_session_token(token: str) -> bool:
+    return (await resolve_ws_session_token(token)) is not None
+
+
+async def check_ws_api_key(api_key: str | None) -> bool:
+    return (await resolve_ws_api_key(api_key)) is not None

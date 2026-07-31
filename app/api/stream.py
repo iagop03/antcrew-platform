@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from antcrew import bus, Event
-from app.core.auth import check_ws_api_key, check_ws_session_token
+from app.core.auth import resolve_ws_api_key, resolve_ws_session_token
 
 log = logging.getLogger(__name__)
 
@@ -18,16 +18,40 @@ router = APIRouter(prefix="/ws", tags=["stream"])
 _WS_QUEUE_SIZE = 100
 _WS_PING_INTERVAL = 30  # seconds
 
+# run_id → workspace_id for active runs; populated by runners on start, removed on completion.
+_run_workspace: dict[str, int] = {}
+
+
+def register_run(run_id: str, workspace_id: int) -> None:
+    """Register a run→workspace mapping so WS connections can filter events by workspace."""
+    _run_workspace[run_id] = workspace_id
+
+
+def deregister_run(run_id: str) -> None:
+    """Remove the run→workspace mapping when a run completes."""
+    _run_workspace.pop(run_id, None)
+
 
 class _Connection:
-    def __init__(self, ws: WebSocket, run_id: Optional[str] = None):
+    def __init__(
+        self,
+        ws: WebSocket,
+        run_id: Optional[str] = None,
+        workspace_ids: Optional[frozenset] = None,
+    ):
         self.ws = ws
         self.run_id = run_id
+        self.workspace_ids = workspace_ids  # None = global access; frozenset = restricted
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=_WS_QUEUE_SIZE)
 
     def enqueue(self, event: Event) -> None:
         if self.run_id and event.run_id != self.run_id:
             return
+        # Workspace isolation: drop events from runs outside this connection's workspaces.
+        if self.workspace_ids is not None and event.run_id:
+            ws_id = _run_workspace.get(event.run_id)
+            if ws_id is not None and ws_id not in self.workspace_ids:
+                return
         try:
             self._queue.put_nowait(event)
         except asyncio.QueueFull:
@@ -87,15 +111,16 @@ async def events_stream(
         except (asyncio.TimeoutError, json.JSONDecodeError, Exception):
             pass  # no first-message auth — proceed to key check (will reject if required)
 
-    # Also accept antcrew_session cookie (parsed from the Upgrade request headers)
+    # Also accept antcrew_session cookie (parsed from the Upgrade request headers).
     if resolved_key is None:
         cookie_header = ws.headers.get("cookie", "")
         for part in cookie_header.split(";"):
             part = part.strip()
             if part.startswith("antcrew_session="):
                 session_token = part[len("antcrew_session="):]
-                if await check_ws_session_token(session_token):
-                    conn = _Connection(ws, run_id=run_id)
+                auth = await resolve_ws_session_token(session_token)
+                if auth is not None:
+                    conn = _Connection(ws, run_id=run_id, workspace_ids=auth.workspace_ids)
 
                     def _session_handler(event: Event) -> None:
                         conn.enqueue(event)
@@ -112,13 +137,13 @@ async def events_stream(
                         log.debug("WS session client disconnected (run_id=%s)", run_id)
                     return
                 break
-        # Fall through to api-key check if cookie not found or invalid
 
-    if not await check_ws_api_key(resolved_key):
+    auth = await resolve_ws_api_key(resolved_key)
+    if auth is None:
         await ws.close(code=4001, reason="Unauthorized")
         return
 
-    conn = _Connection(ws, run_id=run_id)
+    conn = _Connection(ws, run_id=run_id, workspace_ids=auth.workspace_ids)
 
     def _handler(event: Event) -> None:
         conn.enqueue(event)

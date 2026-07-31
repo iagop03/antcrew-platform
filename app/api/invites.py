@@ -86,9 +86,11 @@ async def create_invite(
     if existing:
         raise HTTPException(409, "A pending invite already exists for this email in this workspace")
 
+    import hashlib
     token = secrets.token_urlsafe(32)
     invite = WorkspaceInvite(
-        token=token,
+        token=None,
+        token_hash=hashlib.sha256(token.encode()).hexdigest(),
         workspace_id=workspace_id,
         invitee_email=email,
         inviter_email=ctx.created_by or "admin",

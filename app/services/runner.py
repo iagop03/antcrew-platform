@@ -429,6 +429,14 @@ async def dispatch(
             bus.unsubscribe("pipeline.start", _on_pipeline_start)
             if _tmp_repo_dir is not None:
                 shutil.rmtree(_tmp_repo_dir, ignore_errors=True)
+            if workspace_id is not None:
+                try:
+                    _rid = run_id_future.result() if run_id_future.done() else None
+                    if _rid:
+                        from app.api.stream import deregister_run as _deregister_run
+                        _deregister_run(_rid)
+                except Exception:
+                    pass
 
     asyncio.ensure_future(_bg())
 
@@ -438,6 +446,9 @@ async def dispatch(
             # Await attribution before returning so workspace_id is set before the
             # 202 response reaches the client — eliminates the race on GET /runs/.
             await _set_run_attribution(run_id, created_by, workspace_id, client_label)
+        if run_id and workspace_id is not None:
+            from app.api.stream import register_run as _register_run
+            _register_run(run_id, workspace_id)
         return run_id
     except asyncio.TimeoutError:
         log.warning("runner: pipeline.start not received within %.0f s for %s", _DISPATCH_TIMEOUT, team_name)

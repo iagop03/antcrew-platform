@@ -671,6 +671,12 @@ async def dispatch_engine(
             # Update workspace budget totals (mirrors runner.dispatch behaviour).
             if workspace_id is not None:
                 await _mark_workspace_budget_status(workspace_id)
+            from app.api.stream import deregister_run as _deregister_run
+            _deregister_run(run_id)
+
+    if workspace_id is not None:
+        from app.api.stream import register_run as _register_run
+        _register_run(run_id, workspace_id)
 
     asyncio.ensure_future(_bg())
 

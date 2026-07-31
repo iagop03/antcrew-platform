@@ -503,7 +503,8 @@ class WorkspaceInvite(SQLModel, table=True):
     __tablename__ = "workspace_invite"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    token: str = Field(unique=True, index=True)   # secrets.token_urlsafe(32)
+    token: Optional[str] = Field(default=None, unique=True, index=True)        # legacy plaintext — NULL for new invites
+    token_hash: Optional[str] = Field(default=None, unique=True, index=True)   # sha256(raw_token) — primary lookup
     workspace_id: int = Field(index=True)
     invitee_email: str = Field(index=True)
     inviter_email: str

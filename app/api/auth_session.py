@@ -671,14 +671,24 @@ async def accept_invite(
         raise HTTPException(401, "Session expired or invalid")
     user_session, api_key = result
 
+    import hashlib
     now = _utcnow()
+    token_hash = hashlib.sha256(invite_token.encode()).hexdigest()
     invite = (await session.exec(
         select(WorkspaceInvite).where(
-            WorkspaceInvite.token == invite_token,
+            WorkspaceInvite.token_hash == token_hash,
             WorkspaceInvite.status == "pending",
             WorkspaceInvite.expires_at > now,
         )
     )).first()
+    if invite is None:  # fallback for legacy plaintext tokens
+        invite = (await session.exec(
+            select(WorkspaceInvite).where(
+                WorkspaceInvite.token == invite_token,
+                WorkspaceInvite.status == "pending",
+                WorkspaceInvite.expires_at > now,
+            )
+        )).first()
 
     if invite is None:
         raise HTTPException(404, "Invite not found or expired")
