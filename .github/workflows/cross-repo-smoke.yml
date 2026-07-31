@@ -65,7 +65,7 @@ jobs:
           "
         env:
           PYTHONPATH: antcrew-platform
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           SECRET_KEY: ci-test-key
 
       - name: Smoke — antcrew-proxy imports
