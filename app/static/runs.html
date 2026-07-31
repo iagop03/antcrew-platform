@@ -429,12 +429,13 @@ function dashboard() {
         // 'teams': no server-side team filter; exclude pipelines and engine client-side
         const r = await fetch(qs, { headers: this.apiHeaders() });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        let data = await r.json();
+        const rawData = await r.json();
+        let data = rawData;
         if (this.activeFilter === 'teams') {
-          data = data.filter(r => r.team !== 'engine' && !r.team?.startsWith('pipeline:'));
+          data = rawData.filter(r => r.team !== 'engine' && !r.team?.startsWith('pipeline:'));
         }
         this.runs = data;
-        this.hasMore = data.length >= limit;
+        this.hasMore = rawData.length >= limit;
       } catch (err) {
         this.loadError = `Failed to load runs: ${err.message}`;
       } finally {
