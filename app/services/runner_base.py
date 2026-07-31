@@ -39,11 +39,8 @@ async def _check_workspace_budget(workspace_id: int) -> None:
     from app.services.billing import BLOCKED_STATUSES
 
     async with AsyncSession(_db_engine, expire_on_commit=False) as sess:
-        try:
-            stmt = select(Workspace).where(Workspace.id == workspace_id).with_for_update()
-            ws = (await sess.exec(stmt)).first()
-        except Exception:
-            ws = (await sess.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+        stmt = select(Workspace).where(Workspace.id == workspace_id).with_for_update()
+        ws = (await sess.exec(stmt)).first()
 
         if ws is None:
             return

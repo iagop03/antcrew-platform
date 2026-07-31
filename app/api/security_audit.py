@@ -368,12 +368,24 @@ async def _run_audit_task(run_id: int, cfg_id: int, github_token: str) -> None:
             await _fail_run(run_id, "No relevant files fetched from GitHub")
             return
 
+        # Resolve workspace LLM config (BYOK / proxy / managed)
+        async with AsyncSessionFactory() as _sess:
+            from app.models.run import Workspace as _Workspace
+            from sqlmodel import select as _select
+            _ws = (await _sess.exec(_select(_Workspace).where(_Workspace.id == run.workspace_id))).first()
+            from app.services.runner_base import resolve_workspace_llm_config
+            _llm_api_key, _llm_base_url = await resolve_workspace_llm_config(
+                _sess, _ws, "claude"
+            ) if _ws else (None, None)
+
         # Build ArtifactStore and run SecurityAuditor in thread pool
         result_content = await asyncio.get_event_loop().run_in_executor(
             None,
             _run_auditor_sync,
             files,
             cfg.github_repo or "unknown repo",
+            _llm_api_key,
+            _llm_base_url,
         )
 
         findings_raw: list[dict] = result_content.get("findings", [])
@@ -450,7 +462,12 @@ async def _run_audit_task(run_id: int, cfg_id: int, github_token: str) -> None:
         await _maybe_next_iteration(run, cfg, github_token, session)
 
 
-def _run_auditor_sync(files: list[dict], repo_description: str) -> dict:
+def _run_auditor_sync(
+    files: list[dict],
+    repo_description: str,
+    api_key: "str | None" = None,
+    base_url: "str | None" = None,
+) -> dict:
     """Synchronous wrapper: build ArtifactStore + run SecurityAuditor. Runs in thread."""
     from antcrew_engine.engine import (
         Artifact, ArtifactId, ArtifactKind, MemoryStore,
@@ -468,8 +485,8 @@ def _run_auditor_sync(files: list[dict], repo_description: str) -> dict:
             metadata={"file_path": f["path"]},
         ))
 
-    # Build LLM from env
-    llm = _build_llm()
+    # Build LLM — use workspace BYOK/proxy config when available, fall back to env key
+    llm = _build_llm(api_key=api_key, base_url=base_url)
 
     goal = Goal(
         description=f"Security audit of {repo_description}",
@@ -490,13 +507,21 @@ def _run_auditor_sync(files: list[dict], repo_description: str) -> dict:
     return {"findings": [], "cost_usd": result.cost_usd or 0.0, "errors": result.errors}
 
 
-def _build_llm():
-    """Build LLM instance from environment (Anthropic by default)."""
-    from antcrew.models import AnthropicModel
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is required for SecurityAuditor")
-    return AnthropicModel(api_key=api_key, model="claude-sonnet-4-6")
+def _build_llm(api_key: "str | None" = None, base_url: "str | None" = None):
+    """Build LLM instance, honouring workspace BYOK/proxy config when provided."""
+    from antcrew_engine.config import build_llm as _build
+    kw: dict = {}
+    if api_key:
+        kw["api_key"] = api_key
+    if base_url:
+        kw["base_url"] = base_url
+    if not kw:
+        # Managed mode: require platform env key
+        env_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not env_key:
+            raise RuntimeError("ANTHROPIC_API_KEY is required for SecurityAuditor")
+        kw["api_key"] = env_key
+    return _build("claude-sonnet-4-6", **kw)
 
 
 # ── FindingsTriager ───────────────────────────────────────────────────────────

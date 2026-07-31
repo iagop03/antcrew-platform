@@ -33,7 +33,7 @@ dependencies = [
     "bcrypt>=4.0",
     "croniter>=2.0",
     "antcrew>=0.33.10,<0.34",
-    "antcrew-engine>=0.3.9,<0.4",
+    "antcrew-engine>=0.3.11,<0.4",
 ]
 
 [project.optional-dependencies]
