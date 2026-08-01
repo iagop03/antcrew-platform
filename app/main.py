@@ -33,6 +33,7 @@ from app.api import client_review, compare as compare_api, contract_schemas as c
 from app.api import security_audit as security_audit_api
 from app.api import invites as invites_api
 from app.api import workspaces_proxy as workspaces_proxy_api
+from app.api import run_schedules as run_schedules_api
 from app.core.csrf import require_csrf as _require_csrf
 
 _STATIC = Path(__file__).parent / "static"
@@ -394,6 +395,21 @@ async def _eval_scheduler_loop() -> None:
             log.warning("eval scheduler error: %s", exc)
 
 
+async def _run_scheduler_loop() -> None:
+    """Fire due RunSchedule entries every 60 seconds."""
+    from app.api.run_schedules import dispatch_due_run_schedules
+    from app.core.database import engine as _engine
+    log.info("run scheduler started")
+    while True:
+        await asyncio.sleep(60)
+        try:
+            n = await dispatch_due_run_schedules(_engine)
+            if n:
+                log.info("run scheduler dispatched %d engine run(s)", n)
+        except Exception as exc:
+            log.warning("run scheduler error: %s", exc)
+
+
 async def _check_app_env() -> None:
     """Log the active environment prominently so it is unmistakable in startup logs."""
     log.info("antcrew-platform v%s  env=%s", _VERSION, APP_ENV)
@@ -585,6 +601,7 @@ async def lifespan(app: FastAPI):
         _security_scheduler_task = asyncio.create_task(
             security_audit_api.run_schedule_loop(), name="security-audit-scheduler"
         )
+        asyncio.create_task(_run_scheduler_loop(), name="run-scheduler")
     yield
     if not _TESTING:
         stop_listening()
@@ -682,6 +699,7 @@ app.include_router(contract_schemas_api.router, dependencies=_csrf)
 app.include_router(security_audit_api.router,         dependencies=_csrf)
 app.include_router(security_audit_api.webhook_router)          # HMAC-signed, no CSRF
 app.include_router(invites_api.router,                dependencies=_csrf)
+app.include_router(run_schedules_api.router,          dependencies=_csrf)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 

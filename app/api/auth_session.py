@@ -356,6 +356,11 @@ async def login(
     if user is None or not _verify_password(body.password, user.password_hash):
         raise HTTPException(401, "Invalid email or password")
 
+    # MFA gate: if user has TOTP enabled, issue a short-lived challenge token instead of a session.
+    if user.mfa_enabled and user.totp_secret:
+        mfa_token = _sign_mfa_token(user.id)
+        return {"mfa_required": True, "mfa_token": mfa_token}
+
     # Find the api key linked to this user
     api_key = (await session.exec(
         select(ApiKey).where(
@@ -648,6 +653,224 @@ async def resend_verification_code(
 
     _asyncio.create_task(_send_code(user.email, code))
     return {"message": "Verification code sent"}
+
+
+# ── MFA / TOTP ───────────────────────────────────────────────────────────────
+
+def _totp_issuer() -> str:
+    return os.environ.get("APP_NAME", "AntCrew")
+
+
+def _sign_mfa_token(user_id: int) -> str:
+    """Return HMAC-SHA256 token encoding user_id + expiry (5 min). No DB write needed."""
+    import hashlib
+    import hmac
+    import time
+
+    exp = int(time.time()) + 300  # 5 min
+    payload = f"{user_id}:{exp}"
+    secret = os.environ.get("SECRET_KEY", "")
+    sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    import base64
+    return base64.urlsafe_b64encode(f"{payload}:{sig}".encode()).decode()
+
+
+def _verify_mfa_token(token: str) -> Optional[int]:
+    """Verify HMAC-signed MFA challenge token. Returns user_id or None if invalid/expired."""
+    import base64
+    import hashlib
+    import hmac
+    import time
+
+    try:
+        raw = base64.urlsafe_b64decode(token.encode()).decode()
+        user_id_str, exp_str, sig = raw.rsplit(":", 2)
+        payload = f"{user_id_str}:{exp_str}"
+        secret = os.environ.get("SECRET_KEY", "")
+        expected_sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        if int(time.time()) > int(exp_str):
+            return None
+        return int(user_id_str)
+    except Exception:
+        return None
+
+
+@router.get("/mfa/setup")
+async def mfa_setup(
+    request: Request,
+    session=Depends(get_session),
+):
+    """Generate a TOTP secret and provisioning URI for MFA setup.
+
+    Returns a provisioning URI compatible with Google Authenticator, Authy, etc.
+    The secret is NOT yet stored — call POST /auth/mfa/enable with the first valid
+    code to activate MFA.
+    """
+    import pyotp
+
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    result = await _resolve_session(token, session)
+    if result is None:
+        raise HTTPException(401, "Session expired or invalid")
+    user_session, api_key = result
+    if user_session.user_id is None:
+        raise HTTPException(400, "MFA requires a user account (session-cookie login)")
+
+    from app.models.run import User
+    user = (await session.exec(select(User).where(User.id == user_session.user_id))).first()
+    if user is None:
+        raise HTTPException(404, "User not found")
+
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=user.email, issuer_name=_totp_issuer())
+    return {"secret": secret, "provisioning_uri": uri, "mfa_enabled": user.mfa_enabled}
+
+
+class _MfaEnableRequest(BaseModel):
+    secret: str   # base32 secret from GET /auth/mfa/setup
+    code: str     # 6-digit TOTP code to verify before enabling
+
+
+@router.post("/mfa/enable", status_code=200)
+async def mfa_enable(
+    body: _MfaEnableRequest,
+    request: Request,
+    session=Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+):
+    """Activate MFA for the authenticated user after verifying the first TOTP code.
+
+    Stores the secret and sets mfa_enabled=True. All subsequent logins will require
+    a valid TOTP code.
+    """
+    import pyotp
+
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    result = await _resolve_session(token, session)
+    if result is None:
+        raise HTTPException(401, "Session expired or invalid")
+    user_session, _ = result
+    if user_session.user_id is None:
+        raise HTTPException(400, "MFA requires a user account")
+
+    if not body.secret or not body.code:
+        raise HTTPException(400, "secret and code are required")
+
+    totp = pyotp.TOTP(body.secret)
+    if not totp.verify(body.code.strip(), valid_window=1):
+        raise HTTPException(400, "Invalid TOTP code — check your authenticator app and try again")
+
+    from app.models.run import User
+    user = (await session.exec(select(User).where(User.id == user_session.user_id))).first()
+    if user is None:
+        raise HTTPException(404, "User not found")
+
+    user.totp_secret = body.secret
+    user.mfa_enabled = True
+    session.add(user)
+    await session.commit()
+    return {"mfa_enabled": True}
+
+
+class _MfaDisableRequest(BaseModel):
+    code: str     # current TOTP code to confirm identity before disabling
+
+
+@router.post("/mfa/disable", status_code=200)
+async def mfa_disable(
+    body: _MfaDisableRequest,
+    request: Request,
+    session=Depends(get_session),
+    _csrf: None = Depends(require_csrf),
+):
+    """Disable MFA after verifying the current TOTP code."""
+    import pyotp
+
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    result = await _resolve_session(token, session)
+    if result is None:
+        raise HTTPException(401, "Session expired or invalid")
+    user_session, _ = result
+    if user_session.user_id is None:
+        raise HTTPException(400, "MFA requires a user account")
+
+    from app.models.run import User
+    user = (await session.exec(select(User).where(User.id == user_session.user_id))).first()
+    if user is None:
+        raise HTTPException(404, "User not found")
+    if not user.mfa_enabled or not user.totp_secret:
+        return {"mfa_enabled": False, "message": "MFA was not enabled"}
+
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(body.code.strip(), valid_window=1):
+        raise HTTPException(400, "Invalid TOTP code")
+
+    user.totp_secret = None
+    user.mfa_enabled = False
+    session.add(user)
+    await session.commit()
+    return {"mfa_enabled": False}
+
+
+class _MfaChallengeRequest(BaseModel):
+    mfa_token: str   # short-lived token from POST /auth/login when mfa_required=true
+    code: str        # 6-digit TOTP code
+
+
+@router.post("/mfa/challenge")
+async def mfa_challenge(
+    body: _MfaChallengeRequest,
+    response: Response,
+    session=Depends(get_session),
+):
+    """Complete the MFA challenge after a login that returned mfa_required=true.
+
+    Validates the TOTP code and issues a full session cookie on success.
+    """
+    import pyotp
+    from app.core.csrf import generate as _csrf_gen, set_cookie as _csrf_set
+    from app.models.run import User, ApiKey
+
+    user_id = _verify_mfa_token(body.mfa_token)
+    if user_id is None:
+        raise HTTPException(401, "MFA token is invalid or expired — please log in again")
+
+    user = (await session.exec(select(User).where(User.id == user_id))).first()
+    if user is None or not user.mfa_enabled or not user.totp_secret:
+        raise HTTPException(400, "MFA is not configured for this account")
+
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(body.code.strip(), valid_window=1):
+        raise HTTPException(400, "Invalid TOTP code")
+
+    api_key = (await session.exec(
+        select(ApiKey).where(
+            ApiKey.user_id == user.id,
+            ApiKey.revoked_at == None,  # noqa: E711
+        )
+    )).first()
+    if api_key is None:
+        raise HTTPException(401, "No active API key found for this account")
+
+    token = await _create_session(user.id, api_key.id, session)
+    csrf_token = _csrf_gen()
+    _set_session_cookie(response, token)
+    _csrf_set(response, csrf_token, secure=_is_secure())
+    return {
+        "email": user.email,
+        "workspace_id": api_key.workspace_id,
+        "role": api_key.role,
+        "email_verified": user.email_verified_at is not None,
+    }
 
 
 @router.post("/accept-invite", status_code=200)

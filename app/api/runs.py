@@ -420,3 +420,141 @@ async def events(
         raise RunNotFoundError(run_id)
     _assert_run_access(run, ctx)
     return await get_run_events(session, run_id)
+
+
+class _ReplayRequest(BaseModel):
+    model: Optional[str] = None          # override model; defaults to original
+    goal: Optional[str] = None           # override goal description
+    conditions: Optional[list[str]] = None  # override conditions list
+
+
+@router.post(
+    "/{run_id}/replay",
+    status_code=202,
+    dependencies=[Depends(require_role("admin", "write"))],
+)
+async def replay(
+    run_id: str,
+    body: _ReplayRequest,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Re-run a completed engine run with optional parameter overrides.
+
+    Loads goal, model, conditions, and output_dir from the original run's state.
+    The new run starts fresh (no resume) so artifacts are regenerated from scratch.
+    Returns the new run_id immediately; the run executes in the background.
+    """
+    run = await get_run(session, run_id)
+    if not run:
+        raise RunNotFoundError(run_id)
+    _assert_run_access(run, ctx)
+
+    if run.team != "engine":
+        raise HTTPException(400, "Replay is only supported for engine runs")
+
+    state = run.state or {}
+    if not state.get("goal"):
+        raise HTTPException(422, "Original run has no goal metadata — cannot replay")
+
+    from pathlib import Path as _Path
+    from app.services.engine_runner import dispatch_engine
+
+    orig_output_dir = state.get("output_dir")
+    new_run_id = await dispatch_engine(
+        goal=body.goal or state["goal"],
+        model=body.model or "claude",
+        conditions=body.conditions or state.get("conditions_expected") or [],
+        full=True,
+        output_dir=_Path(orig_output_dir).parent / uuid.uuid4().hex if orig_output_dir else None,
+        workspace_id=run.workspace_id,
+        created_by=ctx.created_by,
+    )
+    return {"run_id": new_run_id, "replayed_from": run_id}
+
+
+@router.get("/compare-artifacts")
+async def compare_artifacts(
+    run_a: str = Query(..., description="First run_id"),
+    run_b: str = Query(..., description="Second run_id"),
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Return a file-level diff between artifacts of two engine runs.
+
+    For each file present in either run, returns: status (added/removed/changed/unchanged),
+    lines_added, lines_removed. File content is NOT returned — only statistics.
+    Supports MemoryStore runs (state.code_artifacts) and FilesystemStore runs (output_dir).
+    """
+    import difflib
+
+    run_a_obj = await get_run(session, run_a)
+    run_b_obj = await get_run(session, run_b)
+    if not run_a_obj:
+        raise RunNotFoundError(run_a)
+    if not run_b_obj:
+        raise RunNotFoundError(run_b)
+    _assert_run_access(run_a_obj, ctx)
+    _assert_run_access(run_b_obj, ctx)
+
+    def _collect_artifacts(run: "Run") -> dict[str, str]:
+        """Return {file_path: content} for all artifacts in a run."""
+        result: dict[str, str] = {}
+        out_dir = _engine_output_dir(run)
+        if out_dir and out_dir.exists():
+            for p in sorted(out_dir.rglob("*")):
+                if p.is_file() and not any(part in _ENGINE_SKIP_DIRS for part in p.parts):
+                    try:
+                        result[str(p.relative_to(out_dir))] = p.read_text(encoding="utf-8", errors="replace")
+                    except OSError:
+                        pass
+        elif run.state:
+            s = run.state
+            for key in ("code_artifacts", "test_artifacts", "doc_artifacts"):
+                for art in s.get(key) or []:
+                    fp = art.get("file_path", "")
+                    if fp:
+                        result[fp] = art.get("content", "")
+        return result
+
+    arts_a = _collect_artifacts(run_a_obj)
+    arts_b = _collect_artifacts(run_b_obj)
+    all_paths = sorted(set(arts_a) | set(arts_b))
+
+    diff_entries = []
+    for path in all_paths:
+        if path in arts_a and path not in arts_b:
+            status = "removed"
+            lines_added = lines_removed = 0
+        elif path not in arts_a and path in arts_b:
+            status = "added"
+            lines_added = len(arts_b[path].splitlines())
+            lines_removed = 0
+        else:
+            lines_a = arts_a[path].splitlines(keepends=True)
+            lines_b = arts_b[path].splitlines(keepends=True)
+            if lines_a == lines_b:
+                status = "unchanged"
+                lines_added = lines_removed = 0
+            else:
+                status = "changed"
+                opcodes = difflib.SequenceMatcher(None, lines_a, lines_b).get_opcodes()
+                lines_added = sum(j2 - j1 for tag, _, _, j1, j2 in opcodes if tag in ("insert", "replace"))
+                lines_removed = sum(i2 - i1 for tag, i1, i2, _, _ in opcodes if tag in ("delete", "replace"))
+        diff_entries.append({
+            "file_path": path,
+            "status": status,
+            "lines_added": lines_added,
+            "lines_removed": lines_removed,
+        })
+
+    changed = sum(1 for e in diff_entries if e["status"] == "changed")
+    added = sum(1 for e in diff_entries if e["status"] == "added")
+    removed = sum(1 for e in diff_entries if e["status"] == "removed")
+    return {
+        "run_a": run_a,
+        "run_b": run_b,
+        "summary": {"changed": changed, "added": added, "removed": removed,
+                    "unchanged": len(diff_entries) - changed - added - removed},
+        "files": diff_entries,
+    }

@@ -184,6 +184,73 @@ async def trigger_audit(
     return {"run_id": run.id, "cycle_id": run.cycle_id, "status": "pending"}
 
 
+class _QuickAuditRequest(BaseModel):
+    github_repo: str               # "owner/repo"
+    github_token: str              # personal access token or fine-grained PAT
+    github_branch: str = "main"
+    max_cost_usd: float = 5.0      # lower default for a trial run
+
+
+@router.post("/quick-audit", status_code=202, dependencies=[Depends(require_role("admin", "write"))])
+async def quick_audit(
+    body: _QuickAuditRequest,
+    background_tasks: BackgroundTasks,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    """One-click security audit for onboarding — no prior config required.
+
+    Accepts a GitHub repo URL + token directly and fires a single-iteration audit.
+    Upserts a SecurityAuditConfig for the workspace so subsequent /runs/trigger
+    calls work without repeating the repo URL.
+    """
+    # Upsert config with the provided repo URL
+    cfg = (await session.exec(
+        select(SecurityAuditConfig).where(SecurityAuditConfig.workspace_id == ctx.workspace_id)
+    )).first()
+    if cfg is None:
+        cfg = SecurityAuditConfig(
+            workspace_id=ctx.workspace_id,
+            enabled=True,
+            github_repo=body.github_repo,
+            github_branch=body.github_branch,
+            max_iterations=1,
+            max_cost_usd=body.max_cost_usd,
+        )
+    else:
+        cfg.github_repo = body.github_repo
+        cfg.github_branch = body.github_branch
+        cfg.max_cost_usd = body.max_cost_usd
+        cfg.updated_at = _utcnow()
+    session.add(cfg)
+    await session.flush()
+
+    run = await _create_run(
+        workspace_id=ctx.workspace_id,
+        cycle_id=str(uuid.uuid4()),
+        iteration=1,
+        triggered_by="quick_audit",
+        commit_sha=None,
+        scope="full",
+        session=session,
+    )
+    await session.commit()
+
+    background_tasks.add_task(
+        _run_audit_task,
+        run_id=run.id,
+        cfg_id=cfg.id,
+        github_token=body.github_token,
+    )
+    return {
+        "run_id": run.id,
+        "cycle_id": run.cycle_id,
+        "status": "pending",
+        "github_repo": body.github_repo,
+        "message": "Quick audit started. Poll /security/runs/{run_id} for status and findings.",
+    }
+
+
 @router.get("/runs")
 async def list_runs(
     ctx: WorkspaceContext = Depends(get_workspace_context),

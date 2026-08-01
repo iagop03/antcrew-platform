@@ -640,6 +640,29 @@ async def dispatch_engine(
         _store = None
         _satisfied: list[str] = []
         _expected: list[str] = []
+
+        # Track cumulative cost/capability count for real-time pipeline.cost_update events.
+        _caps_done: list[int] = [0]
+        _cost_so_far: list[float] = [0.0]
+
+        def _on_agent_end(ev: BusEvent) -> None:
+            if ev.run_id != run_id:
+                return
+            _caps_done[0] += 1
+            payload = ev.payload or {}
+            _cost_so_far[0] += float(payload.get("cost_usd", 0.0))
+            bus.emit(BusEvent(
+                "pipeline.cost_update",
+                {
+                    "run_id": run_id,
+                    "capabilities_completed": _caps_done[0],
+                    "cost_usd_so_far": round(_cost_so_far[0], 6),
+                },
+                run_id=run_id,
+                thread_id="default",
+            ))
+
+        bus.subscribe("agent.end", _on_agent_end)
         try:
             fn = functools.partial(
                 _run_engine_sync,
@@ -654,6 +677,7 @@ async def dispatch_engine(
         except Exception as exc:
             log.error("engine runner: background task for %s raised: %s", run_id, exc)
         finally:
+            bus.unsubscribe("agent.end", _on_agent_end)
             _cancel_events.pop(run_id, None)
             bus.emit(BusEvent(
                 "pipeline.end",

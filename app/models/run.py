@@ -378,6 +378,8 @@ class User(SQLModel, table=True):
     password_hash: str
     display_name: Optional[str] = Field(default=None)
     email_verified_at: Optional[datetime] = Field(default=None)
+    totp_secret: Optional[str] = Field(default=None)   # base32 TOTP secret; NULL = MFA disabled
+    mfa_enabled: bool = Field(default=False)
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -528,6 +530,27 @@ class WorkspaceJoinRequest(SQLModel, table=True):
     status: str = Field(default="pending")          # pending | approved | rejected
     created_at: datetime = Field(default_factory=_utcnow)
     resolved_at: Optional[datetime] = Field(default=None)
+
+
+class RunSchedule(SQLModel, table=True):
+    """Recurring engine run — fires on a cron expression, scoped to a workspace."""
+
+    __tablename__ = "run_schedule"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(index=True)
+    name: str
+    goal: str
+    model: str = Field(default="claude")
+    conditions: Optional[str] = Field(default=None)   # JSON list, NULL = full default set
+    full: bool = Field(default=True)
+    max_cost_usd: Optional[float] = Field(default=None)
+    cron_expr: str                                     # e.g. "0 8 * * 1" (Mon 08:00 UTC)
+    enabled: bool = Field(default=True)
+    next_run_at: datetime = Field(default_factory=_utcnow)
+    last_run_id: Optional[str] = Field(default=None)
+    created_by: Optional[str] = Field(default=None)   # API key label
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class AuditFinding(SQLModel, table=True):
