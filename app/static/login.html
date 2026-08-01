@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Iniciar sesiÃ³n â€” antcrew</title>
-<link href="/static/tailwind.css" rel="stylesheet">
+<title>Iniciar sesión — antcrew</title>
+<link rel="stylesheet" href="/static/tailwind.css">
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <style>[x-cloak]{display:none}</style>
 </head>
@@ -19,10 +19,10 @@
     <p class="text-gray-500 text-sm mt-1">AI pipeline platform</p>
   </div>
 
-  <!-- â”€â”€ STATE: login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+  <!-- ── STATE: login ─────────────────────────────────────────────────── -->
   <div x-show="state === 'login'" x-cloak>
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8">
-      <h2 class="text-lg font-semibold mb-6">Inicia sesiÃ³n</h2>
+      <h2 class="text-lg font-semibold mb-6">Inicia sesión</h2>
 
       <div class="space-y-4">
         <div>
@@ -32,8 +32,8 @@
             class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
         </div>
         <div>
-          <label class="block text-xs text-gray-400 mb-1.5">ContraseÃ±a</label>
-          <input x-model="password" type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+          <label class="block text-xs text-gray-400 mb-1.5">Contraseña</label>
+          <input x-model="password" type="password" placeholder="••••••••"
             @keydown.enter="doLogin()"
             class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
         </div>
@@ -45,27 +45,27 @@
         :disabled="loginLoading || !email.trim() || !password"
         class="mt-6 w-full py-2.5 rounded-lg font-medium text-sm transition
           bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-        <span x-show="!loginLoading">Iniciar sesiÃ³n â†’</span>
-        <span x-show="loginLoading">Entrandoâ€¦</span>
+        <span x-show="!loginLoading">Iniciar sesión →</span>
+        <span x-show="loginLoading">Entrando…</span>
       </button>
     </div>
 
     <p class="text-center text-xs text-gray-600 mt-5">
-      Â¿No tienes cuenta?
+      ¿No tienes cuenta?
       <a href="/onboard" class="text-indigo-400 hover:text-indigo-300 transition">Crear cuenta</a>
     </p>
   </div>
 
-  <!-- â”€â”€ STATE: verify â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+  <!-- ── STATE: verify ────────────────────────────────────────────────── -->
   <div x-show="state === 'verify'" x-cloak>
     <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8">
       <h2 class="text-lg font-semibold mb-1">Verifica tu email</h2>
       <p class="text-gray-400 text-sm mb-6">
-        Hemos enviado un cÃ³digo de 6 dÃ­gitos a <strong x-text="email"></strong>.
+        Hemos enviado un código de 6 dígitos a <strong x-text="email"></strong>.
       </p>
 
       <div class="mb-4">
-        <label class="block text-xs text-gray-400 mb-1.5">CÃ³digo de verificaciÃ³n</label>
+        <label class="block text-xs text-gray-400 mb-1.5">Código de verificación</label>
         <input x-model="verifyCode" type="text" inputmode="numeric" maxlength="6"
           placeholder="123456"
           @keydown.enter="doVerify()"
@@ -78,15 +78,15 @@
         :disabled="verifyLoading || verifyCode.length !== 6"
         class="w-full py-2.5 rounded-lg font-medium text-sm transition
           bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-        <span x-show="!verifyLoading">Verificar â†’</span>
-        <span x-show="verifyLoading">Verificandoâ€¦</span>
+        <span x-show="!verifyLoading">Verificar →</span>
+        <span x-show="verifyLoading">Verificando…</span>
       </button>
 
       <div class="mt-4 text-center">
         <button @click="resendCode()"
           :disabled="resendCooldown > 0"
           class="text-xs text-gray-500 hover:text-indigo-400 transition disabled:cursor-not-allowed">
-          <span x-show="resendCooldown === 0">Â¿No recibiste el cÃ³digo? Reenviar</span>
+          <span x-show="resendCooldown === 0">¿No recibiste el código? Reenviar</span>
           <span x-show="resendCooldown > 0">Reenviar en <span x-text="resendCooldown"></span>s</span>
         </button>
       </div>
@@ -95,7 +95,7 @@
     <p class="text-center text-xs text-gray-600 mt-5">
       <button @click="state = 'login'; verifyCode = ''; verifyError = ''"
         class="text-gray-500 hover:text-indigo-400 transition">
-        â† Volver al login
+        ← Volver al login
       </button>
     </p>
   </div>
@@ -134,7 +134,7 @@ function loginApp() {
         }
         const data = await r.json();
         if (data.email_verified === false) {
-          // Account exists but email not verified â€” send a fresh code and show verify state
+          // Account exists but email not verified — send a fresh code and show verify state
           await fetch('/auth/resend-code', { method: 'POST', credentials: 'same-origin' });
           this.state = 'verify';
           this._startResendCooldown(60);
@@ -142,7 +142,7 @@ function loginApp() {
         }
         window.location.href = '/dashboard';
       } catch (e) {
-        this.loginError = 'Error de red â€” intÃ©ntalo de nuevo';
+        this.loginError = 'Error de red — inténtalo de nuevo';
       } finally {
         this.loginLoading = false;
       }
@@ -165,7 +165,7 @@ function loginApp() {
         }
         window.location.href = '/dashboard';
       } catch (e) {
-        this.verifyError = 'Error de red â€” intÃ©ntalo de nuevo';
+        this.verifyError = 'Error de red — inténtalo de nuevo';
       } finally {
         this.verifyLoading = false;
       }

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>antcrew Â· Settings</title>
-<link href="/static/tailwind.css" rel="stylesheet">
+<title>antcrew · Settings</title>
+<link rel="stylesheet" href="/static/tailwind.css">
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
@@ -114,7 +114,7 @@
 
 <div class="px-6 py-6 max-w-5xl">
 
-  <!-- â”€â”€ WORKSPACES â”€â”€ -->
+  <!-- ── WORKSPACES ── -->
   <div x-show="tab==='workspaces'">
     <div class="flex items-center justify-between mb-4">
       <span class="text-sm text-gray-400 flex items-center gap-1">
@@ -122,7 +122,7 @@
         <span class="relative inline-flex items-center ml-1">
           <span class="peer/tip inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-800 border border-gray-700 text-gray-500 text-[9px] font-bold cursor-help hover:text-gray-300 hover:border-gray-500 transition-colors select-none leading-none">i</span>
           <span class="pointer-events-none absolute bottom-full left-0 mb-2 w-64 rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-xs text-gray-300 leading-relaxed shadow-xl opacity-0 peer-hover/tip:opacity-100 transition-opacity duration-150 z-50">
-            Un workspace agrupa pipelines y runs bajo un mismo presupuesto y permisos. Puedes tener varios â€” por ejemplo uno por proyecto, cliente o entorno. Cada API key de revisor puede estar limitada a un workspace concreto.
+            Un workspace agrupa pipelines y runs bajo un mismo presupuesto y permisos. Puedes tener varios — por ejemplo uno por proyecto, cliente o entorno. Cada API key de revisor puede estar limitada a un workspace concreto.
           </span>
         </span>
       </span>
@@ -134,7 +134,7 @@
     </div>
 
     <p x-show="wsError" class="text-red-400 text-sm mb-3" x-text="wsError"></p>
-    <div x-show="wsLoading" class="text-gray-600 text-sm py-8 text-center" data-i18n="loading">Loadingâ€¦</div>
+    <div x-show="wsLoading" class="text-gray-600 text-sm py-8 text-center" data-i18n="loading">Loading…</div>
 
     <div x-show="!wsLoading && workspaces.length === 0 && !wsError"
       class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm" data-i18n="ws.none">
@@ -172,12 +172,12 @@
                 <template x-if="!ws.is_trial">
                   <span>
                     <span x-show="ws.max_cost_usd != null" x-text="`$${ws.max_cost_usd?.toFixed(2)}`"></span>
-                    <span x-show="ws.max_cost_usd == null" class="text-gray-700">â€”</span>
+                    <span x-show="ws.max_cost_usd == null" class="text-gray-700">—</span>
                   </span>
                 </template>
               </td>
               <td class="px-4 py-3 text-center text-xs">
-                <span x-show="ws.hitl_default" class="text-indigo-400">SÃ­</span>
+                <span x-show="ws.hitl_default" class="text-indigo-400">Sí</span>
                 <span x-show="!ws.hitl_default" class="text-gray-700">No</span>
               </td>
               <td class="px-4 py-3 text-center">
@@ -208,12 +208,12 @@
     </div>
   </div>
 
-  <!-- â”€â”€ REVISORES â”€â”€ -->
+  <!-- ── REVISORES ── -->
   <div x-show="tab==='reviewers'">
     <!-- New key banner -->
     <div x-show="newKeyValue" x-transition
       class="mb-5 p-4 bg-amber-950/40 border border-amber-700/40 rounded-lg">
-      <p class="text-amber-300 text-sm font-medium mb-2.5">Clave creada â€” cÃ³piala ahora, no se volverÃ¡ a mostrar</p>
+      <p class="text-amber-300 text-sm font-medium mb-2.5">Clave creada — cópiala ahora, no se volverá a mostrar</p>
       <div class="flex items-center gap-2">
         <code class="flex-1 font-mono text-xs bg-gray-900/80 px-3 py-2 rounded border border-gray-700 text-gray-100 break-all select-all"
           x-text="newKeyValue"></code>
@@ -221,7 +221,7 @@
           class="shrink-0 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
           Copiar
         </button>
-        <button @click="newKeyValue=''" class="shrink-0 text-gray-600 hover:text-gray-300 px-1.5 py-1 text-sm">âœ•</button>
+        <button @click="newKeyValue=''" class="shrink-0 text-gray-600 hover:text-gray-300 px-1.5 py-1 text-sm">✕</button>
       </div>
     </div>
 
@@ -231,7 +231,7 @@
         <span class="relative inline-flex items-center ml-1">
           <span class="peer/tip inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-800 border border-gray-700 text-gray-500 text-[9px] font-bold cursor-help hover:text-gray-300 hover:border-gray-500 transition-colors select-none leading-none">i</span>
           <span class="pointer-events-none absolute bottom-full left-0 mb-2 w-64 rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-xs text-gray-300 leading-relaxed shadow-xl opacity-0 peer-hover/tip:opacity-100 transition-opacity duration-150 z-50">
-            Las API keys dan acceso a la plataforma. El rol <span class="font-mono text-amber-300">reviewer</span> solo puede resolver revisiones HITL â€” ideal para colaboradores no tÃ©cnicos que Ãºnicamente aprueban el trabajo. Los roles <span class="font-mono text-blue-300">write</span> y <span class="font-mono text-red-300">admin</span> permiten lanzar runs y gestionar la plataforma.
+            Las API keys dan acceso a la plataforma. El rol <span class="font-mono text-amber-300">reviewer</span> solo puede resolver revisiones HITL — ideal para colaboradores no técnicos que únicamente aprueban el trabajo. Los roles <span class="font-mono text-blue-300">write</span> y <span class="font-mono text-red-300">admin</span> permiten lanzar runs y gestionar la plataforma.
           </span>
         </span>
       </span>
@@ -243,7 +243,7 @@
     </div>
 
     <p x-show="keysError" class="text-red-400 text-sm mb-3" x-text="keysError"></p>
-    <div x-show="keysLoading" class="text-gray-600 text-sm py-8 text-center" data-i18n="loading">Loadingâ€¦</div>
+    <div x-show="keysLoading" class="text-gray-600 text-sm py-8 text-center" data-i18n="loading">Loading…</div>
 
     <div x-show="!keysLoading && keys.length === 0 && !keysError"
       class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm" data-i18n="keys.none">
@@ -268,7 +268,7 @@
               <td class="px-4 py-3 font-mono text-sm">
                 <span x-text="key.label"></span>
                 <template x-if="isMyKey(key)">
-                  <span class="ml-1.5 inline-block px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-indigo-900/60 text-indigo-300">tÃº</span>
+                  <span class="ml-1.5 inline-block px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-indigo-900/60 text-indigo-300">tú</span>
                 </template>
               </td>
               <td class="px-4 py-3">
@@ -279,15 +279,15 @@
               <td class="px-4 py-3 text-xs">
                 <div class="flex flex-col gap-0.5">
                   <span x-show="key.email" class="flex items-center gap-1 text-gray-400">
-                    <span class="text-gray-600">âœ‰</span> <span x-text="key.email"></span>
+                    <span class="text-gray-600">✉</span> <span x-text="key.email"></span>
                   </span>
                   <span x-show="key.slack_user_id" class="flex items-center gap-1 text-gray-400">
                     <span class="text-gray-600">#</span> <span x-text="key.slack_user_id"></span>
                   </span>
                   <span x-show="key.telegram_chat_id" class="flex items-center gap-1 text-gray-400">
-                    <span class="text-gray-600">âœˆ</span> <span x-text="key.telegram_chat_id"></span>
+                    <span class="text-gray-600">✈</span> <span x-text="key.telegram_chat_id"></span>
                   </span>
-                  <span x-show="!key.email && !key.slack_user_id && !key.telegram_chat_id" class="text-gray-800">â€”</span>
+                  <span x-show="!key.email && !key.slack_user_id && !key.telegram_chat_id" class="text-gray-800">—</span>
                 </div>
               </td>
               <td class="px-4 py-3 text-gray-600 text-xs" x-text="fmtDate(key.created_at)"></td>
@@ -315,7 +315,7 @@
     </div>
   </div>
 
-  <!-- â”€â”€ MODO LLM â”€â”€ -->
+  <!-- ── MODO LLM ── -->
   <div x-show="tab==='llm'">
     <div class="flex items-center gap-2 mb-6">
       <span class="text-xs text-gray-600 mr-1">Vista:</span>
@@ -329,7 +329,7 @@
 
     <!-- Matrix view -->
     <div x-show="llmView==='matrix'">
-      <div x-show="matrixLoading" class="text-gray-600 text-sm py-8 text-center">Loadingâ€¦</div>
+      <div x-show="matrixLoading" class="text-gray-600 text-sm py-8 text-center">Loading…</div>
       <div x-show="!matrixLoading && matrixData.length === 0" class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm">
         No hay workspaces. Crea uno primero.
       </div>
@@ -359,23 +359,23 @@
                 </td>
                 <td class="px-4 py-2 text-gray-500" x-text="row.provider"></td>
                 <td class="px-4 py-2 text-center">
-                  <span x-show="row.mode==='managed'" class="text-indigo-400 text-base">â—</span>
-                  <span x-show="row.mode==='managed*'" class="text-indigo-300 text-base" title="Fallback managed (sin clave BYOK)">â—</span>
-                  <span x-show="row.mode!=='managed' && row.mode!=='managed*'" class="text-gray-800">â—‹</span>
+                  <span x-show="row.mode==='managed'" class="text-indigo-400 text-base">●</span>
+                  <span x-show="row.mode==='managed*'" class="text-indigo-300 text-base" title="Fallback managed (sin clave BYOK)">◐</span>
+                  <span x-show="row.mode!=='managed' && row.mode!=='managed*'" class="text-gray-800">○</span>
                 </td>
                 <td class="px-4 py-2 text-center">
-                  <span x-show="row.mode==='byok'" class="text-emerald-400 text-base">â—</span>
-                  <span x-show="row.mode!=='byok'" class="text-gray-800">â—‹</span>
+                  <span x-show="row.mode==='byok'" class="text-emerald-400 text-base">●</span>
+                  <span x-show="row.mode!=='byok'" class="text-gray-800">○</span>
                 </td>
                 <td class="px-4 py-2 text-center">
-                  <span x-show="row.mode==='proxy'" class="text-violet-400 text-base">â—</span>
-                  <span x-show="row.mode!=='proxy'" class="text-gray-800">â—‹</span>
+                  <span x-show="row.mode==='proxy'" class="text-violet-400 text-base">●</span>
+                  <span x-show="row.mode!=='proxy'" class="text-gray-800">○</span>
                 </td>
               </tr>
             </template>
           </tbody>
         </table>
-        <p class="px-4 py-2 text-xs text-gray-700">â— = fallback a managed (sin clave BYOK para ese proveedor)</p>
+        <p class="px-4 py-2 text-xs text-gray-700">◐ = fallback a managed (sin clave BYOK para ese proveedor)</p>
       </div>
     </div>
 
@@ -383,30 +383,30 @@
       <label class="block text-sm text-gray-400 mb-2">Workspace</label>
       <select x-model="llmWsId" @change="selectLlmWs()"
         class="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 w-72">
-        <option value="">â€” selecciona un workspace â€”</option>
+        <option value="">— selecciona un workspace —</option>
         <template x-for="ws in workspaces" :key="ws.id">
           <option :value="ws.id" x-text="`${ws.name} (${ws.slug})`"></option>
         </template>
       </select>
     </div>
 
-    <div x-show="llmView==='detail' && !llmWsId" class="text-gray-700 text-sm">Selecciona un workspace para ver su configuraciÃ³n.</div>
+    <div x-show="llmView==='detail' && !llmWsId" class="text-gray-700 text-sm">Selecciona un workspace para ver su configuración.</div>
 
     <div x-show="llmView==='detail' && !!llmWsId">
       <p x-show="llmError" class="text-red-400 text-sm mb-4" x-text="llmError"></p>
-      <div x-show="llmLoading" class="text-gray-600 text-sm" data-i18n="loading">Loadingâ€¦</div>
+      <div x-show="llmLoading" class="text-gray-600 text-sm" data-i18n="loading">Loading…</div>
 
       <div x-show="!llmLoading" class="flex flex-col gap-5">
         <!-- Mode selector -->
         <div class="p-4 bg-gray-900 border border-gray-800 rounded-lg">
-          <p class="text-xs text-gray-600 uppercase tracking-wider mb-3">Modo de facturaciÃ³n LLM</p>
+          <p class="text-xs text-gray-600 uppercase tracking-wider mb-3">Modo de facturación LLM</p>
           <div class="flex items-center gap-2 flex-wrap">
             <button @click="setLlmMode('managed')"
               :class="llmMode==='managed'
                 ? 'bg-indigo-600 text-white border-transparent'
                 : 'bg-transparent text-gray-400 border-gray-700 hover:text-gray-200 hover:border-gray-500'"
               class="px-4 py-1.5 rounded border text-sm transition-colors">
-              Managed <span class="text-xs opacity-70">Ã—3.0</span>
+              Managed <span class="text-xs opacity-70">×3.0</span>
             </button>
             <button @click="setLlmMode('byok')"
               :class="llmMode==='byok'
@@ -414,8 +414,8 @@
                 : 'bg-transparent text-gray-400 border-gray-700 hover:text-gray-200 hover:border-gray-500'"
               class="px-4 py-1.5 rounded border text-sm transition-colors"
               :disabled="llmKeys.length === 0"
-              :title="llmKeys.length === 0 ? 'AÃ±ade al menos una clave antes de activar BYOK' : ''">
-              BYOK <span class="text-xs opacity-70">Ã—0.4</span>
+              :title="llmKeys.length === 0 ? 'Añade al menos una clave antes de activar BYOK' : ''">
+              BYOK <span class="text-xs opacity-70">×0.4</span>
             </button>
             <button @click="activateProxy()"
               :class="llmMode==='proxy'
@@ -424,12 +424,12 @@
               class="px-4 py-1.5 rounded border text-sm transition-colors"
               :disabled="!proxyConfigured"
               :title="!proxyConfigured ? 'Genera un token proxy antes de activar este modo' : ''">
-              Proxy <span class="text-xs opacity-70">Ã—0.7</span>
+              Proxy <span class="text-xs opacity-70">×0.7</span>
             </button>
           </div>
-          <p x-show="llmMode==='byok'" class="text-emerald-500 text-xs mt-2.5">Usando tus claves â€” multiplicador Ã—0.4 activo</p>
-          <p x-show="llmMode==='managed'" class="text-gray-600 text-xs mt-2.5">Usando claves de la plataforma â€” multiplicador Ã—3.0</p>
-          <p x-show="llmMode==='proxy'" class="text-violet-400 text-xs mt-2.5">Modo proxy activo â€” la plataforma nunca ve tu clave Anthropic Â· multiplicador Ã—0.7</p>
+          <p x-show="llmMode==='byok'" class="text-emerald-500 text-xs mt-2.5">Usando tus claves — multiplicador ×0.4 activo</p>
+          <p x-show="llmMode==='managed'" class="text-gray-600 text-xs mt-2.5">Usando claves de la plataforma — multiplicador ×3.0</p>
+          <p x-show="llmMode==='proxy'" class="text-violet-400 text-xs mt-2.5">Modo proxy activo — la plataforma nunca ve tu clave Anthropic · multiplicador ×0.7</p>
 
           <!-- Per-model managed fallback (only relevant for byok / proxy) -->
           <div x-show="llmMode !== 'managed'" x-cloak class="mt-4 pt-4 border-t border-gray-800">
@@ -438,7 +438,7 @@
                 class="mt-0.5 w-4 h-4 rounded border-gray-600 bg-gray-800 accent-indigo-500 shrink-0">
               <div>
                 <p class="text-sm text-gray-200 select-none">Usar claves de la plataforma como respaldo</p>
-                <p class="text-xs text-gray-500 mt-0.5">Si un modelo no tiene clave configurada, antcrew usa su propia clave (Ã—3.0 solo para esos modelos).</p>
+                <p class="text-xs text-gray-500 mt-0.5">Si un modelo no tiene clave configurada, antcrew usa su propia clave (×3.0 solo para esos modelos).</p>
               </div>
             </label>
           </div>
@@ -449,7 +449,7 @@
           <p class="text-xs text-gray-600 uppercase tracking-wider mb-3">Proxy local (opcional)</p>
           <p class="text-xs text-gray-500 mb-4 leading-relaxed">
             Ejecuta <code class="bg-gray-800 px-1 rounded text-gray-300">antcrew-proxy</code> en tu infraestructura.
-            La plataforma envÃ­a llamadas LLM a tu proxy; el proxy sustituye con tu clave real de Anthropic.
+            La plataforma envía llamadas LLM a tu proxy; el proxy sustituye con tu clave real de Anthropic.
             La plataforma nunca recibe tu API key.
           </p>
 
@@ -482,7 +482,7 @@
           </div>
 
           <div x-show="proxyToken" class="mt-4 p-3 bg-gray-800 border border-violet-700/40 rounded-lg space-y-3">
-            <p class="text-xs text-violet-400 font-medium">Token generado â€” cÃ³pialo ahora, no se volverÃ¡ a mostrar</p>
+            <p class="text-xs text-violet-400 font-medium">Token generado — cópialo ahora, no se volverá a mostrar</p>
             <div class="flex items-start gap-2">
               <code class="text-xs text-gray-300 break-all flex-1 font-mono" x-text="proxyToken"></code>
               <button @click="copyProxyToken()" class="shrink-0 text-xs text-gray-500 hover:text-white px-2 py-1 rounded hover:bg-gray-700 transition-colors">Copiar</button>
@@ -492,7 +492,7 @@
                 <p class="text-xs text-gray-500 uppercase tracking-wider">Comando Docker</p>
                 <div class="flex items-center gap-2">
                   <button @click="copyDockerCmd()" class="text-xs text-gray-500 hover:text-white px-2 py-1 rounded hover:bg-gray-700 transition-colors">Copiar cmd</button>
-                  <button @click="downloadEnv()" class="text-xs text-violet-400 hover:text-violet-300 px-2 py-1 rounded border border-violet-700/50 hover:bg-violet-900/20 transition-colors">â†“ Descargar .env</button>
+                  <button @click="downloadEnv()" class="text-xs text-violet-400 hover:text-violet-300 px-2 py-1 rounded border border-violet-700/50 hover:bg-violet-900/20 transition-colors">↓ Descargar .env</button>
                 </div>
               </div>
               <pre class="text-xs text-gray-300 bg-gray-900 rounded-md p-3 whitespace-pre-wrap break-all font-mono leading-relaxed" x-text="proxyDockerCmd"></pre>
@@ -535,7 +535,7 @@
     </div>
   </div>
 
-  <!-- â”€â”€ SCHEDULES â”€â”€ -->
+  <!-- ── SCHEDULES ── -->
   <div x-show="tab==='schedules'">
     <div class="flex items-center justify-between mb-4">
       <span class="text-sm text-gray-400">Recurring engine runs triggered by a cron expression</span>
@@ -547,7 +547,7 @@
     </div>
 
     <p x-show="schedulesError" class="text-red-400 text-sm mb-3" x-text="schedulesError"></p>
-    <div x-show="schedulesLoading" class="text-gray-600 text-sm py-8 text-center">Loadingâ€¦</div>
+    <div x-show="schedulesLoading" class="text-gray-600 text-sm py-8 text-center">Loading…</div>
 
     <div x-show="!schedulesLoading && schedules.length === 0 && !schedulesError"
       class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm">
@@ -569,17 +569,17 @@
               <p class="text-xs text-gray-500 truncate" x-text="s.goal"></p>
               <div class="flex items-center gap-3 mt-2 text-xs text-gray-600" style="font-variant-numeric:tabular-nums">
                 <span class="font-mono" x-text="s.cron_expr"></span>
-                <span>Â·</span>
+                <span>·</span>
                 <span x-text="s.model"></span>
                 <template x-if="s.max_cost_usd != null">
-                  <span>Â· max $<span x-text="s.max_cost_usd.toFixed(2)"></span></span>
+                  <span>· max $<span x-text="s.max_cost_usd.toFixed(2)"></span></span>
                 </template>
-                <span>Â·</span>
+                <span>·</span>
                 <span>next <span x-text="fmtDateShort(s.next_run_at)"></span></span>
               </div>
               <div x-show="s.last_run_id" class="mt-1">
                 <a :href="'/run/' + s.last_run_id" class="text-xs text-indigo-400 hover:text-indigo-300">
-                  last run â†—
+                  last run ↗
                 </a>
               </div>
             </div>
@@ -627,11 +627,11 @@
             <label class="block text-xs text-gray-500 mb-1">Cron expression</label>
             <input x-model="createScheduleForm.cron_expr" type="text" placeholder="0 2 * * *"
               class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
-            <p class="text-xs text-gray-700 mt-0.5">UTC â€” <a href="https://crontab.guru" target="_blank" class="text-indigo-500 hover:underline">crontab.guru</a></p>
+            <p class="text-xs text-gray-700 mt-0.5">UTC — <a href="https://crontab.guru" target="_blank" class="text-indigo-500 hover:underline">crontab.guru</a></p>
           </div>
           <div>
             <label class="block text-xs text-gray-500 mb-1">Max cost (USD, optional)</label>
-            <input x-model="createScheduleForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="â€”"
+            <input x-model="createScheduleForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="—"
               class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
           </div>
         </div>
@@ -649,7 +649,7 @@
     </div>
   </div>
 
-  <!-- â”€â”€ SECURITY â”€â”€ -->
+  <!-- ── SECURITY ── -->
   <div x-show="tab==='security'" class="max-w-xl">
     <div class="mb-5">
       <h2 class="text-base font-semibold mb-1">Quick Security Audit</h2>
@@ -664,7 +664,7 @@
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">GitHub Token (PAT)</label>
-        <input x-model="auditForm.github_token" type="password" placeholder="ghp_â€¦"
+        <input x-model="auditForm.github_token" type="password" placeholder="ghp_…"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 font-mono" />
         <p class="text-xs text-gray-600 mt-1">Needs <code class="text-gray-500">repo:read</code> scope. Never stored.</p>
       </div>
@@ -699,12 +699,12 @@
         :disabled="auditLoading || !auditForm.github_repo.trim() || !auditForm.github_token.trim()"
         class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 rounded-lg transition">
         <span x-show="!auditLoading">Run Quick Audit</span>
-        <span x-show="auditLoading" x-cloak>Launching auditâ€¦</span>
+        <span x-show="auditLoading" x-cloak>Launching audit…</span>
       </button>
     </div>
   </div>
 
-  <!-- â”€â”€ PERFIL â”€â”€ -->
+  <!-- ── PERFIL ── -->
   <div x-show="tab==='profile'" class="max-w-md">
     <p x-show="profileMsg" class="mb-4 text-sm px-3 py-2 rounded-lg"
       :class="profileError ? 'bg-red-950/50 text-red-300 border border-red-800/50' : 'bg-green-950/50 text-green-300 border border-green-800/50'"
@@ -737,12 +737,12 @@
       <div class="flex flex-col gap-4">
         <div>
           <label class="block text-xs text-gray-500 mb-1.5" data-i18n="prof.current">Current password</label>
-          <input x-model="pwForm.current" type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+          <input x-model="pwForm.current" type="password" placeholder="••••••••"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <div>
           <label class="block text-xs text-gray-500 mb-1.5" data-i18n="prof.new">New password</label>
-          <input x-model="pwForm.newPw" type="password" placeholder="MÃ­nimo 8 caracteres"
+          <input x-model="pwForm.newPw" type="password" placeholder="Mínimo 8 caracteres"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <div class="flex justify-end">
@@ -779,7 +779,7 @@
           <code class="block bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-xs font-mono text-gray-200 tracking-widest select-all" x-text="mfaSetup.secret"></code>
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Verify â€” enter the 6-digit code</label>
+          <label class="block text-xs text-gray-500 mb-1">Verify — enter the 6-digit code</label>
           <div class="flex gap-2">
             <input x-model="mfaCode" type="text" inputmode="numeric" maxlength="6" placeholder="000000"
               @keydown.enter="enableMfa()"
@@ -832,7 +832,7 @@
 </div><!-- /content -->
 
 
-<!-- â•â• MODALS â•â• -->
+<!-- ══ MODALS ══ -->
 
 <!-- Shared backdrop -->
 <template x-teleport="body">
@@ -862,37 +862,37 @@
             <span class="relative inline-flex items-center">
               <span class="peer/tip inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-800 border border-gray-700 text-gray-500 text-[9px] font-bold cursor-help hover:text-gray-300 hover:border-gray-500 transition-colors select-none leading-none">i</span>
               <span class="pointer-events-none absolute bottom-full left-0 mb-2 w-64 rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-xs text-gray-300 leading-relaxed shadow-xl opacity-0 peer-hover/tip:opacity-100 transition-opacity duration-150 z-50">
-                Identificador URL-friendly de este workspace. Se usa en la API y como referencia interna. Se genera automÃ¡ticamente desde el nombre â€” puedes editarlo. Solo letras minÃºsculas, nÃºmeros y guiones (ej: <span class="font-mono text-indigo-300">mi-proyecto</span>).
+                Identificador URL-friendly de este workspace. Se usa en la API y como referencia interna. Se genera automáticamente desde el nombre — puedes editarlo. Solo letras minúsculas, números y guiones (ej: <span class="font-mono text-indigo-300">mi-proyecto</span>).
               </span>
             </span>
           </label>
           <input x-model="createWsForm.slug" type="text" placeholder="mi-proyecto"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
-          <p class="text-xs text-gray-600 mt-1">Solo minÃºsculas, nÃºmeros y guiones</p>
+          <p class="text-xs text-gray-600 mt-1">Solo minúsculas, números y guiones</p>
         </div>
         <div>
           <label class="flex items-center gap-1 text-xs text-gray-500 mb-1.5">
-            Presupuesto mÃ¡ximo en USD
-            <span class="text-gray-700">â€” opcional</span>
+            Presupuesto máximo en USD
+            <span class="text-gray-700">— opcional</span>
             <span class="relative inline-flex items-center">
               <span class="peer/tip inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-800 border border-gray-700 text-gray-500 text-[9px] font-bold cursor-help hover:text-gray-300 hover:border-gray-500 transition-colors select-none leading-none">i</span>
               <span class="pointer-events-none absolute bottom-full left-0 mb-2 w-64 rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-xs text-gray-300 leading-relaxed shadow-xl opacity-0 peer-hover/tip:opacity-100 transition-opacity duration-150 z-50">
-                LÃ­mite de gasto acumulado en llamadas LLM. Cuando se alcanza, los nuevos runs de este workspace son rechazados automÃ¡ticamente. DÃ©jalo vacÃ­o para no tener lÃ­mite.
+                Límite de gasto acumulado en llamadas LLM. Cuando se alcanza, los nuevos runs de este workspace son rechazados automáticamente. Déjalo vacío para no tener límite.
               </span>
             </span>
           </label>
-          <input x-model="createWsForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="Sin lÃ­mite"
+          <input x-model="createWsForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="Sin límite"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <label class="flex items-center gap-2.5 text-sm cursor-pointer">
           <input type="checkbox" x-model="createWsForm.hitl_default"
             class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
           <span class="text-gray-300 flex items-center gap-1">
-            Activar revisiÃ³n humana (HITL) por defecto
+            Activar revisión humana (HITL) por defecto
             <span class="relative inline-flex items-center">
               <span class="peer/tip inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-gray-800 border border-gray-700 text-gray-500 text-[9px] font-bold cursor-help hover:text-gray-300 hover:border-gray-500 transition-colors select-none leading-none">i</span>
               <span class="pointer-events-none absolute bottom-full left-0 mb-2 w-64 rounded-lg bg-gray-900 border border-gray-700 px-3 py-2 text-xs text-gray-300 leading-relaxed shadow-xl opacity-0 peer-hover/tip:opacity-100 transition-opacity duration-150 z-50">
-                Human-in-the-Loop. Con esta opciÃ³n activa, los pipelines pausarÃ¡n en cada checkpoint para que un revisor humano apruebe o corrija el trabajo de los agentes antes de continuar.
+                Human-in-the-Loop. Con esta opción activa, los pipelines pausarán en cada checkpoint para que un revisor humano apruebe o corrija el trabajo de los agentes antes de continuar.
               </span>
             </span>
           </span>
@@ -920,19 +920,19 @@
       <p class="font-mono text-xs text-gray-600 mb-5" x-text="editingWs?.slug"></p>
       <div class="flex flex-col gap-4">
         <div>
-          <label class="block text-xs text-gray-500 mb-1.5">Presupuesto mÃ¡ximo en USD <span class="text-gray-700">â€” vacÃ­o = sin lÃ­mite</span></label>
-          <input x-model="editWsForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="Sin lÃ­mite"
+          <label class="block text-xs text-gray-500 mb-1.5">Presupuesto máximo en USD <span class="text-gray-700">— vacío = sin límite</span></label>
+          <input x-model="editWsForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="Sin límite"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1.5">Repositorio por defecto <span class="text-gray-700">â€” opcional</span></label>
+          <label class="block text-xs text-gray-500 mb-1.5">Repositorio por defecto <span class="text-gray-700">— opcional</span></label>
           <input x-model="editWsForm.default_repo_url" type="url" placeholder="https://github.com/org/repo"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
         <label class="flex items-center gap-2.5 text-sm cursor-pointer">
           <input type="checkbox" x-model="editWsForm.hitl_default"
             class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
-          <span class="text-gray-300">RevisiÃ³n humana (HITL) por defecto</span>
+          <span class="text-gray-300">Revisión humana (HITL) por defecto</span>
         </label>
         <template x-if="editingWs?.is_trial">
           <div class="border-t border-gray-800 pt-4 space-y-3">
@@ -942,14 +942,14 @@
                 x-text="`$${Math.max(0, (editingWs.max_cost_usd ?? 0) - (editingWs.total_cost_usd ?? 0)).toFixed(2)} restantes`"></span>
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1.5">AÃ±adir crÃ©dito (USD)</label>
+              <label class="block text-xs text-gray-500 mb-1.5">Añadir crédito (USD)</label>
               <input x-model="editWsForm.add_credit" type="number" step="0.01" min="0" placeholder="0.00"
                 class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
             </div>
             <label class="flex items-center gap-2.5 text-sm cursor-pointer">
               <input type="checkbox" x-model="editWsForm.exit_trial"
                 class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
-              <span class="text-gray-300">Salir del modo trial <span class="text-gray-600 text-xs">(activa facturaciÃ³n normal)</span></span>
+              <span class="text-gray-300">Salir del modo trial <span class="text-gray-600 text-xs">(activa facturación normal)</span></span>
             </label>
           </div>
         </template>
@@ -975,7 +975,7 @@
       <h3 class="text-base font-semibold mb-5">Nueva API key</h3>
       <div class="flex flex-col gap-4">
         <div>
-          <label class="block text-xs text-gray-500 mb-1.5">Label <span class="text-gray-700">â€” identificador Ãºnico</span></label>
+          <label class="block text-xs text-gray-500 mb-1.5">Label <span class="text-gray-700">— identificador único</span></label>
           <input x-model="createKeyForm.label" type="text" placeholder="revisor-maria"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
@@ -983,14 +983,14 @@
           <label class="block text-xs text-gray-500 mb-1.5">Rol</label>
           <select x-model="createKeyForm.role"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
-            <option value="reviewer">reviewer â€” solo resolver reviews HITL</option>
-            <option value="read">read â€” solo lectura</option>
-            <option value="write">write â€” lanzar runs y leer</option>
-            <option value="admin">admin â€” acceso total</option>
+            <option value="reviewer">reviewer — solo resolver reviews HITL</option>
+            <option value="read">read — solo lectura</option>
+            <option value="write">write — lanzar runs y leer</option>
+            <option value="admin">admin — acceso total</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1.5">Workspace <span class="text-gray-700">â€” opcional</span></label>
+          <label class="block text-xs text-gray-500 mb-1.5">Workspace <span class="text-gray-700">— opcional</span></label>
           <select x-model="createKeyForm.workspace_id"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
             <option value="">Todos los workspaces</option>
@@ -1000,7 +1000,7 @@
           </select>
         </div>
         <div class="border-t border-gray-800/60 pt-4">
-          <p class="text-xs text-gray-600 uppercase tracking-wider mb-3">Notificaciones HITL <span class="normal-case text-gray-700 font-normal">â€” configura uno o mÃ¡s canales</span></p>
+          <p class="text-xs text-gray-600 uppercase tracking-wider mb-3">Notificaciones HITL <span class="normal-case text-gray-700 font-normal">— configura uno o más canales</span></p>
           <div class="flex flex-col gap-3">
             <div>
               <label class="block text-xs text-gray-500 mb-1.5">Email</label>
@@ -1008,13 +1008,13 @@
                 class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1.5">Slack User ID <span class="text-gray-700">â€” ej. U0123ABCDEF</span></label>
+              <label class="block text-xs text-gray-500 mb-1.5">Slack User ID <span class="text-gray-700">— ej. U0123ABCDEF</span></label>
               <input x-model="createKeyForm.slack_user_id" type="text" placeholder="U0123ABCDEF"
                 class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
-              <p class="text-xs text-gray-700 mt-1">En Slack: perfil â†’ â‹¯ â†’ Copy member ID</p>
+              <p class="text-xs text-gray-700 mt-1">En Slack: perfil → ⋯ → Copy member ID</p>
             </div>
             <div>
-              <label class="block text-xs text-gray-500 mb-1.5">Telegram Chat ID <span class="text-gray-700">â€” ej. 123456789</span></label>
+              <label class="block text-xs text-gray-500 mb-1.5">Telegram Chat ID <span class="text-gray-700">— ej. 123456789</span></label>
               <input x-model="createKeyForm.telegram_chat_id" type="text" placeholder="123456789"
                 class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
               <p class="text-xs text-gray-700 mt-1">Habla con @userinfobot en Telegram para obtener tu ID</p>
@@ -1041,7 +1041,7 @@
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 pointer-events-auto shadow-2xl"
       @keydown.escape.window="editingKey=null" @click.stop>
       <h3 class="text-base font-semibold font-mono" x-text="editingKey?.label"></h3>
-      <p class="text-xs text-gray-600 mb-5">Editar rol y canales de notificaciÃ³n</p>
+      <p class="text-xs text-gray-600 mb-5">Editar rol y canales de notificación</p>
       <div class="flex flex-col gap-4">
         <div>
           <label class="block text-xs text-gray-500 mb-1.5">Rol</label>
@@ -1058,7 +1058,7 @@
           <div class="flex flex-col gap-3">
             <div>
               <label class="block text-xs text-gray-500 mb-1.5">Email</label>
-              <input x-model="editKeyForm.email" type="email" placeholder="â€”"
+              <input x-model="editKeyForm.email" type="email" placeholder="—"
                 class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
             </div>
             <div>
@@ -1092,7 +1092,7 @@
   <div x-show="showAddKey" class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-md p-6 pointer-events-auto shadow-2xl"
       @keydown.escape.window="showAddKey=false" @click.stop>
-      <h3 class="text-base font-semibold mb-5">AÃ±adir clave BYOK</h3>
+      <h3 class="text-base font-semibold mb-5">Añadir clave BYOK</h3>
       <div class="flex flex-col gap-4">
         <div>
           <label class="block text-xs text-gray-500 mb-1.5">Proveedor</label>
@@ -1134,7 +1134,7 @@
             :placeholder="addKeyForm.provider === 'ollama' ? 'http://localhost:11434' : addKeyForm.provider === 'moonshot' ? 'https://api.moonshot.cn/v1' : 'https://api.openai.com/v1'"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
           <p x-show="addKeyForm.provider === 'ollama'" class="mt-1.5 text-xs text-gray-500">
-            Plataforma en la nube con Ollama local: ejecuta el proxy en tu mÃ¡quina y usa
+            Plataforma en la nube con Ollama local: ejecuta el proxy en tu máquina y usa
             <code class="bg-gray-700 px-1 rounded">https://tu-proxy.com/ollama</code> como URL.
           </p>
         </div>
@@ -1257,9 +1257,9 @@ function settings() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ current_password: this.pwForm.current, new_password: this.pwForm.newPw }),
         });
-        if (!r.ok) { const e = await r.json(); this.profileError = true; this.profileMsg = e.detail || 'Error al cambiar contraseÃ±a'; return; }
+        if (!r.ok) { const e = await r.json(); this.profileError = true; this.profileMsg = e.detail || 'Error al cambiar contraseña'; return; }
         this.pwForm = { current: '', newPw: '' };
-        this.profileMsg = 'ContraseÃ±a actualizada';
+        this.profileMsg = 'Contraseña actualizada';
       } catch(e) { this.profileError = true; this.profileMsg = e.message; }
     },
 
@@ -1319,7 +1319,7 @@ function settings() {
             if (ws.llm_key_mode === 'proxy') mode = 'proxy';
             else if (ws.llm_key_mode === 'byok' && hasKey) mode = 'byok';
             else if (ws.llm_key_mode === 'managed') mode = 'managed';
-            else mode = ws.byok_managed_fallback ? 'managed*' : 'â€”';
+            else mode = ws.byok_managed_fallback ? 'managed*' : '—';
             rows.push({
               wsId: ws.id, wsName: ws.name, wsMode: ws.llm_key_mode,
               provider, isFirst: i === 0, isLast: i === providers.length - 1,
@@ -1350,7 +1350,7 @@ function settings() {
       URL.revokeObjectURL(a.href);
     },
 
-    /* â”€â”€ Workspaces â”€â”€ */
+    /* ── Workspaces ── */
     async loadWorkspaces() {
       this.wsLoading = true; this.wsError = '';
       try {
@@ -1422,7 +1422,7 @@ function settings() {
     },
 
     async deleteWs(ws) {
-      if (!confirm(`Â¿Eliminar "${ws.name}"? Esta acciÃ³n no se puede deshacer.`)) return;
+      if (!confirm(`¿Eliminar "${ws.name}"? Esta acción no se puede deshacer.`)) return;
       try {
         const r = await fetch(`/workspaces/${ws.id}`, { method: 'DELETE', headers: this.apiHeaders() });
         if (r.status !== 204 && !r.ok) { this.wsError = 'Error al eliminar el workspace'; return; }
@@ -1430,7 +1430,7 @@ function settings() {
       } catch(e) { this.wsError = e.message; }
     },
 
-    /* â”€â”€ Revisores â”€â”€ */
+    /* ── Revisores ── */
     async loadKeys() {
       this.keysLoading = true; this.keysError = '';
       try {
@@ -1489,7 +1489,7 @@ function settings() {
     },
 
     async revokeKey(key) {
-      if (!confirm(`Â¿Revocar "${key.label}"? La clave dejarÃ¡ de funcionar inmediatamente.`)) return;
+      if (!confirm(`¿Revocar "${key.label}"? La clave dejará de funcionar inmediatamente.`)) return;
       try {
         await fetch(`/api-keys/${key.label}`, { method: 'DELETE', headers: this.apiHeaders() });
         await this.loadKeys();
@@ -1506,7 +1506,7 @@ function settings() {
     },
 
     wsName(id) {
-      if (!id) return 'â€”';
+      if (!id) return '—';
       return this.workspaces.find(w => w.id === id)?.name || `#${id}`;
     },
 
@@ -1514,7 +1514,7 @@ function settings() {
       try { await navigator.clipboard.writeText(this.newKeyValue); } catch(e) {}
     },
 
-    /* â”€â”€ LLM Mode â”€â”€ */
+    /* ── LLM Mode ── */
     async selectLlmWs() {
       if (this.llmWsId) await this.loadLlmData();
     },
@@ -1560,7 +1560,7 @@ function settings() {
       } catch(e) { this.llmError = e.message; }
     },
 
-    /* â”€â”€ Proxy mode â”€â”€ */
+    /* ── Proxy mode ── */
     async loadProxyStatus() {
       if (!this.llmWsId) return;
       try {
@@ -1604,7 +1604,7 @@ function settings() {
     },
 
     async revokeProxy() {
-      if (!confirm('Â¿Revocar el token proxy? El proxy dejarÃ¡ de aceptar peticiones de la plataforma.')) return;
+      if (!confirm('¿Revocar el token proxy? El proxy dejará de aceptar peticiones de la plataforma.')) return;
       this.llmError = '';
       try {
         const r = await fetch(`/workspaces/${this.llmWsId}/proxy`, {
@@ -1627,8 +1627,8 @@ function settings() {
     },
 
     apiKeyPlaceholder(provider) {
-      const map = { anthropic: 'sk-ant-api03-â€¦', openai: 'sk-proj-â€¦', groq: 'gsk_â€¦', gemini: 'AIzaâ€¦', moonshot: 'sk-â€¦' };
-      return map[provider] || 'api-keyâ€¦';
+      const map = { anthropic: 'sk-ant-api03-…', openai: 'sk-proj-…', groq: 'gsk_…', gemini: 'AIza…', moonshot: 'sk-…' };
+      return map[provider] || 'api-key…';
     },
 
     async addLlmKey() {
@@ -1654,7 +1654,7 @@ function settings() {
     },
 
     async deleteLlmKey(provider) {
-      if (!confirm(`Â¿Eliminar la clave de ${provider}? Si es la Ãºltima, el workspace volverÃ¡ a modo managed.`)) return;
+      if (!confirm(`¿Eliminar la clave de ${provider}? Si es la última, el workspace volverá a modo managed.`)) return;
       try {
         await fetch(`/workspaces/${this.llmWsId}/llm-keys/${provider}`, { method: 'DELETE', headers: this.apiHeaders() });
         await this.loadLlmData();
@@ -1663,17 +1663,17 @@ function settings() {
     },
 
     fmtDate(d) {
-      if (!d) return 'â€”';
+      if (!d) return '—';
       return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
     },
 
     fmtDateShort(d) {
-      if (!d) return 'â€”';
+      if (!d) return '—';
       const dt = new Date(d + (d.endsWith('Z') ? '' : 'Z'));
       return dt.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
     },
 
-    /* â”€â”€ Schedules â”€â”€ */
+    /* ── Schedules ── */
     async loadSchedules() {
       this.schedulesLoading = true; this.schedulesError = '';
       try {
@@ -1730,7 +1730,7 @@ function settings() {
       } catch(e) { this.schedulesError = e.message; }
     },
 
-    /* â”€â”€ MFA â”€â”€ */
+    /* ── MFA ── */
     async setupMfa() {
       this.mfaMsg = ''; this.mfaError = false; this.mfaSetup = null; this.mfaCode = '';
       try {
@@ -1770,7 +1770,7 @@ function settings() {
       this.mfaLoading = false;
     },
 
-    /* â”€â”€ Security â”€â”€ */
+    /* ── Security ── */
     async runQuickAudit() {
       this.auditLoading = true; this.auditError = ''; this.auditResult = null;
       try {

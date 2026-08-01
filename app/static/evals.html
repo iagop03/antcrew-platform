@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Evals â€” antcrew</title>
-<link href="/static/tailwind.css" rel="stylesheet">
+<title>Evals — antcrew</title>
+<link rel="stylesheet" href="/static/tailwind.css">
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <style>[x-cloak]{display:none}</style>
@@ -118,7 +118,7 @@
             </td>
             <td class="px-4 py-3 cursor-pointer" @click="selected = selected?.eval_id === ev.eval_id ? null : ev">
               <div class="font-medium text-gray-200 truncate max-w-xs" x-text="ev.name || ev.request"></div>
-              <div class="text-xs text-gray-500 font-mono mt-0.5" x-text="ev.eval_id.slice(0,16) + 'â€¦'"></div>
+              <div class="text-xs text-gray-500 font-mono mt-0.5" x-text="ev.eval_id.slice(0,16) + '…'"></div>
             </td>
             <td class="px-4 py-3 text-indigo-300 font-medium" x-text="ev.team"></td>
             <td class="px-4 py-3">
@@ -132,11 +132,11 @@
                 x-text="ev.status === 'done' ? (ev.report?.passed ? 'PASS' : 'FAIL') : ev.status"></span>
             </td>
             <td class="px-4 py-3 text-right font-mono text-sm"
-                x-text="ev.report ? (ev.report.overall_score * 100).toFixed(0) + '%' : 'â€”'"></td>
+                x-text="ev.report ? (ev.report.overall_score * 100).toFixed(0) + '%' : '—'"></td>
             <td class="px-4 py-3 text-right text-gray-300 font-mono text-xs"
-                x-text="ev.cost_usd ? 'â‚¬' + ev.cost_usd.toFixed(4) : 'â€”'"></td>
+                x-text="ev.cost_usd ? '€' + ev.cost_usd.toFixed(4) : '—'"></td>
             <td class="px-4 py-3 text-right text-gray-400 text-xs"
-                x-text="ev.elapsed_ms ? (ev.elapsed_ms / 1000).toFixed(1) + 's' : 'â€”'"></td>
+                x-text="ev.elapsed_ms ? (ev.elapsed_ms / 1000).toFixed(1) + 's' : '—'"></td>
             <td class="px-4 py-3 text-right text-gray-400 text-xs" x-text="timeAgo(ev.created_at)"></td>
           </tr>
           <!-- Inline expanded report -->
@@ -173,7 +173,7 @@
                     </div>
                   </template>
                   <p class="text-xs text-gray-500"
-                    x-text="`tokens: ${ev.report.token_count?.toLocaleString() || 'â€”'}  Â· cost: â‚¬${ev.report.cost_usd?.toFixed(4) || '0.0000'}  Â· time: ${(ev.report.elapsed_ms/1000).toFixed(1)}s`">
+                    x-text="`tokens: ${ev.report.token_count?.toLocaleString() || '—'}  · cost: €${ev.report.cost_usd?.toFixed(4) || '0.0000'}  · time: ${(ev.report.elapsed_ms/1000).toFixed(1)}s`">
                   </p>
                 </div>
               </td>
@@ -194,7 +194,7 @@
 <div class="px-6 mt-8 mb-8">
   <div class="flex items-center justify-between mb-3">
     <button @click="schedOpen = !schedOpen" class="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition">
-      <span x-text="schedOpen ? 'â–¾' : 'â–¸'" class="text-gray-500"></span>
+      <span x-text="schedOpen ? '▾' : '▸'" class="text-gray-500"></span>
       <span data-i18n="evals.schedules.title">Recurring Schedules</span>
       <span class="text-xs text-gray-500 font-normal" x-text="`(${schedules.length})`"></span>
     </button>
@@ -256,7 +256,7 @@
   <div class="flex items-center justify-between mb-3">
     <button @click="regOpen = !regOpen"
       class="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition">
-      <span x-text="regOpen ? 'â–¾' : 'â–¸'" class="text-gray-500"></span>
+      <span x-text="regOpen ? '▾' : '▸'" class="text-gray-500"></span>
       <span data-i18n="evals.regression.title">Regression Tests</span>
       <span class="text-xs text-gray-500 font-normal" data-i18n="evals.regression.subtitle">(prompt drift detection)</span>
     </button>
@@ -290,7 +290,7 @@
             :disabled="regSubmitting || !regRunIds.trim()"
             class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-medium px-3 py-2 rounded-lg transition">
             <span x-show="!regSubmitting" data-i18n="evals.regression.run">Run Regression</span>
-            <span x-show="regSubmitting" x-cloak data-i18n="evals.regression.running">Launchingâ€¦</span>
+            <span x-show="regSubmitting" x-cloak data-i18n="evals.regression.running">Launching…</span>
           </button>
         </div>
       </div>
@@ -357,7 +357,7 @@
       <div class="mb-4">
         <label class="block text-sm text-gray-400 mb-1" data-i18n="evals.modal.request">Request / task</label>
         <textarea x-model="form.request" rows="2"
-          placeholder="Build a login module with JWTâ€¦"
+          placeholder="Build a login module with JWT…"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
       </div>
       <div class="mb-4">
@@ -382,7 +382,7 @@
           class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition" data-i18n="common.cancel">Cancel</button>
         <button type="submit" :disabled="submitting"
           class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
-          x-text="submitting ? window.__i18n?.t('evals.modal.starting') || 'Startingâ€¦' : window.__i18n?.t('evals.modal.run') || 'Run Eval'"></button>
+          x-text="submitting ? window.__i18n?.t('evals.modal.starting') || 'Starting…' : window.__i18n?.t('evals.modal.run') || 'Run Eval'"></button>
       </div>
       <p x-show="formError" class="text-red-400 text-xs mt-3" x-text="formError"></p>
     </form>
@@ -410,7 +410,7 @@
       <div class="mb-4">
         <label class="block text-sm text-gray-400 mb-1">Request</label>
         <textarea x-model="schedForm.request" rows="2"
-          placeholder="Build a login module with JWTâ€¦"
+          placeholder="Build a login module with JWT…"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
       </div>
       <div class="mb-4 grid grid-cols-3 gap-3">
@@ -435,7 +435,7 @@
           class="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2 rounded-lg transition" data-i18n="common.cancel">Cancel</button>
         <button type="submit" :disabled="schedSubmitting"
           class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
-          x-text="schedSubmitting ? window.__i18n?.t('evals.schedules.saving') || 'Savingâ€¦' : window.__i18n?.t('evals.schedules.new') || 'Create Schedule'"></button>
+          x-text="schedSubmitting ? window.__i18n?.t('evals.schedules.saving') || 'Saving…' : window.__i18n?.t('evals.schedules.new') || 'Create Schedule'"></button>
       </div>
       <p x-show="schedError" class="text-red-400 text-xs mt-3" x-text="schedError"></p>
     </form>
@@ -450,7 +450,7 @@
       <button @click="compareModal = false" class="text-gray-500 hover:text-white text-xl">&times;</button>
     </div>
     <template x-if="compareLoading">
-      <div class="py-8 text-center text-gray-400">Loading comparisonâ€¦</div>
+      <div class="py-8 text-center text-gray-400">Loading comparison…</div>
     </template>
     <template x-if="compareError">
       <div class="py-4 text-red-400 text-sm" x-text="compareError"></div>
@@ -474,22 +474,22 @@
         <div class="grid grid-cols-3 gap-4 text-sm items-center">
           <div class="text-gray-400">Overall score</div>
           <div class="font-mono text-center"
-            x-text="compareData.baseline.overall_score != null ? (compareData.baseline.overall_score*100).toFixed(1)+'%' : 'â€”'"></div>
+            x-text="compareData.baseline.overall_score != null ? (compareData.baseline.overall_score*100).toFixed(1)+'%' : '—'"></div>
           <div class="font-mono text-center font-semibold"
             :class="compareData.delta.improved ? 'text-green-400' : compareData.delta.regression ? 'text-red-400' : 'text-gray-200'"
-            x-text="compareData.candidate.overall_score != null ? (compareData.candidate.overall_score*100).toFixed(1)+'%' : 'â€”'">
+            x-text="compareData.candidate.overall_score != null ? (compareData.candidate.overall_score*100).toFixed(1)+'%' : '—'">
           </div>
         </div>
 
         <!-- Delta row -->
         <div class="grid grid-cols-3 gap-4 text-sm items-center">
           <div class="text-gray-400">Delta</div>
-          <div class="text-gray-600">â€”</div>
+          <div class="text-gray-600">—</div>
           <div class="font-mono font-semibold"
             :class="compareData.delta.improved ? 'text-green-400' : compareData.delta.regression ? 'text-red-400' : 'text-gray-400'"
             x-text="compareData.delta.overall_score != null
               ? (compareData.delta.overall_score >= 0 ? '+' : '') + (compareData.delta.overall_score*100).toFixed(1) + '%'
-              : 'â€”'">
+              : '—'">
           </div>
         </div>
 
@@ -501,10 +501,10 @@
             ? 'bg-red-950 border border-red-800 text-red-300'
             : 'bg-gray-800 border border-gray-700 text-gray-400'">
           <template x-if="compareData.delta.improved">
-            <span>Improvement detected â€” candidate scores higher than baseline.</span>
+            <span>Improvement detected — candidate scores higher than baseline.</span>
           </template>
           <template x-if="compareData.delta.regression">
-            <span>Regression detected â€” candidate scores lower than baseline.</span>
+            <span>Regression detected — candidate scores lower than baseline.</span>
           </template>
           <template x-if="!compareData.delta.improved && !compareData.delta.regression">
             <span>No significant change detected.</span>
@@ -514,8 +514,8 @@
         <!-- Cost / time -->
         <div class="grid grid-cols-3 gap-4 text-xs text-gray-500">
           <div>Cost / Time</div>
-          <div x-text="`$${(compareData.baseline.cost_usd||0).toFixed(4)}  Â·  ${((compareData.baseline.elapsed_ms||0)/1000).toFixed(1)}s`"></div>
-          <div x-text="`$${(compareData.candidate.cost_usd||0).toFixed(4)}  Â·  ${((compareData.candidate.elapsed_ms||0)/1000).toFixed(1)}s`"></div>
+          <div x-text="`$${(compareData.baseline.cost_usd||0).toFixed(4)}  ·  ${((compareData.baseline.elapsed_ms||0)/1000).toFixed(1)}s`"></div>
+          <div x-text="`$${(compareData.candidate.cost_usd||0).toFixed(4)}  ·  ${((compareData.candidate.elapsed_ms||0)/1000).toFixed(1)}s`"></div>
         </div>
       </div>
     </template>
