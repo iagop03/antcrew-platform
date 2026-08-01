@@ -76,13 +76,16 @@ jobs:
             sleep 5
           done
 
-      - name: Ensure services are running and reset shutdown timer
+      - name: Ensure services are running and reset deletion timer
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
-          ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" bash << 'REMOTE'
+          SHUTDOWN_SECS=$(( ${{ github.event.inputs.hours || '1' }} * 3600 ))
+
+          ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" bash << REMOTE
           set -euo pipefail
           cd /opt/antcrew
 
-          # Load image name recorded by the last Deploy run
           if [ -f /opt/antcrew/.platform-image-env ]; then
             source /opt/antcrew/.platform-image-env
             export PLATFORM_IMAGE
@@ -92,10 +95,23 @@ jobs:
 
           docker compose -f docker-compose.uat.yml up -d --remove-orphans 2>/dev/null || true
 
-          # Cancel any pending shutdown and schedule a fresh window
-          shutdown -c 2>/dev/null || true
-          shutdown -h +$(( ${{ github.event.inputs.hours || '1' }} * 60 ))
-          echo "Services running. Auto-shutdown in ${{ github.event.inputs.hours || '1' }} hour(s)."
+          # Reset self-deletion timer (kill old one, start fresh)
+          [ -f /opt/antcrew/cleanup.pid ] && kill \$(cat /opt/antcrew/cleanup.pid) 2>/dev/null || true
+
+          (sleep $SHUTDOWN_SECS
+           TOKEN=\$(cat /opt/antcrew/.hcloud_token)
+           SERVER_ID=\$(curl -sf -H "Authorization: Bearer \$TOKEN" \
+             "https://api.hetzner.cloud/v1/servers?name=antcrew-uat" \
+             | jq -r '.servers[0].id // empty')
+           [ -n "\$SERVER_ID" ] && curl -sf -X DELETE \
+             -H "Authorization: Bearer \$TOKEN" \
+             "https://api.hetzner.cloud/v1/servers/\$SERVER_ID"
+          ) &
+          echo \$! > /opt/antcrew/cleanup.pid
+          disown
+
+          echo "Services running. Server self-deletes in $(( $SHUTDOWN_SECS / 60 )) minutes."
           REMOTE
 
-          echo "UAT live at http://$UAT_IP:8000 (auto-shuts down in 60 min)"
+          HOURS=${{ github.event.inputs.hours || '1' }}
+          echo "UAT live at http://$UAT_IP:8000 (auto-deletes in ${HOURS}h)"

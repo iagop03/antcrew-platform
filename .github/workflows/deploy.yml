@@ -245,6 +245,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
           PLATFORM_IMAGE: ghcr.io/${{ github.repository }}:uat-latest
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
           # Write .env.uat locally (runner expands secrets), then SCP it
           cat > /tmp/env.uat <<EOF
@@ -258,22 +259,41 @@ jobs:
           # Copy compose file (standalone, no base file needed)
           scp -i ~/.ssh/hetzner_uat docker-compose.uat.yml root@"$UAT_IP":/opt/antcrew/
 
-          # Login to GHCR, pull image, start services, schedule shutdown
-          SHUTDOWN_MINS=$(( ${{ github.event.inputs.uat_hours || '1' }} * 60 ))
+          # Store Hetzner token so the server can delete itself when done
+          printf '%s' "$HCLOUD_TOKEN" | ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" \
+            'cat > /opt/antcrew/.hcloud_token && chmod 600 /opt/antcrew/.hcloud_token'
+
+          SHUTDOWN_SECS=$(( ${{ github.event.inputs.uat_hours || '1' }} * 3600 ))
           ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" bash <<REMOTE
           set -euo pipefail
           cd /opt/antcrew
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
           export PLATFORM_IMAGE="$PLATFORM_IMAGE"
-          # Record image name so on-demand restarts know what to run
           echo "PLATFORM_IMAGE=$PLATFORM_IMAGE" > /opt/antcrew/.platform-image-env
           docker compose -f docker-compose.uat.yml pull platform
           docker compose -f docker-compose.uat.yml up -d --remove-orphans
-          shutdown -h +$SHUTDOWN_MINS
-          echo "Deploy complete. Server auto-shuts down in $SHUTDOWN_MINS minutes."
+
+          # Kill any previous self-delete timer
+          [ -f /opt/antcrew/cleanup.pid ] && kill \$(cat /opt/antcrew/cleanup.pid) 2>/dev/null || true
+
+          # Schedule self-deletion via Hetzner API so billing stops immediately
+          (sleep $SHUTDOWN_SECS
+           TOKEN=\$(cat /opt/antcrew/.hcloud_token)
+           SERVER_ID=\$(curl -sf -H "Authorization: Bearer \$TOKEN" \
+             "https://api.hetzner.cloud/v1/servers?name=antcrew-uat" \
+             | jq -r '.servers[0].id // empty')
+           [ -n "\$SERVER_ID" ] && curl -sf -X DELETE \
+             -H "Authorization: Bearer \$TOKEN" \
+             "https://api.hetzner.cloud/v1/servers/\$SERVER_ID"
+          ) &
+          echo \$! > /opt/antcrew/cleanup.pid
+          disown
+
+          echo "Deploy complete. Server self-deletes in $(( SHUTDOWN_SECS / 60 )) minutes."
           REMOTE
 
-          echo "UAT live at http://$UAT_IP:8000 (auto-shuts down in $SHUTDOWN_MINS min)"
+          SHUTDOWN_MINS=$(( ${{ github.event.inputs.uat_hours || '1' }} * 60 ))
+          echo "UAT live at http://$UAT_IP:8000 (auto-deletes in $SHUTDOWN_MINS min)"
 
       # ── INT / PROD: Fly.io ────────────────────────────────────────────────────
 
