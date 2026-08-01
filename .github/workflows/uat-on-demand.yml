@@ -1,0 +1,94 @@
+name: UAT — on-demand start
+
+# Powers on the UAT Hetzner server (which auto-shut-down after 60 min) and
+# resets the 60-minute auto-shutdown timer. Does NOT rebuild the image.
+# Run this when you need UAT again after it has powered off.
+#
+# Prerequisites: the server must already exist (run Deploy → UAT first).
+# If the server was deleted by a subsequent Deploy → UAT, it no longer exists
+# and this workflow will fail with a clear error message.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  start:
+    name: Start UAT server
+    runs-on: ubuntu-latest
+    environment: uat
+
+    steps:
+      - name: Install hcloud CLI
+        run: |
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xzf - hcloud
+          sudo mv hcloud /usr/local/bin/hcloud
+
+      - name: Set up SSH key
+        env:
+          HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$HETZNER_SSH_KEY" > ~/.ssh/hetzner_uat
+          chmod 600 ~/.ssh/hetzner_uat
+          printf 'Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' >> ~/.ssh/config
+
+      - name: Power on UAT server
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          if ! hcloud server describe antcrew-uat &>/dev/null; then
+            echo "::error::Server antcrew-uat does not exist."
+            echo "::error::Run the Deploy workflow and choose UAT to create it."
+            exit 1
+          fi
+
+          STATUS=$(hcloud server describe antcrew-uat -o json | jq -r '.status')
+          echo "Current status: $STATUS"
+
+          if [ "$STATUS" = "running" ]; then
+            echo "Server is already running — will just reset the auto-shutdown timer."
+          else
+            echo "Powering on antcrew-uat…"
+            hcloud server poweron antcrew-uat --wait
+            echo "Server powered on."
+          fi
+
+          UAT_IP=$(hcloud server describe antcrew-uat -o json | jq -r '.public_net.ipv4.ip')
+          echo "UAT_IP=$UAT_IP" >> "$GITHUB_ENV"
+
+      - name: Wait for SSH
+        run: |
+          echo "Waiting for SSH on $UAT_IP…"
+          for i in $(seq 1 24); do
+            if ssh -i ~/.ssh/hetzner_uat -o ConnectTimeout=5 root@"$UAT_IP" true 2>/dev/null; then
+              echo "SSH ready (attempt $i)."
+              break
+            fi
+            [ "$i" -eq 24 ] && { echo "::error::SSH timeout after 120 s"; exit 1; }
+            sleep 5
+          done
+
+      - name: Ensure services are running and reset shutdown timer
+        run: |
+          ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" bash << 'REMOTE'
+          set -euo pipefail
+          cd /opt/antcrew
+
+          # Load image name recorded by the last Deploy run
+          if [ -f /opt/antcrew/.platform-image-env ]; then
+            source /opt/antcrew/.platform-image-env
+            export PLATFORM_IMAGE
+          else
+            echo "WARNING: .platform-image-env not found — containers may already be running"
+          fi
+
+          docker compose -f docker-compose.uat.yml up -d --remove-orphans 2>/dev/null || true
+
+          # Cancel any pending shutdown and schedule a fresh 60-minute window
+          shutdown -c 2>/dev/null || true
+          shutdown -h +60
+          echo "Services running. Auto-shutdown reset to 60 minutes from now."
+          REMOTE
+
+          echo "UAT live at http://$UAT_IP:8000 (auto-shuts down in 60 min)"

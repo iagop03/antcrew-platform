@@ -135,10 +135,9 @@ jobs:
           echo "UAT gate passed — latest UAT deployment is successful."
 
   # ── Step 4: deploy ──────────────────────────────────────────────────────────
-  # prod requires:
-  #   a) gate-prod to pass (UAT was deployed successfully)
-  #   b) manual approval in the 'prod' GitHub Environment
-  #      (configure under Settings → Environments → prod → Required reviewers)
+  # UAT  → Hetzner ephemeral server (cx22, auto-shuts down after 60 min)
+  # INT  → Fly.io (auto-deploy on every push to main)
+  # PROD → Fly.io (requires gate-prod + manual approval in the prod environment)
   deploy:
     name: Deploy to ${{ needs.build.outputs.env_name }}
     needs: [build, gate-prod]
@@ -152,9 +151,119 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ── UAT: Hetzner ephemeral ────────────────────────────────────────────────
+
+      - name: Install hcloud CLI
+        if: needs.build.outputs.env_name == 'uat'
+        run: |
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar xzf - hcloud
+          sudo mv hcloud /usr/local/bin/hcloud
+
+      - name: Set up SSH key
+        if: needs.build.outputs.env_name == 'uat'
+        env:
+          HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$HETZNER_SSH_KEY" > ~/.ssh/hetzner_uat
+          chmod 600 ~/.ssh/hetzner_uat
+          printf 'Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' >> ~/.ssh/config
+
+      - name: Rotate UAT server
+        if: needs.build.outputs.env_name == 'uat'
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          # Delete existing server if present so each deploy starts clean
+          if hcloud server describe antcrew-uat &>/dev/null; then
+            echo "Deleting existing antcrew-uat server…"
+            hcloud server delete antcrew-uat
+          fi
+
+          # Find snapshot by label (set once during initial Hetzner setup)
+          SNAPSHOT_ID=$(hcloud image list --type snapshot --output json \
+            | jq -r '.[] | select(.labels.name == "antcrew-uat-base") | .id' \
+            | head -1)
+
+          if [ -z "$SNAPSHOT_ID" ] || [ "$SNAPSHOT_ID" = "null" ]; then
+            echo "::error::No snapshot labeled name=antcrew-uat-base found."
+            echo "::error::Create a base Ubuntu+Docker server, then:"
+            echo "::error::  hcloud server create-image --type snapshot --label name=antcrew-uat-base <server>"
+            exit 1
+          fi
+
+          echo "Creating server from snapshot $SNAPSHOT_ID…"
+          hcloud server create \
+            --name antcrew-uat \
+            --type cx22 \
+            --image "$SNAPSHOT_ID" \
+            --location nbg1 \
+            --ssh-key github-actions-uat \
+            --wait
+
+          UAT_IP=$(hcloud server describe antcrew-uat -o json | jq -r '.public_net.ipv4.ip')
+          echo "UAT_IP=$UAT_IP" >> "$GITHUB_ENV"
+          echo "Server ready: $UAT_IP"
+
+      - name: Wait for SSH
+        if: needs.build.outputs.env_name == 'uat'
+        run: |
+          echo "Waiting for SSH on $UAT_IP…"
+          for i in $(seq 1 24); do
+            if ssh -i ~/.ssh/hetzner_uat -o ConnectTimeout=5 root@"$UAT_IP" true 2>/dev/null; then
+              echo "SSH ready (attempt $i)."
+              break
+            fi
+            [ "$i" -eq 24 ] && { echo "::error::SSH timeout after 120 s"; exit 1; }
+            sleep 5
+          done
+
+      - name: Deploy application to UAT
+        if: needs.build.outputs.env_name == 'uat'
+        env:
+          UAT_DATABASE_URL: ${{ secrets.UAT_DATABASE_URL }}
+          UAT_SECRET_KEY: ${{ secrets.UAT_SECRET_KEY }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_ACTOR: ${{ github.actor }}
+          PLATFORM_IMAGE: ghcr.io/${{ github.repository }}:uat-latest
+        run: |
+          # Write .env.uat locally (runner expands secrets), then SCP it
+          cat > /tmp/env.uat <<EOF
+          DATABASE_URL=${UAT_DATABASE_URL}
+          SECRET_KEY=${UAT_SECRET_KEY}
+          EOF
+          ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" "mkdir -p /opt/antcrew"
+          scp -i ~/.ssh/hetzner_uat /tmp/env.uat root@"$UAT_IP":/opt/antcrew/.env.uat
+          rm -f /tmp/env.uat
+
+          # Copy compose file (standalone, no base file needed)
+          scp -i ~/.ssh/hetzner_uat docker-compose.uat.yml root@"$UAT_IP":/opt/antcrew/
+
+          # Login to GHCR, pull image, start services, schedule shutdown
+          ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" bash <<REMOTE
+          set -euo pipefail
+          cd /opt/antcrew
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+          export PLATFORM_IMAGE="$PLATFORM_IMAGE"
+          # Record image name so on-demand restarts know what to run
+          echo "PLATFORM_IMAGE=$PLATFORM_IMAGE" > /opt/antcrew/.platform-image-env
+          docker compose -f docker-compose.uat.yml pull platform
+          docker compose -f docker-compose.uat.yml up -d --remove-orphans
+          # Auto-shutdown in 60 minutes
+          shutdown -h +60
+          echo "Deploy complete. Server auto-shuts down in 60 minutes."
+          REMOTE
+
+          echo "UAT live at http://$UAT_IP:8000 (auto-shuts down in 60 min)"
+
+      # ── INT / PROD: Fly.io ────────────────────────────────────────────────────
+
       - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: needs.build.outputs.env_name != 'uat'
 
       - name: Deploy to Fly.io
+        if: needs.build.outputs.env_name != 'uat'
         run: flyctl deploy --remote-only --config fly.${{ needs.build.outputs.env_name }}.toml
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
