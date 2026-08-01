@@ -235,7 +235,7 @@ jobs:
           RECORD_ID=$(curl -sf -H "Authorization: Bearer $CLOUDFLARE_TOKEN" \
             "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records?type=A&name=platform-uat.antcrew.org" \
             | jq -r '.result[0].id // empty')
-          BODY="{\"type\":\"A\",\"name\":\"platform-uat\",\"content\":\"$UAT_IP\",\"ttl\":60,\"proxied\":true}"
+          BODY="{\"type\":\"A\",\"name\":\"platform-uat\",\"content\":\"$UAT_IP\",\"ttl\":60,\"proxied\":false}"
           if [ -n "$RECORD_ID" ]; then
             curl -sf -X PUT -H "Authorization: Bearer $CLOUDFLARE_TOKEN" -H "Content-Type: application/json" \
               "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records/$RECORD_ID" -d "$BODY"
