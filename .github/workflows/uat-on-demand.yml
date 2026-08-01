@@ -106,7 +106,7 @@ jobs:
            [ -n "\$SERVER_ID" ] && curl -sf -X DELETE \
              -H "Authorization: Bearer \$TOKEN" \
              "https://api.hetzner.cloud/v1/servers/\$SERVER_ID"
-          ) &
+          ) </dev/null >/var/log/uat-cleanup.log 2>&1 &
           echo \$! > /opt/antcrew/cleanup.pid
           disown
 

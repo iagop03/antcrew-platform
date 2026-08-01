@@ -298,6 +298,7 @@ jobs:
           [ -f /opt/antcrew/cleanup.pid ] && kill \$(cat /opt/antcrew/cleanup.pid) 2>/dev/null || true
 
           # Schedule self-deletion via Hetzner API so billing stops immediately
+          # Redirect to /dev/null so SSH file descriptors are not inherited
           (sleep $SHUTDOWN_SECS
            TOKEN=\$(cat /opt/antcrew/.hcloud_token)
            SERVER_ID=\$(curl -sf -H "Authorization: Bearer \$TOKEN" \
@@ -306,7 +307,7 @@ jobs:
            [ -n "\$SERVER_ID" ] && curl -sf -X DELETE \
              -H "Authorization: Bearer \$TOKEN" \
              "https://api.hetzner.cloud/v1/servers/\$SERVER_ID"
-          ) &
+          ) </dev/null >/var/log/uat-cleanup.log 2>&1 &
           echo \$! > /opt/antcrew/cleanup.pid
           disown
 
