@@ -235,7 +235,7 @@ jobs:
           RECORD_ID=$(curl -sf -H "Authorization: Bearer $CLOUDFLARE_TOKEN" \
             "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records?type=A&name=platform-uat.antcrew.org" \
             | jq -r '.result[0].id // empty')
-          BODY="{\"type\":\"A\",\"name\":\"platform-uat\",\"content\":\"$UAT_IP\",\"ttl\":60,\"proxied\":false}"
+          BODY="{\"type\":\"A\",\"name\":\"platform-uat\",\"content\":\"$UAT_IP\",\"ttl\":1,\"proxied\":true}"
           if [ -n "$RECORD_ID" ]; then
             curl -sf -X PUT -H "Authorization: Bearer $CLOUDFLARE_TOKEN" -H "Content-Type: application/json" \
               "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records/$RECORD_ID" -d "$BODY"
@@ -243,7 +243,11 @@ jobs:
             curl -sf -X POST -H "Authorization: Bearer $CLOUDFLARE_TOKEN" -H "Content-Type: application/json" \
               "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" -d "$BODY"
           fi
-          echo "DNS updated: platform-uat.antcrew.org → $UAT_IP (proxied)"
+          # Cloudflare SSL must be Flexible so the proxy can reach the HTTP-only origin
+          curl -sf -X PATCH -H "Authorization: Bearer $CLOUDFLARE_TOKEN" -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE/settings/ssl" \
+            -d '{"value":"flexible"}' | jq -r '.result.value'
+          echo "DNS updated: platform-uat.antcrew.org → $UAT_IP (proxied, SSL=flexible)"
 
       - name: Wait for SSH
         if: needs.build.outputs.env_name == 'uat'
