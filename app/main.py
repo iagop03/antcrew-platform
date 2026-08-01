@@ -642,8 +642,9 @@ _cors_origins = (
 )
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline'; "  # Alpine.js requires inline; tighten with nonce if CSP Level 3 is added
-    "style-src 'self' 'unsafe-inline'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "font-src 'self' https://cdn.jsdelivr.net data:; "
     "img-src 'self' data:; "
     "connect-src 'self'; "
     "frame-ancestors 'none'; "
