@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pipelines — antcrew</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>Pipelines â€” antcrew</title>
+<link href="/static/tailwind.css" rel="stylesheet">
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <style>
@@ -39,7 +39,7 @@ body{overflow:hidden}
 <body class="bg-gray-950 text-gray-100 flex flex-col h-screen" x-data="app()" x-init="init()"
   @keydown.window="onKeyDown($event)">
 
-<!-- ── Standard nav (same as other pages) ── -->
+<!-- â”€â”€ Standard nav (same as other pages) â”€â”€ -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
 <nav class="sticky top-0 z-40 border-b border-gray-800 shrink-0" style="background:rgba(3,7,18,.96);backdrop-filter:blur(10px)">
   <div class="h-11 px-3 flex items-center gap-0.5">
@@ -80,7 +80,7 @@ body{overflow:hidden}
 </nav>
 <script>(function(){var p=location.pathname;document.querySelectorAll('.ac-nav[data-ac]').forEach(function(el){var dp=el.dataset.ac;if((dp==='/dashboard'&&(p==='/'||p==='/dashboard'))||(dp!=='/dashboard'&&(p===dp||p.startsWith(dp+'/'))))el.classList.add('ac-on');});document.addEventListener('click',function(e){var w=document.getElementById('ac-pf-w');if(w&&!w.contains(e.target)){var d=document.getElementById('ac-pf-d');if(d)d.style.display='none';}});var pb=document.getElementById('ac-pf-b');if(pb)pb.addEventListener('click',function(e){e.stopPropagation();var d=document.getElementById('ac-pf-d');if(d)d.style.display=d.style.display==='none'?'block':'none';});var k=localStorage.getItem('antcrew_api_key');var h={'Content-Type':'application/json'};if(k)h['X-Api-Key']=k;fetch('/reviews/?status=pending&limit=100',{headers:h,credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&d.length>0){var b=document.getElementById('nav-rev-badge');if(b){b.textContent=d.length>99?'99+':d.length;b.style.display='inline-flex';}}}).catch(function(){});fetch('/auth/me',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(me){if(!me)return;var n=document.getElementById('ac-pf-n');var em=document.getElementById('ac-pf-e');var i=document.getElementById('ac-pf-i');if(n)n.textContent=me.display_name||'';if(em)em.textContent=me.email||'';if(i){var s=(me.display_name||me.email||'').trim();var pts=s.split(/\s+/);i.textContent=(pts.length>1?pts[0][0]+pts[pts.length-1][0]:s.slice(0,2)).toUpperCase();}}).catch(function(){});})();</script>
 
-<!-- ── Pipeline toolbar ── -->
+<!-- â”€â”€ Pipeline toolbar â”€â”€ -->
 <div class="flex items-center gap-2 px-4 py-2 bg-gray-900/60 border-b border-gray-800/60 shrink-0">
   <div class="flex items-center gap-2 flex-1 min-w-0">
     <input x-show="activeId && !isTemplate" x-cloak
@@ -90,7 +90,7 @@ body{overflow:hidden}
     <input x-show="activeId && !isTemplate" x-cloak
       x-model="activeDescription"
       class="w-56 bg-transparent border border-transparent rounded px-2 py-1 text-xs text-gray-500 focus:outline-none focus:border-gray-700 focus:bg-gray-800/50 transition-colors"
-      placeholder="Descripción (opcional)">
+      placeholder="DescripciÃ³n (opcional)">
     <span x-show="activeId && isTemplate" class="text-sm text-gray-400 italic" x-text="activeName"></span>
     <span x-show="activeId && isTemplate" class="text-xs bg-gray-800 text-gray-600 px-2 py-0.5 rounded font-mono">template</span>
   </div>
@@ -103,23 +103,23 @@ body{overflow:hidden}
     <button @click="redo()" :disabled="historyIdx >= history.length - 1" title="Rehacer (Ctrl+Y)"
       class="px-1.5 py-1 text-gray-600 hover:text-gray-300 transition-colors disabled:opacity-25 rounded flex items-center">
       <i class="ti ti-arrow-forward-up text-base leading-none"></i></button>
-    <button @click="addComment()" title="Añadir comentario (Ctrl+M)"
-      class="px-1.5 py-1 text-gray-600 hover:text-yellow-400 text-xs transition-colors rounded">💬</button>
-    <button @click="snapToGrid = !snapToGrid" title="Encajar a cuadrícula (Ctrl+G)"
+    <button @click="addComment()" title="AÃ±adir comentario (Ctrl+M)"
+      class="px-1.5 py-1 text-gray-600 hover:text-yellow-400 text-xs transition-colors rounded">ðŸ’¬</button>
+    <button @click="snapToGrid = !snapToGrid" title="Encajar a cuadrÃ­cula (Ctrl+G)"
       class="px-1.5 py-1 text-xs transition-colors rounded font-mono"
-      :class="snapToGrid ? 'text-indigo-400' : 'text-gray-600 hover:text-gray-300'">⊞</button>
+      :class="snapToGrid ? 'text-indigo-400' : 'text-gray-600 hover:text-gray-300'">âŠž</button>
     <button @click="autoLayout()" title="Auto-layout (Ctrl+L)"
-      class="px-1.5 py-1 text-gray-600 hover:text-indigo-400 text-xs transition-colors rounded font-mono">⊟</button>
+      class="px-1.5 py-1 text-gray-600 hover:text-indigo-400 text-xs transition-colors rounded font-mono">âŠŸ</button>
     <button @click="zoomToFit()" title="Zoom to fit (Ctrl+F)"
-      class="px-1.5 py-1 text-gray-600 hover:text-gray-300 text-xs transition-colors rounded">⤢</button>
+      class="px-1.5 py-1 text-gray-600 hover:text-gray-300 text-xs transition-colors rounded">â¤¢</button>
   </div>
 
   <div class="flex items-center gap-1.5">
-    <span x-show="isDirty && activeId && !isTemplate" x-cloak class="text-xs text-amber-500" title="Hay cambios sin guardar">● sin guardar</span>
+    <span x-show="isDirty && activeId && !isTemplate" x-cloak class="text-xs text-amber-500" title="Hay cambios sin guardar">â— sin guardar</span>
 
     <span x-show="saveStatus" x-cloak class="text-xs"
       :class="saveStatus==='saved'?'text-emerald-500':saveStatus==='error'?'text-red-400':'text-gray-500'"
-      x-text="saveStatus==='saved'?'✓ Guardado':saveStatus==='saving'?'Guardando…':'Error'"></span>
+      x-text="saveStatus==='saved'?'âœ“ Guardado':saveStatus==='saving'?'Guardandoâ€¦':'Error'"></span>
 
     <button x-show="isDirty && activeId && !isTemplate" x-cloak @click="discardChanges()"
       class="px-3 py-1.5 text-gray-500 hover:text-red-400 text-xs rounded transition-colors border border-gray-800 hover:border-red-900">
@@ -134,7 +134,7 @@ body{overflow:hidden}
 
     <button x-show="activeId && isTemplate" @click="saveAsName=activeName+' (copia)'; showSaveAsModal=true"
       class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
-      Guardar como…
+      Guardar comoâ€¦
     </button>
 
     <!-- Run button -->
@@ -146,7 +146,7 @@ body{overflow:hidden}
   </div>
 </div>
 
-<!-- ── Main layout ── -->
+<!-- â”€â”€ Main layout â”€â”€ -->
 <div class="flex flex-1 min-h-0">
 
   <!-- Left sidebar -->
@@ -184,7 +184,7 @@ body{overflow:hidden}
                 <span x-text="p.name"></span>
               </button>
               <button @click="deletePipeline(p)"
-                class="pr-2 text-gray-800 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs">✕</button>
+                class="pr-2 text-gray-800 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs">âœ•</button>
             </div>
           </template>
         </div>
@@ -207,7 +207,7 @@ body{overflow:hidden}
             <span class="text-gray-300 flex-1 truncate" x-text="agent.label"></span>
             <span x-show="agent.phase" class="text-gray-700 text-xs flex-shrink-0" x-text="agent.glyph || ''"></span>
             <button x-show="agent.custom" @click.stop="removeCustomAgent(agent)"
-              class="text-gray-700 hover:text-red-400 transition-colors leading-none flex-shrink-0">✕</button>
+              class="text-gray-700 hover:text-red-400 transition-colors leading-none flex-shrink-0">âœ•</button>
             <!-- Tooltip -->
             <div class="absolute left-full ml-2 top-0 z-50 w-56 bg-gray-950 border border-gray-700 rounded-lg p-3 shadow-xl
                         opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150 text-left"
@@ -247,11 +247,11 @@ body{overflow:hidden}
     <div x-show="hasDraft" x-cloak
       class="absolute top-3 z-10 bg-amber-950/95 border border-amber-800/70 rounded-lg px-4 py-2.5 flex items-center gap-3 text-xs shadow-xl"
       style="left:50%;transform:translateX(-50%)">
-      <span class="text-amber-300">Cambios no guardados de la sesión anterior</span>
+      <span class="text-amber-300">Cambios no guardados de la sesiÃ³n anterior</span>
       <button @click="_restoreDraft()"
         class="text-white bg-amber-700 hover:bg-amber-600 px-2.5 py-0.5 rounded transition-colors font-medium">Restaurar</button>
       <button @click="hasDraft=false; localStorage.removeItem('ac_pipeline_draft')"
-        class="text-amber-600 hover:text-amber-400 transition-colors ml-1">✕</button>
+        class="text-amber-600 hover:text-amber-400 transition-colors ml-1">âœ•</button>
     </div>
 
     <!-- Empty state -->
@@ -290,7 +290,7 @@ body{overflow:hidden}
       </defs>
 
       <g id="stage" :transform="`translate(${pan.x},${pan.y}) scale(${zoom})`">
-        <!-- Rendered imperatively by renderCanvas() — x-for doesn't work inside SVG -->
+        <!-- Rendered imperatively by renderCanvas() â€” x-for doesn't work inside SVG -->
         <g id="edges-layer"></g>
         <g id="nodes-layer"></g>
       </g>
@@ -317,26 +317,26 @@ body{overflow:hidden}
       <div class="bg-gray-900/95 border border-gray-800 rounded-lg overflow-hidden shadow-lg">
         <button @click="legendOpen=!legendOpen"
           class="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-500 hover:text-gray-300 text-xs w-full transition-colors">
-          <span x-text="legendOpen ? '▾' : '▸'" class="w-3"></span>
+          <span x-text="legendOpen ? 'â–¾' : 'â–¸'" class="w-3"></span>
           <span>Leyenda</span>
         </button>
         <div x-show="legendOpen" x-cloak class="border-t border-gray-800 p-2.5 space-y-2" style="width:172px">
           <p class="text-xs text-gray-700 uppercase tracking-wide font-semibold">Fases</p>
           <div class="space-y-1.5">
-            <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#7c3aed"></span><span>⊙ Discovery</span></div>
-            <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#2563eb"></span><span>≡ Planning</span></div>
+            <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#7c3aed"></span><span>âŠ™ Discovery</span></div>
+            <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#2563eb"></span><span>â‰¡ Planning</span></div>
             <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#0891b2"></span><span>&lt;/&gt; Build</span></div>
-            <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#059669"></span><span>✓ Quality</span></div>
-            <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#dc2626"></span><span>⇧ Delivery</span></div>
+            <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#059669"></span><span>âœ“ Quality</span></div>
+            <div class="flex items-center gap-2 text-xs text-gray-400"><span class="w-3 h-3 rounded-sm flex-shrink-0 inline-block" style="background:#dc2626"></span><span>â‡§ Delivery</span></div>
           </div>
           <p class="text-xs text-gray-700 uppercase tracking-wide font-semibold pt-1">Aristas</p>
           <div class="space-y-1.5">
-            <div class="flex items-center gap-2 text-xs"><span style="color:#475569;font-size:14px">→</span><span class="text-gray-500">Normal</span></div>
-            <div class="flex items-center gap-2 text-xs"><span style="color:#059669;font-size:14px">→</span><span class="text-gray-500">Condición</span></div>
+            <div class="flex items-center gap-2 text-xs"><span style="color:#475569;font-size:14px">â†’</span><span class="text-gray-500">Normal</span></div>
+            <div class="flex items-center gap-2 text-xs"><span style="color:#059669;font-size:14px">â†’</span><span class="text-gray-500">CondiciÃ³n</span></div>
             <div class="flex items-center gap-2 text-xs"><span style="color:#d97706;font-size:11px">-- &gt;</span><span class="text-gray-500">Else/fix</span></div>
-            <div class="flex items-center gap-2 text-xs"><span style="color:#f59e0b">⏸</span><span class="text-gray-500">HITL gate</span></div>
+            <div class="flex items-center gap-2 text-xs"><span style="color:#f59e0b">â¸</span><span class="text-gray-500">HITL gate</span></div>
           </div>
-          <p class="text-xs text-gray-700 pt-1">Shift+arrastrar = selección múltiple</p>
+          <p class="text-xs text-gray-700 pt-1">Shift+arrastrar = selecciÃ³n mÃºltiple</p>
         </div>
       </div>
     </div>
@@ -350,10 +350,10 @@ body{overflow:hidden}
 
     <!-- Zoom controls -->
     <div class="absolute bottom-4 right-4 flex items-center gap-0.5 bg-gray-900/90 border border-gray-800 rounded-lg px-1 py-0.5 backdrop-blur">
-      <button @click="zoom=Math.max(.25,zoom-.15)" class="px-2 py-1 text-gray-500 hover:text-white text-sm transition-colors">−</button>
+      <button @click="zoom=Math.max(.25,zoom-.15)" class="px-2 py-1 text-gray-500 hover:text-white text-sm transition-colors">âˆ’</button>
       <span class="text-xs text-gray-600 w-10 text-center" x-text="Math.round(zoom*100)+'%'"></span>
       <button @click="zoom=Math.min(2.5,zoom+.15)" class="px-2 py-1 text-gray-500 hover:text-white text-sm transition-colors">+</button>
-      <button @click="zoom=1;pan={x:40,y:40}" class="px-2 py-1 text-gray-600 hover:text-white text-xs border-l border-gray-800 ml-1 pl-2 transition-colors">⌂</button>
+      <button @click="zoom=1;pan={x:40,y:40}" class="px-2 py-1 text-gray-600 hover:text-white text-xs border-l border-gray-800 ml-1 pl-2 transition-colors">âŒ‚</button>
     </div>
   </div>
 
@@ -364,11 +364,11 @@ body{overflow:hidden}
     <!-- Multi-select panel -->
     <template x-if="selectedNodes.length > 1">
       <div class="p-4 space-y-3">
-        <p class="text-xs text-gray-600 uppercase tracking-wide">Selección múltiple</p>
+        <p class="text-xs text-gray-600 uppercase tracking-wide">SelecciÃ³n mÃºltiple</p>
         <p class="text-sm text-gray-400" x-text="selectedNodes.length + ' nodos seleccionados'"></p>
         <button @click="deleteSelected()"
           class="w-full px-3 py-1.5 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs rounded transition-colors border border-red-900/40">
-          Eliminar selección
+          Eliminar selecciÃ³n
         </button>
       </div>
     </template>
@@ -387,7 +387,7 @@ body{overflow:hidden}
           <!-- Comment node info -->
           <div x-show="selectedNode.type === 'comment'"
             class="rounded p-2 text-xs text-yellow-400/80 bg-yellow-950/25 border border-yellow-800/30 leading-relaxed">
-            Nodo de documentación — no afecta la ejecución.
+            Nodo de documentaciÃ³n â€” no afecta la ejecuciÃ³n.
             <button @click="startEditComment(selectedNodeId)" class="underline ml-1">Editar texto</button>
           </div>
 
@@ -425,7 +425,7 @@ body{overflow:hidden}
             <label class="flex items-center gap-2 cursor-pointer select-none">
               <input type="checkbox" x-model="selectedNode.hitl" @change="render()"
                 class="w-3.5 h-3.5 rounded bg-gray-800 border-gray-600 accent-indigo-500">
-              <span class="text-xs text-gray-300">Revisión HITL</span>
+              <span class="text-xs text-gray-300">RevisiÃ³n HITL</span>
             </label>
           </div>
           <div x-show="selectedNode.hitl" x-cloak>
@@ -439,7 +439,7 @@ body{overflow:hidden}
           </div>
           <div x-show="selectedNode.hitl && edgesFromNode(selectedNodeId).length === 0" x-cloak
             class="rounded p-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-800/40 leading-relaxed">
-            ⚠ Sin downstream — HITL se saltea.
+            âš  Sin downstream â€” HITL se saltea.
           </div>
           </template>
         </div>
@@ -449,7 +449,7 @@ body{overflow:hidden}
           <div class="space-y-1">
             <template x-for="e in edgesFromNode(selectedNodeId)" :key="e.id">
               <div class="flex items-center gap-1 text-xs text-gray-500">
-                <span class="text-indigo-400">→</span>
+                <span class="text-indigo-400">â†’</span>
                 <span x-text="labelOf(e.to)" class="truncate"></span>
                 <span x-show="e.condition" class="text-amber-500 text-xs shrink-0" x-text="'['+e.condition+']'"></span>
               </div>
@@ -465,7 +465,7 @@ body{overflow:hidden}
       <div class="p-4 space-y-3">
         <div class="flex items-center justify-between">
           <p class="text-xs text-gray-600 uppercase tracking-wide">Runs recientes</p>
-          <button @click="loadPipelineRuns()" class="text-gray-700 hover:text-gray-400 text-xs transition-colors">↻</button>
+          <button @click="loadPipelineRuns()" class="text-gray-700 hover:text-gray-400 text-xs transition-colors">â†»</button>
         </div>
         <template x-if="loadingPipelineRuns">
           <div class="space-y-1">
@@ -474,7 +474,7 @@ body{overflow:hidden}
           </div>
         </template>
         <template x-if="!loadingPipelineRuns && pipelineRuns.length === 0">
-          <p class="text-xs text-gray-700">Sin runs todavía.</p>
+          <p class="text-xs text-gray-700">Sin runs todavÃ­a.</p>
         </template>
         <div class="space-y-1">
           <template x-for="r in pipelineRuns" :key="r.run_id">
@@ -488,7 +488,7 @@ body{overflow:hidden}
                     'bg-red-900/50 text-red-300': r.status==='error',
                     'bg-gray-800 text-gray-400': !['running','success','done','error'].includes(r.status)
                   }" x-text="r.status"></span>
-                <span class="font-mono text-gray-600" x-text="r.cost_usd ? '€'+r.cost_usd.toFixed(3) : '—'"></span>
+                <span class="font-mono text-gray-600" x-text="r.cost_usd ? 'â‚¬'+r.cost_usd.toFixed(3) : 'â€”'"></span>
               </div>
               <p class="text-gray-400 truncate" x-text="r.request"></p>
               <p class="text-gray-700 text-xs" x-text="timeAgo(r.created_at)"></p>
@@ -513,7 +513,7 @@ body{overflow:hidden}
 
 </div>
 
-<!-- ── Run modal ── -->
+<!-- â”€â”€ Run modal â”€â”€ -->
 <template x-teleport="body">
   <div x-show="showRunModal" class="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4"
     @click.self="showRunModal=false">
@@ -522,10 +522,10 @@ body{overflow:hidden}
       <p class="text-xs text-gray-500" x-text="activeName"></p>
 
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5">Request / instrucción</label>
+        <label class="block text-xs text-gray-400 mb-1.5">Request / instrucciÃ³n</label>
         <textarea x-model="runRequest" rows="3"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"
-          placeholder="Describe lo que quieres construir…"></textarea>
+          placeholder="Describe lo que quieres construirâ€¦"></textarea>
       </div>
 
       <div class="grid grid-cols-2 gap-3">
@@ -533,7 +533,7 @@ body{overflow:hidden}
           <label class="block text-xs text-gray-400 mb-1.5">Workspace</label>
           <select x-model="runWorkspaceId"
             class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500">
-            <option value="">— ninguno —</option>
+            <option value="">â€” ninguno â€”</option>
             <template x-for="ws in workspaces" :key="ws.id">
               <option :value="ws.id" x-text="ws.name"></option>
             </template>
@@ -552,7 +552,7 @@ body{overflow:hidden}
 
       <label class="flex items-center gap-2 text-sm cursor-pointer">
         <input type="checkbox" x-model="runHitl" class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
-        <span class="text-gray-300 text-xs">Revisión humana (HITL)</span>
+        <span class="text-gray-300 text-xs">RevisiÃ³n humana (HITL)</span>
       </label>
 
       <p x-show="runError" class="text-red-400 text-xs" x-text="runError"></p>
@@ -567,20 +567,20 @@ body{overflow:hidden}
               Lanzar
             </span>
           </template>
-          <span x-show="runLoading">Lanzando…</span>
+          <span x-show="runLoading">Lanzandoâ€¦</span>
         </button>
       </div>
     </div>
   </div>
 </template>
 
-<!-- ── Edge condition modal ── -->
+<!-- â”€â”€ Edge condition modal â”€â”€ -->
 <template x-teleport="body">
   <div x-show="editingEdge" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
     @click.self="editingEdge=null">
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-80 p-5 space-y-3">
-      <h3 class="font-semibold text-sm">Condición del edge</h3>
-      <p class="text-xs text-gray-500">Evalúa <code class="text-amber-400">state["metadata"][key]</code>. Vacío = siempre.</p>
+      <h3 class="font-semibold text-sm">CondiciÃ³n del edge</h3>
+      <p class="text-xs text-gray-500">EvalÃºa <code class="text-amber-400">state["metadata"][key]</code>. VacÃ­o = siempre.</p>
       <input x-model="editingEdgeCondition" @keydown.enter="saveEdgeCondition()" @keydown.escape="editingEdge=null"
         list="condition-opts" placeholder="ej: reviewer_fix_requested"
         class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-amber-500">
@@ -603,13 +603,13 @@ body{overflow:hidden}
   </div>
 </template>
 
-<!-- ── New agent modal ── -->
+<!-- â”€â”€ New agent modal â”€â”€ -->
 <template x-teleport="body">
   <div x-show="showNewAgentModal" x-cloak class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
     @click.self="showNewAgentModal=false">
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-96 p-6 space-y-4">
       <h3 class="font-semibold text-sm">Crear agente personalizado</h3>
-      <p class="text-xs text-gray-500">Define el nombre, prompt de sistema y color. El agente se persiste en el workspace y podrás arrastrarlo al canvas.</p>
+      <p class="text-xs text-gray-500">Define el nombre, prompt de sistema y color. El agente se persiste en el workspace y podrÃ¡s arrastrarlo al canvas.</p>
 
       <div>
         <label class="block text-xs text-gray-400 mb-1.5">Nombre / rol <span class="text-red-500">*</span></label>
@@ -619,13 +619,13 @@ body{overflow:hidden}
 
       <div>
         <label class="block text-xs text-gray-400 mb-1.5">System prompt <span class="text-red-500">*</span></label>
-        <textarea x-model="newAgent.systemPrompt" rows="5" placeholder="Eres un agente especializado en… Recibe {request} y produce…"
+        <textarea x-model="newAgent.systemPrompt" rows="5" placeholder="Eres un agente especializado enâ€¦ Recibe {request} y produceâ€¦"
           class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-xs font-mono focus:outline-none focus:border-indigo-500 resize-none"></textarea>
         <p class="text-xs text-gray-600 mt-1">Usa <code class="text-gray-500">{'{'}request{'}'}</code> para interpolar el input del pipeline.</p>
       </div>
 
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5">Descripción del rol <span class="text-gray-600">(opcional)</span></label>
+        <label class="block text-xs text-gray-400 mb-1.5">DescripciÃ³n del rol <span class="text-gray-600">(opcional)</span></label>
         <input x-model="newAgent.roleDescription" placeholder="ej: Analiza datos y produce informes concisos"
           class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
       </div>
@@ -654,7 +654,7 @@ body{overflow:hidden}
   </div>
 </template>
 
-<!-- ── Save as modal ── -->
+<!-- â”€â”€ Save as modal â”€â”€ -->
 <template x-teleport="body">
   <div x-show="showSaveAsModal" x-cloak class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
     @click.self="showSaveAsModal=false" @keydown.escape.window="showSaveAsModal=false">
@@ -675,7 +675,7 @@ body{overflow:hidden}
   </div>
 </template>
 
-<!-- ── Confirmation modal ── -->
+<!-- â”€â”€ Confirmation modal â”€â”€ -->
 <template x-teleport="body">
   <div x-show="confirmModal.open" x-cloak class="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-80 p-5 space-y-4 shadow-2xl">
@@ -690,21 +690,21 @@ body{overflow:hidden}
   </div>
 </template>
 
-<!-- ── Toast notification ── -->
+<!-- â”€â”€ Toast notification â”€â”€ -->
 <template x-teleport="body">
   <div x-show="toast" x-cloak
     class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] bg-gray-800 border border-gray-600 text-gray-200 text-xs px-4 py-2.5 rounded-lg shadow-xl pointer-events-none"
     x-text="toast"></div>
 </template>
 
-<!-- ── Comment edit modal ── -->
+<!-- â”€â”€ Comment edit modal â”€â”€ -->
 <template x-teleport="body">
   <div x-show="editingCommentId" x-cloak class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
     @click.self="finishEditComment()">
     <div class="bg-gray-900 border border-gray-700 rounded-xl w-80 p-5 space-y-3">
       <h3 class="font-semibold text-sm">Editar comentario</h3>
       <textarea x-model="editingCommentText" rows="4" @keydown.escape="finishEditComment()"
-        placeholder="Escribe una nota de documentación…"
+        placeholder="Escribe una nota de documentaciÃ³nâ€¦"
         class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-yellow-600 resize-none"></textarea>
       <div class="flex gap-2 justify-end">
         <button @click="editingCommentId=null"
@@ -717,11 +717,11 @@ body{overflow:hidden}
 </template>
 
 <script>
-// ── Constants ─────────────────────────────────────────────────────────────
+// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const NODE_W = 168, NODE_H = 56;
 
 // Single source: colors and glyphs come from /pipelines/agents (_AGENT_PALETTE in pipelines.py).
-// AGENT_COLORS is a local fallback only — used before palette loads or for custom agents.
+// AGENT_COLORS is a local fallback only â€” used before palette loads or for custom agents.
 const AGENT_COLORS = {
   business_analyst: '#7c3aed', pm: '#7c3aed', researcher: '#7c3aed',
   codebase_scanner: '#7c3aed', idea: '#7c3aed',
@@ -732,11 +732,11 @@ const AGENT_COLORS = {
 };
 
 const AGENT_GLYPH = {
-  business_analyst: '⊙', researcher: '⊙', codebase_scanner: '⊙', idea: '⊙',
-  pm: '≡', sprint_planner: '≡',
+  business_analyst: 'âŠ™', researcher: 'âŠ™', codebase_scanner: 'âŠ™', idea: 'âŠ™',
+  pm: 'â‰¡', sprint_planner: 'â‰¡',
   backend_dev: '</>', frontend_dev: '</>', feature: '</>', copywriter: '</>',
-  qa: '✓', reviewer: '✓', editor: '✓',
-  devops: '⇧', doc_writer: '⇧',
+  qa: 'âœ“', reviewer: 'âœ“', editor: 'âœ“',
+  devops: 'â‡§', doc_writer: 'â‡§',
 };
 
 function nodeColor(type) {
@@ -797,16 +797,16 @@ const AGENT_PALETTE_COLORS = [
   '#0d9488', '#7c6f00', '#9333ea', '#e11d48',
 ];
 
-// ── Canvas architecture note ──────────────────────────────────────────────
-// The pipeline canvas uses Alpine.js + imperative SVG rendering (renderCanvas →
+// â”€â”€ Canvas architecture note â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// The pipeline canvas uses Alpine.js + imperative SVG rendering (renderCanvas â†’
 // _renderEdges / _renderNodes via document.createElementNS). This was a deliberate
 // choice evaluated against React Flow / Svelte Flow at the start of phase 2:
 //
-//   • Hard constraint: no build step — the entire platform ships from Python as
+//   â€¢ Hard constraint: no build step â€” the entire platform ships from Python as
 //     plain HTML + CDN scripts. React Flow requires Vite/webpack; Svelte Flow
 //     requires the Svelte compiler. Both are disqualifying.
-//   • Zero migration cost: 8 other pages already use Alpine; no new dependency.
-//   • All phase-2 features (multi-select marquee, dagre-lite auto-layout, minimap,
+//   â€¢ Zero migration cost: 8 other pages already use Alpine; no new dependency.
+//   â€¢ All phase-2 features (multi-select marquee, dagre-lite auto-layout, minimap,
 //     scroll-zoom, validation badges) were implemented in ~700 LOC of vanilla JS.
 //
 // The cost is DOM complexity: _renderNodes() + _renderEdges() are ~350 LOC of
@@ -816,8 +816,8 @@ const AGENT_PALETTE_COLORS = [
 // Accessibility (ARIA roles, tabindex on nodes/edges, keyboard graph navigation)
 // is MISSING and is accepted as conscious technical debt. A proper implementation
 // would require ARIA live-region updates on every render or a shadow accessible
-// tree mirroring the graph — deferred until there is a confirmed user need.
-// ─────────────────────────────────────────────────────────────────────────────
+// tree mirroring the graph â€” deferred until there is a confirmed user need.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function app() {
   return {
     PROVIDERS,
@@ -915,13 +915,13 @@ function app() {
     // Legend overlay
     legendOpen: false,
 
-    // Palette map — populated by loadPalette(); keyed by agent type
+    // Palette map â€” populated by loadPalette(); keyed by agent type
     _paletteMap: {},
 
     // Autosave debounce timer
     _autoSaveTimer: null,
 
-    // ── Computed ───────────────────────────────────────────────────────────
+    // â”€â”€ Computed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     get selectedNode() {
       if (!this.selectedNodeId) return null;
@@ -932,12 +932,12 @@ function app() {
       return [...this.palette, ...this.customAgents];
     },
 
-    // Flat list of all models from PROVIDERS — used by run modal to avoid duplication
+    // Flat list of all models from PROVIDERS â€” used by run modal to avoid duplication
     get allModels() {
       return PROVIDERS.flatMap(pv => pv.models);
     },
 
-    // ── Helpers ────────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     nodeColor(type) { return nodeColor(type); },
 
@@ -1043,7 +1043,7 @@ function app() {
       return Math.floor(s/86400) + 'd';
     },
 
-    // ── Init ──────────────────────────────────────────────────────────────
+    // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async init() {
       window.addEventListener('beforeunload', (e) => {
@@ -1071,7 +1071,7 @@ function app() {
       const r = await fetch('/pipelines/agents', { headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin' });
       if (r.ok) {
         this.palette = await r.json();
-        // Build lookup map: type → {color, phase, glyph} — single source from backend
+        // Build lookup map: type â†’ {color, phase, glyph} â€” single source from backend
         this._paletteMap = Object.fromEntries(this.palette.map(a => [a.type, a]));
       }
     },
@@ -1093,7 +1093,7 @@ function app() {
       if (r.ok) this.workspaces = await r.json();
     },
 
-    // ── Confirmation modal & toast ─────────────────────────────────────────
+    // â”€â”€ Confirmation modal & toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     _showConfirm(message, onConfirm) {
       this.confirmModal = { open: true, message, onConfirm };
@@ -1115,7 +1115,7 @@ function app() {
       this._toastTimer = setTimeout(() => { this.toast = ''; }, ms);
     },
 
-    // ── isDirty tracking ───────────────────────────────────────────────────
+    // â”€â”€ isDirty tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     _markSaved() {
       this.isDirty = false;
@@ -1133,7 +1133,7 @@ function app() {
       if (r.ok) this.loadPipeline(await r.json());
     },
 
-    // ── Custom agents ──────────────────────────────────────────────────────
+    // â”€â”€ Custom agents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async loadCustomAgents() {
       const ws = this.workspaces[0];
@@ -1183,7 +1183,7 @@ function app() {
 
     removeCustomAgent(agent) {
       const type = agent.agent_type || agent.type;
-      this._showConfirm(`¿Eliminar el agente "${agent.label}"?`, async () => {
+      this._showConfirm(`Â¿Eliminar el agente "${agent.label}"?`, async () => {
         const ws = this.workspaces[0];
         if (!ws) { this._showToast('No hay workspace activo.'); return; }
         const key = localStorage.getItem('antcrew_api_key') || '';
@@ -1199,7 +1199,7 @@ function app() {
       });
     },
 
-    // ── Pipeline load/save ─────────────────────────────────────────────────
+    // â”€â”€ Pipeline load/save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     _stopRunsPoller() {
       if (this._runsPoller) { clearInterval(this._runsPoller); this._runsPoller = null; }
@@ -1335,7 +1335,7 @@ function app() {
     },
 
     async deletePipeline(p) {
-      this._showConfirm(`¿Eliminar el pipeline "${p.name}"?`, async () => {
+      this._showConfirm(`Â¿Eliminar el pipeline "${p.name}"?`, async () => {
         const key = localStorage.getItem('antcrew_api_key') || '';
         await fetch(`/pipelines/${p.id}`, {
           method: 'DELETE', headers: key ? {'X-Api-Key': key} : {}, credentials: 'same-origin',
@@ -1347,7 +1347,7 @@ function app() {
       });
     },
 
-    // ── Run ────────────────────────────────────────────────────────────────
+    // â”€â”€ Run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async executeRun() {
       if (!this.runRequest.trim()) return;
@@ -1384,7 +1384,7 @@ function app() {
       }
     },
 
-    // ── Canvas ─────────────────────────────────────────────────────────────
+    // â”€â”€ Canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     // x-for inside SVG doesn't work in Alpine (SVG <template> has no .content).
     // All canvas content is rendered imperatively by renderCanvas().
@@ -1453,12 +1453,12 @@ function app() {
         g.appendChild(vis);
         // Mid-edge decorations
         const mid = this.edgeMid(edge);
-        // HITL ⏸ badge
+        // HITL â¸ badge
         if (style.isHitl) {
           const hg = this._svg('g', { transform: `translate(${mid.x},${mid.y - 10})` });
           hg.appendChild(this._svg('circle', { r: '8', fill: '#451a03', stroke: '#f59e0b', 'stroke-width': '1' }));
           const ht = this._svg('text', { 'text-anchor': 'middle', y: '4', 'font-size': '9' });
-          ht.textContent = '⏸'; hg.appendChild(ht); g.appendChild(hg);
+          ht.textContent = 'â¸'; hg.appendChild(ht); g.appendChild(hg);
         }
         // Condition label
         if (edge.condition) {
@@ -1479,7 +1479,7 @@ function app() {
         g.addEventListener('mouseleave', () => dg.style.opacity = '0');
         dg.appendChild(this._svg('circle', { r: '8', fill: '#7f1d1d' }));
         const dx = this._svg('text', { 'text-anchor': 'middle', y: '4', fill: 'white', 'font-size': '11' });
-        dx.textContent = '✕'; dg.appendChild(dx);
+        dx.textContent = 'âœ•'; dg.appendChild(dx);
         dg.addEventListener('click', (ev) => { ev.stopPropagation(); this.pushHistory(); this.removeEdge(edge); this.renderCanvas(); this._autoSave(); });
         g.appendChild(dg);
         // Endpoint handles when edge is selected (for reconnection)
@@ -1528,7 +1528,7 @@ function app() {
       }
       if (lines.length > 3) {
         const el = this._svg('text', { x: '10', y: '52', 'font-size': '9', fill: '#ca8a04aa' });
-        el.textContent = '…'; g.appendChild(el);
+        el.textContent = 'â€¦'; g.appendChild(el);
       }
       // Delete button
       const dbtn = this._svg('g', { transform: 'translate(156,4)' });
@@ -1537,7 +1537,7 @@ function app() {
       g.addEventListener('mouseleave', () => dbtn.style.opacity = '0');
       dbtn.appendChild(this._svg('circle', { r: '7', fill: '#450a0a' }));
       const dtx = this._svg('text', { 'text-anchor': 'middle', y: '4', fill: '#fca5a5', 'font-size': '9' });
-      dtx.textContent = '✕'; dbtn.appendChild(dtx);
+      dtx.textContent = 'âœ•'; dbtn.appendChild(dtx);
       dbtn.addEventListener('mousedown', (e) => e.stopPropagation());
       dbtn.addEventListener('click', () => { this.pushHistory(); this.removeNode(node); this.renderCanvas(); this._autoSave(); });
       g.appendChild(dbtn);
@@ -1562,7 +1562,7 @@ function app() {
         if (outCount[e.from] !== undefined) outCount[e.from]++;
       }
 
-      // Cycle detection (DFS) — marks nodes involved in back-edges
+      // Cycle detection (DFS) â€” marks nodes involved in back-edges
       const adj = {};
       for (const n of this.nodes) adj[n.id] = [];
       for (const e of this.edges) { if (adj[e.from]) adj[e.from].push(e.to); }
@@ -1652,7 +1652,7 @@ function app() {
           const hg = this._svg('g', { transform: 'translate(10,4)' });
           hg.appendChild(this._svg('rect', { width: '44', height: '13', rx: '3', fill: hbg, stroke: hst, 'stroke-width': '1' }));
           const ht = this._svg('text', { x: '22', y: '9.5', 'text-anchor': 'middle', 'font-size': '8', 'font-family': 'ui-monospace,monospace', fill: hasDown ? '#c4b5fd' : '#fbbf24' });
-          ht.textContent = !hasDown ? '⚠ HITL' : (node.channel_type === 'slack' ? 'SLACK' : node.channel_type === 'telegram' ? 'TG' : 'HITL');
+          ht.textContent = !hasDown ? 'âš  HITL' : (node.channel_type === 'slack' ? 'SLACK' : node.channel_type === 'telegram' ? 'TG' : 'HITL');
           hg.appendChild(ht); g.appendChild(hg);
         }
 
@@ -1661,12 +1661,12 @@ function app() {
           const vg = this._svg('g', { transform: 'translate(122,4)' });
           vg.appendChild(this._svg('rect', { width: '38', height: '13', rx: '3', fill: '#450a0a', stroke: '#ef4444', 'stroke-width': '1' }));
           const vt = this._svg('text', { x: '19', y: '9.5', 'text-anchor': 'middle', 'font-size': '8', 'font-family': 'ui-monospace,monospace', fill: '#fca5a5' });
-          vt.textContent = '⟲ ciclo'; vg.appendChild(vt); g.appendChild(vg);
+          vt.textContent = 'âŸ² ciclo'; vg.appendChild(vt); g.appendChild(vg);
         } else if (isOrphan) {
           const vg = this._svg('g', { transform: 'translate(116,4)' });
           vg.appendChild(this._svg('rect', { width: '44', height: '13', rx: '3', fill: '#451a03', stroke: '#d97706', 'stroke-width': '1' }));
           const vt = this._svg('text', { x: '22', y: '9.5', 'text-anchor': 'middle', 'font-size': '8', 'font-family': 'ui-monospace,monospace', fill: '#fbbf24' });
-          vt.textContent = '⚠ huérfano'; vg.appendChild(vt); g.appendChild(vg);
+          vt.textContent = 'âš  huÃ©rfano'; vg.appendChild(vt); g.appendChild(vg);
         }
 
         // Delete button (hover-only, top-right corner)
@@ -1676,7 +1676,7 @@ function app() {
         g.addEventListener('mouseleave', () => dbtn.style.opacity = '0');
         dbtn.appendChild(this._svg('circle', { r: '7', fill: '#450a0a' }));
         const dtx = this._svg('text', { 'text-anchor': 'middle', y: '4', fill: '#fca5a5', 'font-size': '9' });
-        dtx.textContent = '✕'; dbtn.appendChild(dtx);
+        dtx.textContent = 'âœ•'; dbtn.appendChild(dtx);
         dbtn.addEventListener('mousedown', (e) => e.stopPropagation());
         dbtn.addEventListener('click', () => { this.pushHistory(); this.removeNode(node); this.renderCanvas(); this._autoSave(); });
         g.appendChild(dbtn);
@@ -1726,11 +1726,11 @@ function app() {
       if (!e.target.closest('.edge-group')) this.selectedEdgeId = null;
       const c = this._canvasClientCoords(e);
       if (e.shiftKey) {
-        // Shift+drag → marquee selection
+        // Shift+drag â†’ marquee selection
         this.marquee = { cx1: c.x, cy1: c.y, cx2: c.x, cy2: c.y };
         this.dragging = { type: 'marquee' };
       } else {
-        // Plain drag → pan
+        // Plain drag â†’ pan
         this.dragging = { type: 'canvas', startX: c.x - this.pan.x, startY: c.y - this.pan.y };
         this.selectedNodeId = null;
         this.selectedNodes = [];
@@ -1873,7 +1873,7 @@ function app() {
           const mx2 = Math.max(this.marquee.cx1, this.marquee.cx2);
           const my1 = Math.min(this.marquee.cy1, this.marquee.cy2);
           const my2 = Math.max(this.marquee.cy1, this.marquee.cy2);
-          // Convert screen coords → canvas coords
+          // Convert screen coords â†’ canvas coords
           const cx1 = (mx1 - this.pan.x) / this.zoom, cy1 = (my1 - this.pan.y) / this.zoom;
           const cx2 = (mx2 - this.pan.x) / this.zoom, cy2 = (my2 - this.pan.y) / this.zoom;
           this.selectedNodes = this.nodes
@@ -1900,7 +1900,7 @@ function app() {
       this.tempEdgePath = `M ${x1} ${y1} C ${x1+c} ${y1} ${x2-c} ${y2} ${x2} ${y2}`;
     },
 
-    // ── Drag & drop from palette ───────────────────────────────────────────
+    // â”€â”€ Drag & drop from palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     onPaletteDragStart(e, agent) {
       e.dataTransfer.setData('agent_type', agent.agent_type || agent.type);
@@ -1950,10 +1950,10 @@ function app() {
       this._autoSave();
     },
 
-    // ── Edges ──────────────────────────────────────────────────────────────
+    // â”€â”€ Edges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     startReconnect(e, edge, endpoint) {
-      // endpoint: 'from' | 'to'  — which end the user is dragging
+      // endpoint: 'from' | 'to'  â€” which end the user is dragging
       this.reconnectingEdge = { edge, endpoint };
       this.selectedEdgeId = null;
       const fixedNode = endpoint === 'from'
@@ -2059,13 +2059,13 @@ function app() {
         this.selectedNodes = [node.id];
         this.pushHistory();
       }
-      // Start drag — carry all selected nodes if multi-select active
+      // Start drag â€” carry all selected nodes if multi-select active
       const multiIds = this.selectedNodes.length > 1 ? [...this.selectedNodes] : null;
       this.dragging = { type: 'node', nodeId: node.id, offsetX: c.x - node.x, offsetY: c.y - node.y, multiIds };
       this.renderCanvas();
     },
 
-    // ── Undo / Redo ───────────────────────────────────────────────────────────
+    // â”€â”€ Undo / Redo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     pushHistory() {
       const snap = JSON.stringify({ nodes: this.nodes.map(n=>({...n})), edges: this.edges.map(e=>({...e})) });
@@ -2090,7 +2090,7 @@ function app() {
       this.renderCanvas(); this._autoSave();
     },
 
-    // ── Auto-save draft (debounced 600ms) ────────────────────────────────────
+    // â”€â”€ Auto-save draft (debounced 600ms) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     _autoSave() {
       if (!this.activeId) return;
@@ -2130,7 +2130,7 @@ function app() {
       } catch {}
     },
 
-    // ── Save as ───────────────────────────────────────────────────────────────
+    // â”€â”€ Save as â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     async savePipelineAs() {
       const name = (this.saveAsName || '').trim();
@@ -2155,7 +2155,7 @@ function app() {
       this.loadPipeline(created);
     },
 
-    // ── Duplicate node ────────────────────────────────────────────────────────
+    // â”€â”€ Duplicate node â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     duplicateNode() {
       const src = this.selectedNode;
@@ -2170,7 +2170,7 @@ function app() {
       this.renderCanvas(); this._autoSave();
     },
 
-    // ── Comment nodes ─────────────────────────────────────────────────────────
+    // â”€â”€ Comment nodes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     addComment() {
       if (!this.activeId) this.newPipeline();
@@ -2199,7 +2199,7 @@ function app() {
       this.editingCommentId = null;
     },
 
-    // ── Multi-select delete ───────────────────────────────────────────────────
+    // â”€â”€ Multi-select delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     deleteSelected() {
       if (!this.selectedNodes.length) return;
@@ -2214,7 +2214,7 @@ function app() {
       this._autoSave();
     },
 
-    // ── Auto-layout (topological Sugiyama-lite) ───────────────────────────────
+    // â”€â”€ Auto-layout (topological Sugiyama-lite) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     autoLayout() {
       const realNodes = this.nodes.filter(n => n.type !== 'comment');
@@ -2269,7 +2269,7 @@ function app() {
       this._autoSave();
     },
 
-    // ── Zoom to fit ───────────────────────────────────────────────────────────
+    // â”€â”€ Zoom to fit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     zoomToFit() {
       const realNodes = this.nodes.filter(n => n.type !== 'comment');
@@ -2290,7 +2290,7 @@ function app() {
       this.renderCanvas();
     },
 
-    // ── Minimap ───────────────────────────────────────────────────────────────
+    // â”€â”€ Minimap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     _renderMinimap() {
       const mm = document.getElementById('minimap-svg');

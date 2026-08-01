@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crear cuenta — antcrew</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>Crear cuenta â€” antcrew</title>
+<link href="/static/tailwind.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <script>
 // If user is already authenticated and verified, send them straight to the dashboard
@@ -44,7 +44,7 @@
               'bg-gray-800 text-gray-500': step < i + 1
             }">
             <span x-show="step <= i + 1" x-text="i + 1"></span>
-            <span x-show="step > i + 1">✓</span>
+            <span x-show="step > i + 1">âœ“</span>
           </div>
           <span class="text-xs hidden sm:block"
             :class="step === i + 1 ? 'text-gray-200' : 'text-gray-600'"
@@ -57,10 +57,10 @@
     </template>
   </div>
 
-  <!-- ── STEP 1 ── Cuenta ────────────────────────────────────────────── -->
+  <!-- â”€â”€ STEP 1 â”€â”€ Cuenta â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
   <div x-show="step === 1" x-cloak>
     <h2 class="text-lg font-semibold mb-1">Crea tu cuenta</h2>
-    <p class="text-gray-400 text-sm mb-6">Email y contraseña para acceder a la plataforma.</p>
+    <p class="text-gray-400 text-sm mb-6">Email y contraseÃ±a para acceder a la plataforma.</p>
 
     <div class="space-y-4">
       <div>
@@ -70,8 +70,8 @@
           class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
       </div>
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5">Contraseña</label>
-        <input x-model="password" type="password" placeholder="Mínimo 8 caracteres"
+        <label class="block text-xs text-gray-400 mb-1.5">ContraseÃ±a</label>
+        <input x-model="password" type="password" placeholder="MÃ­nimo 8 caracteres"
           @keydown.enter="createAccount()"
           class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
       </div>
@@ -83,25 +83,25 @@
       :disabled="step1Loading || !email.trim() || password.length < 8"
       class="mt-6 w-full py-2.5 rounded-lg font-medium text-sm transition
         bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-      <span x-show="!step1Loading">Continuar →</span>
-      <span x-show="step1Loading">Creando…</span>
+      <span x-show="!step1Loading">Continuar â†’</span>
+      <span x-show="step1Loading">Creandoâ€¦</span>
     </button>
 
     <p class="text-center text-xs text-gray-600 mt-5">
-      ¿Ya tienes cuenta?
-      <a href="/login" class="text-indigo-400 hover:text-indigo-300 transition">Inicia sesión</a>
+      Â¿Ya tienes cuenta?
+      <a href="/login" class="text-indigo-400 hover:text-indigo-300 transition">Inicia sesiÃ³n</a>
     </p>
   </div>
 
-  <!-- ── STEP 2 ── Verificar email ──────────────────────────────────── -->
+  <!-- â”€â”€ STEP 2 â”€â”€ Verificar email â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
   <div x-show="step === 2" x-cloak>
     <h2 class="text-lg font-semibold mb-1">Verifica tu email</h2>
     <p class="text-gray-400 text-sm mb-6">
-      Hemos enviado un código de 6 dígitos a <strong x-text="email"></strong>.
+      Hemos enviado un cÃ³digo de 6 dÃ­gitos a <strong x-text="email"></strong>.
     </p>
 
     <div class="mb-4">
-      <label class="block text-xs text-gray-400 mb-1.5">Código de verificación</label>
+      <label class="block text-xs text-gray-400 mb-1.5">CÃ³digo de verificaciÃ³n</label>
       <input x-model="verifyCode" type="text" inputmode="numeric" maxlength="6"
         placeholder="123456"
         @keydown.enter="verifyEmail()"
@@ -114,24 +114,24 @@
       :disabled="step2Loading || verifyCode.length !== 6"
       class="w-full py-2.5 rounded-lg font-medium text-sm transition
         bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-      <span x-show="!step2Loading">Verificar →</span>
-      <span x-show="step2Loading">Verificando…</span>
+      <span x-show="!step2Loading">Verificar â†’</span>
+      <span x-show="step2Loading">Verificandoâ€¦</span>
     </button>
 
     <div class="mt-4 text-center">
       <button @click="resendCode()"
         :disabled="resendCooldown > 0"
         class="text-xs text-gray-500 hover:text-indigo-400 transition disabled:cursor-not-allowed">
-        <span x-show="resendCooldown === 0">¿No recibiste el código? Reenviar</span>
+        <span x-show="resendCooldown === 0">Â¿No recibiste el cÃ³digo? Reenviar</span>
         <span x-show="resendCooldown > 0">Reenviar en <span x-text="resendCooldown"></span>s</span>
       </button>
     </div>
   </div>
 
-  <!-- ── STEP 3 ── Workspace ────────────────────────────────────────── -->
+  <!-- â”€â”€ STEP 3 â”€â”€ Workspace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
   <div x-show="step === 3" x-cloak>
     <h2 class="text-lg font-semibold mb-1">Tu workspace</h2>
-    <p class="text-gray-400 text-sm mb-6">Dale un nombre a tu espacio de trabajo. Podrás cambiarlo más tarde desde Settings.</p>
+    <p class="text-gray-400 text-sm mb-6">Dale un nombre a tu espacio de trabajo. PodrÃ¡s cambiarlo mÃ¡s tarde desde Settings.</p>
 
     <div class="space-y-4">
       <div>
@@ -142,7 +142,7 @@
           class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 placeholder-gray-600">
       </div>
       <div>
-        <label class="block text-xs text-gray-400 mb-1.5">Slug <span class="text-gray-700">(URL-friendly, solo minúsculas y guiones)</span></label>
+        <label class="block text-xs text-gray-400 mb-1.5">Slug <span class="text-gray-700">(URL-friendly, solo minÃºsculas y guiones)</span></label>
         <div class="flex items-center gap-2">
           <span class="text-gray-600 text-sm font-mono shrink-0">antcrew.io/</span>
           <input x-model="wsSlug" type="text" placeholder="acme-corp"
@@ -159,15 +159,15 @@
       :disabled="step3Loading || !wsName.trim() || !wsSlug.trim()"
       class="mt-6 w-full py-2.5 rounded-lg font-medium text-sm transition
         bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-      <span x-show="!step3Loading">Continuar →</span>
-      <span x-show="step3Loading">Guardando…</span>
+      <span x-show="!step3Loading">Continuar â†’</span>
+      <span x-show="step3Loading">Guardandoâ€¦</span>
     </button>
   </div>
 
-  <!-- ── STEP 4 ── API Keys ─────────────────────────────────────────── -->
+  <!-- â”€â”€ STEP 4 â”€â”€ API Keys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
   <div x-show="step === 4" x-cloak>
-    <h2 class="text-lg font-semibold mb-1">Configuración LLM</h2>
-    <p class="text-gray-400 text-sm mb-6">¿Cómo quieres que antcrew acceda a los modelos de lenguaje?</p>
+    <h2 class="text-lg font-semibold mb-1">ConfiguraciÃ³n LLM</h2>
+    <p class="text-gray-400 text-sm mb-6">Â¿CÃ³mo quieres que antcrew acceda a los modelos de lenguaje?</p>
 
     <!-- Mode selector -->
     <div class="space-y-3 mb-5">
@@ -178,9 +178,9 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">Claves de la plataforma</span>
-            <span class="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-500 font-mono">×3.0</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-gray-800 text-gray-500 font-mono">Ã—3.0</span>
           </div>
-          <p class="text-xs text-gray-500 mt-1">antcrew gestiona las claves. Empieza sin configuración, ideal para equipos pequeños.</p>
+          <p class="text-xs text-gray-500 mt-1">antcrew gestiona las claves. Empieza sin configuraciÃ³n, ideal para equipos pequeÃ±os.</p>
         </div>
       </label>
 
@@ -191,9 +191,9 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">Mis propias claves (BYOK)</span>
-            <span class="text-xs px-1.5 py-0.5 rounded bg-emerald-900/60 text-emerald-400 font-mono">×0.4</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-emerald-900/60 text-emerald-400 font-mono">Ã—0.4</span>
           </div>
-          <p class="text-xs text-gray-500 mt-1">Aportas tus claves de Anthropic, OpenAI, etc. Máximo control y coste mínimo.</p>
+          <p class="text-xs text-gray-500 mt-1">Aportas tus claves de Anthropic, OpenAI, etc. MÃ¡ximo control y coste mÃ­nimo.</p>
         </div>
       </label>
 
@@ -204,7 +204,7 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">Proxy local</span>
-            <span class="text-xs px-1.5 py-0.5 rounded bg-violet-900/60 text-violet-400 font-mono">×0.7</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-violet-900/60 text-violet-400 font-mono">Ã—0.7</span>
           </div>
           <p class="text-xs text-gray-500 mt-1">Ejecutas <code class="text-gray-400 bg-gray-800 px-1 rounded">antcrew-proxy</code> en tu infraestructura. La plataforma nunca ve tu clave.</p>
         </div>
@@ -214,8 +214,8 @@
     <!-- BYOK / Proxy: info note -->
     <div x-show="llmMode !== 'managed'" x-cloak
       class="mb-4 p-3 rounded-lg bg-gray-900 border border-gray-800 text-xs text-gray-400 leading-relaxed">
-      <span x-show="llmMode === 'byok'">Añade tus claves en <strong class="text-gray-200">Settings → LLM Mode</strong> después de crear la cuenta. Puedes hacerlo ahora o más tarde.</span>
-      <span x-show="llmMode === 'proxy'">Configura el endpoint de proxy en <strong class="text-gray-200">Settings → LLM Mode</strong> después de crear la cuenta.</span>
+      <span x-show="llmMode === 'byok'">AÃ±ade tus claves en <strong class="text-gray-200">Settings â†’ LLM Mode</strong> despuÃ©s de crear la cuenta. Puedes hacerlo ahora o mÃ¡s tarde.</span>
+      <span x-show="llmMode === 'proxy'">Configura el endpoint de proxy en <strong class="text-gray-200">Settings â†’ LLM Mode</strong> despuÃ©s de crear la cuenta.</span>
     </div>
 
     <!-- Per-model fallback toggle (visible for byok and proxy) -->
@@ -225,7 +225,7 @@
         class="mt-0.5 w-4 h-4 rounded border-gray-600 bg-gray-800 accent-indigo-500 shrink-0 cursor-pointer">
       <label for="fallback-toggle" class="cursor-pointer">
         <p class="text-sm text-gray-200 select-none">Usar claves de la plataforma como respaldo</p>
-        <p class="text-xs text-gray-500 mt-0.5">Si un modelo no tiene clave configurada, antcrew usa su propia clave (×3.0 para esos modelos).</p>
+        <p class="text-xs text-gray-500 mt-0.5">Si un modelo no tiene clave configurada, antcrew usa su propia clave (Ã—3.0 para esos modelos).</p>
       </label>
     </div>
 
@@ -235,17 +235,17 @@
       :disabled="step4Loading"
       class="w-full py-2.5 rounded-lg font-medium text-sm transition
         bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-      <span x-show="!step4Loading">Continuar →</span>
-      <span x-show="step4Loading">Guardando…</span>
+      <span x-show="!step4Loading">Continuar â†’</span>
+      <span x-show="step4Loading">Guardandoâ€¦</span>
     </button>
   </div>
 
-  <!-- ── STEP 5 ── Listo ──────────────────────────────────────────────── -->
+  <!-- â”€â”€ STEP 5 â”€â”€ Listo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
   <div x-show="step === 5" x-cloak>
     <div class="text-center mb-6">
-      <div class="text-5xl mb-3">✓</div>
-      <h2 class="text-lg font-semibold mb-1">¡Todo listo!</h2>
-      <p class="text-gray-400 text-sm">Tu cuenta y workspace están configurados.</p>
+      <div class="text-5xl mb-3">âœ“</div>
+      <h2 class="text-lg font-semibold mb-1">Â¡Todo listo!</h2>
+      <p class="text-gray-400 text-sm">Tu cuenta y workspace estÃ¡n configurados.</p>
     </div>
 
     <!-- Summary card -->
@@ -262,13 +262,13 @@
         <span class="text-xs text-gray-500">Modo LLM</span>
         <span class="text-xs font-mono px-2 py-0.5 rounded"
           :class="llmMode === 'byok' ? 'bg-emerald-900/50 text-emerald-400' : llmMode === 'proxy' ? 'bg-violet-900/50 text-violet-400' : 'bg-gray-800 text-gray-400'"
-          x-text="llmMode === 'managed' ? 'managed ×3.0' : llmMode === 'byok' ? 'byok ×0.4' : 'proxy ×0.7'"></span>
+          x-text="llmMode === 'managed' ? 'managed Ã—3.0' : llmMode === 'byok' ? 'byok Ã—0.4' : 'proxy Ã—0.7'"></span>
       </div>
       <div class="flex justify-between items-center">
         <span class="text-xs text-gray-500">Tu API key (admin)</span>
         <button @click="copyText(adminKey, 'admin-key')"
           class="text-xs text-indigo-400 hover:text-indigo-300 transition"
-          x-text="copied === 'admin-key' ? '✓ Copiada' : 'Copiar'"></button>
+          x-text="copied === 'admin-key' ? 'âœ“ Copiada' : 'Copiar'"></button>
       </div>
       <code class="block text-xs text-gray-400 font-mono break-all bg-gray-950 rounded px-3 py-2"
         x-text="adminKey"></code>
@@ -296,7 +296,7 @@
           :disabled="inviteLoading || !inviteEmail.trim()"
           class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 transition disabled:opacity-50">
           <span x-show="!inviteLoading">Invitar</span>
-          <span x-show="inviteLoading">…</span>
+          <span x-show="inviteLoading">â€¦</span>
         </button>
       </div>
       <p x-show="inviteError" x-cloak class="text-red-400 text-xs mb-2" x-text="inviteError"></p>
@@ -305,9 +305,9 @@
           <div class="flex items-center gap-2 text-xs text-gray-400">
             <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
             <span x-text="inv.email"></span>
-            <span class="text-gray-600">·</span>
+            <span class="text-gray-600">Â·</span>
             <span class="text-gray-500" x-text="inv.role"></span>
-            <span class="ml-auto text-green-600">Invitación enviada</span>
+            <span class="ml-auto text-green-600">InvitaciÃ³n enviada</span>
           </div>
         </template>
       </div>
@@ -315,13 +315,13 @@
 
     <!-- Quick start -->
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
-      <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Lanzar un run con revisión</p>
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Lanzar un run con revisiÃ³n</p>
       <div class="relative">
         <pre class="text-xs text-gray-300 font-mono overflow-x-auto bg-gray-950 rounded-lg px-4 py-3 leading-relaxed"
           x-text="curlExample()"></pre>
         <button @click="copyText(curlExample(), 'curl')"
           class="absolute top-2 right-2 text-xs text-gray-500 hover:text-indigo-400 transition px-2 py-1 bg-gray-900 rounded"
-          x-text="copied === 'curl' ? '✓' : 'Copiar'"></button>
+          x-text="copied === 'curl' ? 'âœ“' : 'Copiar'"></button>
       </div>
     </div>
 
@@ -359,14 +359,14 @@ function onboard() {
     step2Error: '',
     resendCooldown: 0,
 
-    // Step 3 — workspace
+    // Step 3 â€” workspace
     wsName: '',
     wsSlug: '',
     slugError: '',
     step3Loading: false,
     step3Error: '',
 
-    // Step 4 — LLM
+    // Step 4 â€” LLM
     llmMode: 'managed',
     byokManagedFallback: false,
     step4Loading: false,
@@ -397,7 +397,7 @@ function onboard() {
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
           if (r.status === 409) {
-            this.step1Error = 'Ya existe una cuenta con ese email. ¿Quieres iniciar sesión?';
+            this.step1Error = 'Ya existe una cuenta con ese email. Â¿Quieres iniciar sesiÃ³n?';
           } else {
             this.step1Error = d.detail || `Error ${r.status}`;
           }
@@ -457,11 +457,11 @@ function onboard() {
       this.step3Error = '';
       const slug = this.wsSlug.trim().toLowerCase();
       if (!/^[a-z0-9-]+$/.test(slug)) {
-        this.slugError = 'Solo minúsculas, números y guiones';
+        this.slugError = 'Solo minÃºsculas, nÃºmeros y guiones';
         return;
       }
       if (!this.wsName.trim()) {
-        this.step3Error = 'El nombre no puede estar vacío';
+        this.step3Error = 'El nombre no puede estar vacÃ­o';
         return;
       }
       this.step3Loading = true;
@@ -474,7 +474,7 @@ function onboard() {
         if (!r.ok) {
           const d = await r.json().catch(() => ({}));
           if (r.status === 409) {
-            this.slugError = 'Ese slug ya está en uso, elige otro';
+            this.slugError = 'Ese slug ya estÃ¡ en uso, elige otro';
           } else {
             this.step3Error = d.detail || `Error ${r.status}`;
           }
@@ -564,7 +564,7 @@ function onboard() {
   -H "Content-Type: application/json" \\
   -d '{
     "team": "my_team",
-    "request": "Analiza el módulo de pagos",
+    "request": "Analiza el mÃ³dulo de pagos",
     "hitl": true,
     "workspace_id": ${this.workspaceId || 1}
   }'`;

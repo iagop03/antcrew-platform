@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tickets — antcrew</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>Tickets â€” antcrew</title>
+<link href="/static/tailwind.css" rel="stylesheet">
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
@@ -56,11 +56,11 @@
   <div class="flex items-center justify-between mb-4">
     <div>
       <h1 class="text-xl font-semibold" data-i18n="tickets.title">Tickets</h1>
-      <p class="text-gray-400 text-sm mt-0.5" data-i18n="tickets.subtitle">Kanban board — click a card to move it</p>
+      <p class="text-gray-400 text-sm mt-0.5" data-i18n="tickets.subtitle">Kanban board â€” click a card to move it</p>
     </div>
     <div class="flex items-center gap-3">
       <!-- Search -->
-      <input type="text" x-model="search" data-i18n="tickets.search" placeholder="Search tickets…"
+      <input type="text" x-model="search" data-i18n="tickets.search" placeholder="Search ticketsâ€¦"
         class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500 w-56">
       <div class="text-sm text-gray-500" x-text="`${filteredTickets.length} / ${tickets.length}`"></div>
     </div>
@@ -68,15 +68,15 @@
 
   <!-- Run filter banner -->
   <div x-show="runIdFilter" class="mb-4 bg-indigo-950 border border-indigo-800 rounded-lg px-4 py-2.5 flex items-center gap-3 text-sm">
-    <span class="text-indigo-300">Filtered to run <span class="font-mono text-indigo-200" x-text="runIdFilter ? runIdFilter.slice(0,16) + '…' : ''"></span></span>
-    <a :href="'/run/' + runIdFilter" class="text-indigo-400 hover:underline text-xs">View run →</a>
-    <button @click="runIdFilter = null; ticketsOffset = 0; load()" class="ml-auto text-indigo-500 hover:text-indigo-300 text-xs">✕ Clear filter</button>
+    <span class="text-indigo-300">Filtered to run <span class="font-mono text-indigo-200" x-text="runIdFilter ? runIdFilter.slice(0,16) + 'â€¦' : ''"></span></span>
+    <a :href="'/run/' + runIdFilter" class="text-indigo-400 hover:underline text-xs">View run â†’</a>
+    <button @click="runIdFilter = null; ticketsOffset = 0; load()" class="ml-auto text-indigo-500 hover:text-indigo-300 text-xs">âœ• Clear filter</button>
   </div>
 
   <!-- Error banner -->
   <div x-show="loadError" class="mb-4">
     <div class="bg-red-950 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300 flex items-center gap-3">
-      <span>⚠</span>
+      <span>âš </span>
       <span x-text="loadError"></span>
       <button @click="load()" class="ml-auto text-xs text-red-400 hover:text-red-200 underline">Retry</button>
     </div>
@@ -134,13 +134,13 @@
     <button @click="prevPage()" :disabled="ticketsOffset === 0"
       class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition"
       :class="ticketsOffset === 0 ? 'border-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'">
-      ← Anterior
+      â† Anterior
     </button>
-    <span class="text-xs text-gray-500" x-text="`${ticketsOffset + 1}–${ticketsOffset + tickets.length} tickets`"></span>
+    <span class="text-xs text-gray-500" x-text="`${ticketsOffset + 1}â€“${ticketsOffset + tickets.length} tickets`"></span>
     <button @click="nextPage()" :disabled="!hasMore"
       class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition"
       :class="!hasMore ? 'border-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'">
-      Siguiente →
+      Siguiente â†’
     </button>
   </div>
 </div>
@@ -193,7 +193,7 @@
                 <button @click="exportTicket(selected.ticket_id, target)"
                   :disabled="exporting"
                   class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:border-gray-500 hover:text-white disabled:opacity-50 transition capitalize"
-                  x-text="exporting ? 'Exporting…' : target"></button>
+                  x-text="exporting ? 'Exportingâ€¦' : target"></button>
               </template>
             </div>
             <template x-if="exportResult">
@@ -201,7 +201,7 @@
                 <template x-if="exportResult.url">
                   <a :href="exportResult.url" target="_blank" rel="noopener"
                     class="text-indigo-400 hover:underline"
-                    x-text="'Exported → ' + exportResult.url"></a>
+                    x-text="'Exported â†’ ' + exportResult.url"></a>
                 </template>
                 <template x-if="exportResult.error">
                   <span class="text-red-400" x-text="exportResult.error"></span>
@@ -214,7 +214,7 @@
         <div class="text-xs text-gray-600 flex gap-4">
           <span>Priority: <span class="text-gray-400" x-text="selected.priority"></span></span>
           <a :href="'/run/' + selected.run_id" class="text-indigo-400 hover:underline">
-            View run →
+            View run â†’
           </a>
         </div>
       </div>

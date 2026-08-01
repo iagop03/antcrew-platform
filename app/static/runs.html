@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Runs — antcrew</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>Runs â€” antcrew</title>
+<link href="/static/tailwind.css" rel="stylesheet">
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
@@ -85,7 +85,7 @@
 <!-- Error banner -->
 <div x-show="loadError" class="px-6 mb-4">
   <div class="bg-red-950 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300 flex items-center gap-3">
-    <span>⚠</span>
+    <span>âš </span>
     <span x-text="loadError"></span>
     <button @click="loadRuns()" class="ml-auto text-xs text-red-400 hover:text-red-200 underline">Retry</button>
   </div>
@@ -138,7 +138,7 @@
         <template x-for="run in runs" :key="run.run_id">
           <tr class="border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer transition"
               @click="window.location='/run/' + run.run_id">
-            <td class="px-4 py-3 font-mono text-xs text-gray-400" x-text="run.run_id.slice(0,12) + '…'"></td>
+            <td class="px-4 py-3 font-mono text-xs text-gray-400" x-text="run.run_id.slice(0,12) + 'â€¦'"></td>
             <td class="px-4 py-3 font-medium">
               <template x-if="run.team?.startsWith('pipeline:')">
                 <span class="inline-flex items-center gap-1">
@@ -161,9 +161,9 @@
                 x-text="run.status"></span>
             </td>
             <td class="px-4 py-3 text-right text-gray-300 font-mono text-xs"
-                x-text="run.cost_usd ? '€' + run.cost_usd.toFixed(4) : '—'"></td>
+                x-text="run.cost_usd ? 'â‚¬' + run.cost_usd.toFixed(4) : 'â€”'"></td>
             <td class="px-4 py-3 text-right text-gray-400 text-xs"
-                x-text="run.duration_s ? run.duration_s.toFixed(0) + 's' : '—'"></td>
+                x-text="run.duration_s ? run.duration_s.toFixed(0) + 's' : 'â€”'"></td>
             <td class="px-4 py-3 text-right text-gray-400 text-xs" x-text="timeAgo(run.created_at)"></td>
           </tr>
         </template>
@@ -176,13 +176,13 @@
     <button @click="prevPage()" :disabled="runsOffset === 0"
       class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition"
       :class="runsOffset === 0 ? 'border-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'">
-      ← Anterior
+      â† Anterior
     </button>
-    <span class="text-xs text-gray-500" x-text="`Mostrando ${runsOffset + 1}–${runsOffset + runs.length}`"></span>
+    <span class="text-xs text-gray-500" x-text="`Mostrando ${runsOffset + 1}â€“${runsOffset + runs.length}`"></span>
     <button @click="nextPage()" :disabled="!hasMore"
       class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition"
       :class="!hasMore ? 'border-gray-800 text-gray-600 cursor-not-allowed' : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'">
-      Siguiente →
+      Siguiente â†’
     </button>
   </div>
 </div>
@@ -190,7 +190,7 @@
 <!-- New Run Modal -->
 <div x-show="showModal" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
   <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
-    <h2 class="text-lg font-semibold mb-4" data-i18n="runs.modal.title">Nueva Ejecución</h2>
+    <h2 class="text-lg font-semibold mb-4" data-i18n="runs.modal.title">Nueva EjecuciÃ³n</h2>
 
     <!-- Mode tabs -->
     <div class="flex gap-1 mb-5 bg-gray-800 rounded-lg p-1">
@@ -198,19 +198,19 @@
         class="flex-1 text-sm py-1.5 rounded-md transition font-medium"
         :class="form.mode === 'team' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'"
         data-i18n="runs.modal.team_run">
-        Ejecución de equipo
+        EjecuciÃ³n de equipo
       </button>
       <button type="button" @click="form.mode = 'engine'"
         class="flex-1 text-sm py-1.5 rounded-md transition font-medium"
         :class="form.mode === 'engine' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'"
         data-i18n="runs.modal.engine_run">
-        Ejecución de motor
+        EjecuciÃ³n de motor
       </button>
     </div>
 
     <form @submit.prevent="triggerRun()">
 
-      <!-- ── TEAM MODE ── -->
+      <!-- â”€â”€ TEAM MODE â”€â”€ -->
       <template x-if="form.mode === 'team'">
         <div>
           <template x-if="templates.length > 0">
@@ -236,11 +236,11 @@
           <div class="mb-4">
             <label class="block text-sm text-gray-400 mb-1" data-i18n="form.request">Solicitud</label>
             <textarea x-model="form.request" rows="3"
-              placeholder="Construye un módulo de autenticación con JWT y refresh tokens…"
+              placeholder="Construye un mÃ³dulo de autenticaciÃ³n con JWT y refresh tokensâ€¦"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
           </div>
           <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.max_cost">Coste máximo (€, opcional)</label>
+            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.max_cost">Coste mÃ¡ximo (â‚¬, opcional)</label>
             <input type="number" step="0.01" min="0.01" x-model.number="form.max_cost_usd"
               placeholder="ej. 2.00"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
@@ -249,7 +249,7 @@
             <input type="checkbox" id="hitl-toggle" x-model="form.hitl"
               class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0">
             <label for="hitl-toggle" class="text-sm text-gray-300 select-none cursor-pointer" data-i18n="runs.modal.hitl">
-              Activar HITL — pausar para revisión humana en cada punto de control
+              Activar HITL â€” pausar para revisiÃ³n humana en cada punto de control
             </label>
           </div>
           <div class="mb-5">
@@ -271,14 +271,14 @@
         </div>
       </template>
 
-      <!-- ── ENGINE MODE ── -->
+      <!-- â”€â”€ ENGINE MODE â”€â”€ -->
       <template x-if="form.mode === 'engine'">
         <div>
           <div class="mb-1 flex items-center gap-2">
             <input type="checkbox" id="resume-toggle" x-model="form.resume"
               class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0">
             <label for="resume-toggle" class="text-sm text-gray-300 select-none cursor-pointer" data-i18n="runs.modal.resume_toggle">
-              Reanudar — continuar una ejecución anterior desde el directorio de salida
+              Reanudar â€” continuar una ejecuciÃ³n anterior desde el directorio de salida
             </label>
           </div>
           <div class="mb-4">
@@ -286,11 +286,11 @@
               Goal <template x-if="form.resume"><span class="text-gray-500">(optional when resuming)</span></template>
             </label>
             <textarea x-model="form.goal" rows="3"
-              :placeholder="form.resume ? 'Leave blank to reuse saved goal…' : 'Build a REST API for a task manager with auth…'"
+              :placeholder="form.resume ? 'Leave blank to reuse saved goalâ€¦' : 'Build a REST API for a task manager with authâ€¦'"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
           </div>
           <div class="mb-4">
-            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.tech">Stack tecnológico (separado por comas, opcional)</label>
+            <label class="block text-sm text-gray-400 mb-1" data-i18n="runs.modal.tech">Stack tecnolÃ³gico (separado por comas, opcional)</label>
             <input type="text" x-model="form.tech"
               placeholder="Python, FastAPI, SQLite"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
@@ -299,7 +299,7 @@
             <input type="checkbox" id="full-toggle" x-model="form.full"
               class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0">
             <label for="full-toggle" class="text-sm text-gray-300 select-none cursor-pointer" data-i18n="runs.modal.full_pipeline">
-              Pipeline completo — código + tests + revisión (desmarcar para solo planificación)
+              Pipeline completo â€” cÃ³digo + tests + revisiÃ³n (desmarcar para solo planificaciÃ³n)
             </label>
           </div>
           <div class="mb-5">
@@ -319,7 +319,7 @@
             <input type="text" x-model="form.sourceDir"
               placeholder="/srv/repos/my-project"
               class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
-            <p class="text-xs text-gray-500 mt-1">Load existing codebase into the store — skips planning phases.</p>
+            <p class="text-xs text-gray-500 mt-1">Load existing codebase into the store â€” skips planning phases.</p>
           </div>
         </div>
       </template>
@@ -330,7 +330,7 @@
           data-i18n="common.cancel">Cancelar</button>
         <button type="submit" :disabled="submitting"
           class="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-sm py-2 rounded-lg font-medium transition"
-          x-text="submitting ? 'Iniciando…' : (form.mode === 'engine' && form.resume ? 'Reanudar' : 'Iniciar')"></button>
+          x-text="submitting ? 'Iniciandoâ€¦' : (form.mode === 'engine' && form.resume ? 'Reanudar' : 'Iniciar')"></button>
       </div>
       <p x-show="formError" class="text-red-400 text-xs mt-3" x-text="formError"></p>
     </form>
@@ -576,7 +576,7 @@ function dashboard() {
     },
 
     timeAgo(iso) {
-      if (!iso) return '—';
+      if (!iso) return 'â€”';
       const diff = (Date.now() - new Date(iso)) / 1000;
       if (diff < 60) return `${Math.floor(diff)}s ago`;
       if (diff < 3600) return `${Math.floor(diff/60)}m ago`;

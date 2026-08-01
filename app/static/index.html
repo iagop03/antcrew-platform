@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — antcrew</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>Dashboard â€” antcrew</title>
+<link href="/static/tailwind.css" rel="stylesheet">
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
@@ -32,7 +32,7 @@
     <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i><span data-i18n="nav.settings">Settings</span></a>
     <div class="ml-auto flex items-center gap-1.5">
       <span x-show="wsConnected" class="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Live"></span>
-      <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse shrink-0" title="Reconectando…"></span>
+      <span x-show="!wsConnected" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse shrink-0" title="Reconectandoâ€¦"></span>
       <div class="relative ml-1" id="ac-pf-w">
         <button id="ac-pf-b" style="width:28px;height:28px;border-radius:50%;background:#4338ca;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span id="ac-pf-i">?</span></button>
         <div id="ac-pf-d" style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:192px;background:#111827;border:1px solid #1f2937;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,.5);z-index:100;overflow:hidden">
@@ -73,7 +73,7 @@
           :class="budget.exhausted ? 'bg-red-500' : budget.remaining_usd / budget.budget_usd < 0.15 ? 'bg-yellow-500' : 'bg-green-500'"></span>
         <span class="font-mono"
           :class="budget.exhausted ? 'text-red-400' : 'text-gray-400'"
-          x-text="'€' + budget.total_spend_usd.toFixed(2) + ' / €' + budget.budget_usd.toFixed(2) + ' este mes'"></span>
+          x-text="'â‚¬' + budget.total_spend_usd.toFixed(2) + ' / â‚¬' + budget.budget_usd.toFixed(2) + ' este mes'"></span>
       </div>
     </template>
   </div>
@@ -89,7 +89,7 @@
   </div>
   <div class="bg-gray-900 border border-gray-800 rounded-xl px-4 py-3">
     <p class="text-xs text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-      <i class="ti ti-eye text-amber-400"></i> Pend. revisión
+      <i class="ti ti-eye text-amber-400"></i> Pend. revisiÃ³n
     </p>
     <p class="text-2xl font-semibold font-mono" :class="pendingCount > 0 ? 'text-amber-400' : 'text-gray-300'" x-text="pendingCount"></p>
   </div>
@@ -104,7 +104,7 @@
       <i class="ti ti-currency-dollar text-purple-400"></i> Gasto total
     </p>
     <p class="text-2xl font-semibold font-mono text-purple-400"
-      x-text="budget ? '€' + budget.total_spend_usd.toFixed(2) : (stats.total_cost != null ? '€' + Number(stats.total_cost).toFixed(2) : '—')"></p>
+      x-text="budget ? 'â‚¬' + budget.total_spend_usd.toFixed(2) : (stats.total_cost != null ? 'â‚¬' + Number(stats.total_cost).toFixed(2) : 'â€”')"></p>
   </div>
 </div>
 
@@ -248,7 +248,7 @@ function dashFeed() {
                 : isError ? 'ti ti-circle-x text-red-400'
                 : 'ti ti-minus text-gray-500',
               title: (run.request || run.team || '').slice(0, 72),
-              subtitle: `${run.team} · ${run.cost_usd ? '€' + run.cost_usd.toFixed(3) : '—'} · ${this.timeAgo(run.created_at)}`,
+              subtitle: `${run.team} Â· ${run.cost_usd ? 'â‚¬' + run.cost_usd.toFixed(3) : 'â€”'} Â· ${this.timeAgo(run.created_at)}`,
               badge: run.status,
               badgeClass: isRunning ? 'bg-blue-900/50 text-blue-300'
                 : isSuccess ? 'bg-green-900/50 text-green-300'
@@ -267,9 +267,9 @@ function dashFeed() {
               id: 'rev-' + rev.review_id,
               type: 'review',
               icon: 'ti ti-eye text-amber-400',
-              title: `Revisión pendiente — ${rev.agent_name || 'agent'}`,
-              subtitle: `Run ${(rev.run_id || '').slice(0, 8)} · ${this.timeAgo(rev.created_at)}`,
-              badge: 'espera revisión',
+              title: `RevisiÃ³n pendiente â€” ${rev.agent_name || 'agent'}`,
+              subtitle: `Run ${(rev.run_id || '').slice(0, 8)} Â· ${this.timeAgo(rev.created_at)}`,
+              badge: 'espera revisiÃ³n',
               badgeClass: 'bg-amber-900/50 text-amber-300',
               ts: new Date(rev.created_at),
               href: '/reviews',
@@ -307,7 +307,7 @@ function dashFeed() {
     },
 
     timeAgo(iso) {
-      if (!iso) return '—';
+      if (!iso) return 'â€”';
       const diff = (Date.now() - new Date(iso)) / 1000;
       if (diff < 60) return `${Math.floor(diff)}s ago`;
       if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;

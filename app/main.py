@@ -642,7 +642,7 @@ _cors_origins = (
 )
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
     "font-src 'self' https://cdn.jsdelivr.net data:; "
     "img-src 'self' data:; "

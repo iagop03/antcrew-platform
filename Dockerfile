@@ -1,4 +1,16 @@
-# Stage 1 — install Python dependencies
+# Stage 1 — build Tailwind CSS from HTML sources
+FROM node:20-slim AS css-builder
+WORKDIR /build
+COPY app/static/ ./static/
+RUN printf '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n' > input.css && \
+    npx --yes tailwindcss@3 \
+        --content './static/*.html' \
+        -i input.css \
+        -o tailwind.css \
+        --minify
+
+
+# Stage 2 — install Python dependencies
 FROM python:3.11-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,6 +39,7 @@ COPY --from=builder /deps /usr/local
 
 WORKDIR /app
 COPY . .
+COPY --from=css-builder /build/tailwind.css ./app/static/tailwind.css
 RUN chown -R appuser:appuser /app
 
 USER appuser

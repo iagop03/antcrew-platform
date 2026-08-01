@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Model Compare — antcrew</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>Model Compare â€” antcrew</title>
+<link href="/static/tailwind.css" rel="stylesheet">
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <style>[x-cloak]{display:none}</style>
@@ -52,12 +52,12 @@
 </nav>
 <script>(function(){var p=location.pathname;document.querySelectorAll('.ac-nav[data-ac]').forEach(function(el){var dp=el.dataset.ac;if((dp==='/dashboard'&&(p==='/'||p==='/dashboard'))||(dp!=='/dashboard'&&(p===dp||p.startsWith(dp+'/'))))el.classList.add('ac-on');});document.addEventListener('click',function(e){var w=document.getElementById('ac-pf-w');if(w&&!w.contains(e.target)){var d=document.getElementById('ac-pf-d');if(d)d.style.display='none';}});var pb=document.getElementById('ac-pf-b');if(pb)pb.addEventListener('click',function(e){e.stopPropagation();var d=document.getElementById('ac-pf-d');if(d)d.style.display=d.style.display==='none'?'block':'none';});var k=localStorage.getItem('antcrew_api_key');var h={'Content-Type':'application/json'};if(k)h['X-Api-Key']=k;fetch('/reviews/?status=pending&limit=100',{headers:h,credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&d.length>0){var b=document.getElementById('nav-rev-badge');if(b){b.textContent=d.length>99?'99+':d.length;b.style.display='inline-flex';}}}).catch(function(){});fetch('/auth/me',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(me){if(!me)return;var n=document.getElementById('ac-pf-n');var em=document.getElementById('ac-pf-e');var i=document.getElementById('ac-pf-i');if(n)n.textContent=me.display_name||'';if(em)em.textContent=me.email||'';if(i){var s=(me.display_name||me.email||'').trim();var pts=s.split(/\s+/);i.textContent=(pts.length>1?pts[0][0]+pts[pts.length-1][0]:s.slice(0,2)).toUpperCase();}}).catch(function(){});})();</script>
 
-<!-- ── LIST VIEW ─────────────────────────────────────────────────────────── -->
+<!-- â”€â”€ LIST VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div x-show="view === 'list'" x-cloak>
   <div class="px-6 py-5 flex items-center justify-between">
     <div>
       <h1 class="text-xl font-semibold" data-i18n="cmp.title">Model Compare</h1>
-      <p class="text-gray-400 text-sm mt-0.5" data-i18n="cmp.subtitle">Run the same request against two LLM backends — diff cost, speed, and output artifacts.</p>
+      <p class="text-gray-400 text-sm mt-0.5" data-i18n="cmp.subtitle">Run the same request against two LLM backends â€” diff cost, speed, and output artifacts.</p>
     </div>
     <div class="flex items-center gap-2">
       <button @click="view='diff'; diffResult=null; diffError=''"
@@ -134,11 +134,11 @@
   </div>
 </div>
 
-<!-- ── NEW COMPARE FORM ──────────────────────────────────────────────────── -->
+<!-- â”€â”€ NEW COMPARE FORM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div x-show="view === 'new'" x-cloak>
   <div class="px-6 py-5">
     <button @click="view='list'" class="text-sm text-gray-500 hover:text-white transition mb-5 block">
-      <span data-i18n="cmp.all">← All Compares</span>
+      <span data-i18n="cmp.all">â† All Compares</span>
     </button>
     <h1 class="text-xl font-semibold mb-1" data-i18n="cmp.form.title">New Model Compare</h1>
     <p class="text-gray-400 text-sm mb-6" data-i18n="cmp.form.subtitle">Runs the same request in parallel against two backends and diffs the output artifacts.</p>
@@ -189,7 +189,7 @@
         <label class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5"
                x-text="form.team === 'engine' ? (window.__i18n?.t('cmp.form.goal')||'Goal') : (window.__i18n?.t('cmp.form.request')||'Request')"></label>
         <textarea x-model="form.request" rows="4"
-          :placeholder="form.team === 'engine' ? 'Describe the engineering goal…' : 'Describe what you want to build…'"
+          :placeholder="form.team === 'engine' ? 'Describe the engineering goalâ€¦' : 'Describe what you want to buildâ€¦'"
           class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
       </div>
 
@@ -211,7 +211,7 @@
           :disabled="formLoading || !form.request.trim()"
           class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 rounded-lg transition">
           <span x-show="!formLoading" data-i18n="cmp.form.run">Run Compare</span>
-          <span x-show="formLoading" x-cloak data-i18n="cmp.form.running">Launching…</span>
+          <span x-show="formLoading" x-cloak data-i18n="cmp.form.running">Launchingâ€¦</span>
         </button>
         <button @click="view='list'" class="text-sm text-gray-400 hover:text-white transition" data-i18n="cmp.form.cancel">Cancel</button>
       </div>
@@ -219,10 +219,10 @@
   </div>
 </div>
 
-<!-- ── DETAIL VIEW ───────────────────────────────────────────────────────── -->
+<!-- â”€â”€ DETAIL VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div x-show="view === 'detail'" x-cloak>
   <div class="px-6 pt-5 pb-1">
-    <button @click="goBack()" class="text-sm text-gray-500 hover:text-white transition"><span data-i18n="cmp.all">← All Compares</span></button>
+    <button @click="goBack()" class="text-sm text-gray-500 hover:text-white transition"><span data-i18n="cmp.all">â† All Compares</span></button>
   </div>
 
   <!-- Skeleton -->
@@ -240,7 +240,7 @@
     <div>
       <!-- Meta row -->
       <div class="px-6 py-3 flex items-center gap-3 flex-wrap">
-        <span class="font-mono text-xs text-gray-500" x-text="'cmp · ' + current.compare_id"></span>
+        <span class="font-mono text-xs text-gray-500" x-text="'cmp Â· ' + current.compare_id"></span>
         <span class="px-2 py-0.5 rounded-full text-xs font-medium"
           :class="{
             'bg-yellow-900/50 text-yellow-300': current.status === 'running',
@@ -251,7 +251,7 @@
         </span>
       </div>
 
-      <!-- ── RUNNING STATE ── -->
+      <!-- â”€â”€ RUNNING STATE â”€â”€ -->
       <template x-if="current.status === 'running'">
         <div class="px-6 pb-6">
           <div class="grid grid-cols-2 gap-4 mb-4">
@@ -278,11 +278,11 @@
               </div>
             </div>
           </div>
-          <p class="text-center text-sm text-gray-600" data-i18n="cmp.polling">Polling for results every 3 s…</p>
+          <p class="text-center text-sm text-gray-600" data-i18n="cmp.polling">Polling for results every 3 sâ€¦</p>
         </div>
       </template>
 
-      <!-- ── DONE STATE ── -->
+      <!-- â”€â”€ DONE STATE â”€â”€ -->
       <template x-if="current.status !== 'running' && current.diff">
         <div>
           <!-- Model stat cards -->
@@ -375,7 +375,7 @@
                     Only A (<span x-text="current.diff.code_files.only_in_a.length"></span>)
                   </span>
                   <div class="flex flex-wrap gap-1.5">
-                    <span x-show="!current.diff.code_files.only_in_a.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                    <span x-show="!current.diff.code_files.only_in_a.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                     <template x-for="f in current.diff.code_files.only_in_a" :key="f">
                       <span class="px-2 py-0.5 rounded text-xs font-mono" style="background:rgba(79,70,229,.12);color:#818cf8;border:1px solid rgba(99,102,241,.18)" x-text="f"></span>
                     </template>
@@ -386,7 +386,7 @@
                     Only B (<span x-text="current.diff.code_files.only_in_b.length"></span>)
                   </span>
                   <div class="flex flex-wrap gap-1.5">
-                    <span x-show="!current.diff.code_files.only_in_b.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                    <span x-show="!current.diff.code_files.only_in_b.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                     <template x-for="f in current.diff.code_files.only_in_b" :key="f">
                       <span class="px-2 py-0.5 rounded text-xs font-mono" style="background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(52,211,153,.15)" x-text="f"></span>
                     </template>
@@ -397,7 +397,7 @@
                     Both (<span x-text="current.diff.code_files.shared.length"></span>)
                   </span>
                   <div class="flex flex-wrap gap-1.5">
-                    <span x-show="!current.diff.code_files.shared.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                    <span x-show="!current.diff.code_files.shared.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                     <template x-for="f in current.diff.code_files.shared" :key="f">
                       <span class="px-2 py-0.5 rounded text-xs font-mono bg-gray-800/60 text-gray-400 border border-gray-700" x-text="f"></span>
                     </template>
@@ -418,7 +418,7 @@
                     Only A (<span x-text="current.diff.tickets.only_in_a.length"></span>)
                   </span>
                   <div class="flex flex-wrap gap-1.5">
-                    <span x-show="!current.diff.tickets.only_in_a.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                    <span x-show="!current.diff.tickets.only_in_a.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                     <template x-for="t in current.diff.tickets.only_in_a" :key="t">
                       <span class="px-2 py-0.5 rounded text-xs" style="background:rgba(79,70,229,.12);color:#a5b4fc;border:1px solid rgba(99,102,241,.18)" x-text="t"></span>
                     </template>
@@ -429,7 +429,7 @@
                     Only B (<span x-text="current.diff.tickets.only_in_b.length"></span>)
                   </span>
                   <div class="flex flex-wrap gap-1.5">
-                    <span x-show="!current.diff.tickets.only_in_b.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                    <span x-show="!current.diff.tickets.only_in_b.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                     <template x-for="t in current.diff.tickets.only_in_b" :key="t">
                       <span class="px-2 py-0.5 rounded text-xs" style="background:rgba(16,185,129,.08);color:#6ee7b7;border:1px solid rgba(52,211,153,.15)" x-text="t"></span>
                     </template>
@@ -440,7 +440,7 @@
                     Both (<span x-text="current.diff.tickets.shared.length"></span>)
                   </span>
                   <div class="flex flex-wrap gap-1.5">
-                    <span x-show="!current.diff.tickets.shared.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                    <span x-show="!current.diff.tickets.shared.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                     <template x-for="t in current.diff.tickets.shared" :key="t">
                       <span class="px-2 py-0.5 rounded text-xs bg-gray-800/60 text-gray-400 border border-gray-700" x-text="t"></span>
                     </template>
@@ -462,7 +462,7 @@
                       Only A (<span x-text="current.diff.doc_files.only_in_a.length"></span>)
                     </span>
                     <div class="flex flex-wrap gap-1.5">
-                      <span x-show="!current.diff.doc_files.only_in_a.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                      <span x-show="!current.diff.doc_files.only_in_a.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                       <template x-for="f in current.diff.doc_files.only_in_a" :key="f">
                         <span class="px-2 py-0.5 rounded text-xs font-mono" style="background:rgba(79,70,229,.12);color:#818cf8;border:1px solid rgba(99,102,241,.18)" x-text="f"></span>
                       </template>
@@ -473,7 +473,7 @@
                       Only B (<span x-text="current.diff.doc_files.only_in_b.length"></span>)
                     </span>
                     <div class="flex flex-wrap gap-1.5">
-                      <span x-show="!current.diff.doc_files.only_in_b.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                      <span x-show="!current.diff.doc_files.only_in_b.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                       <template x-for="f in current.diff.doc_files.only_in_b" :key="f">
                         <span class="px-2 py-0.5 rounded text-xs font-mono" style="background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(52,211,153,.15)" x-text="f"></span>
                       </template>
@@ -484,7 +484,7 @@
                       Both (<span x-text="current.diff.doc_files.shared.length"></span>)
                     </span>
                     <div class="flex flex-wrap gap-1.5">
-                      <span x-show="!current.diff.doc_files.shared.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                      <span x-show="!current.diff.doc_files.shared.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                       <template x-for="f in current.diff.doc_files.shared" :key="f">
                         <span class="px-2 py-0.5 rounded text-xs font-mono bg-gray-800/60 text-gray-400 border border-gray-700" x-text="f"></span>
                       </template>
@@ -507,7 +507,7 @@
                       Only A (<span x-text="current.diff.test_files.only_in_a.length"></span>)
                     </span>
                     <div class="flex flex-wrap gap-1.5">
-                      <span x-show="!current.diff.test_files.only_in_a.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                      <span x-show="!current.diff.test_files.only_in_a.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                       <template x-for="f in current.diff.test_files.only_in_a" :key="f">
                         <span class="px-2 py-0.5 rounded text-xs font-mono" style="background:rgba(79,70,229,.12);color:#818cf8;border:1px solid rgba(99,102,241,.18)" x-text="f"></span>
                       </template>
@@ -518,7 +518,7 @@
                       Only B (<span x-text="current.diff.test_files.only_in_b.length"></span>)
                     </span>
                     <div class="flex flex-wrap gap-1.5">
-                      <span x-show="!current.diff.test_files.only_in_b.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                      <span x-show="!current.diff.test_files.only_in_b.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                       <template x-for="f in current.diff.test_files.only_in_b" :key="f">
                         <span class="px-2 py-0.5 rounded text-xs font-mono" style="background:rgba(16,185,129,.08);color:#34d399;border:1px solid rgba(52,211,153,.15)" x-text="f"></span>
                       </template>
@@ -529,7 +529,7 @@
                       Both (<span x-text="current.diff.test_files.shared.length"></span>)
                     </span>
                     <div class="flex flex-wrap gap-1.5">
-                      <span x-show="!current.diff.test_files.shared.length" class="text-xs text-gray-600 italic pt-0.5">—</span>
+                      <span x-show="!current.diff.test_files.shared.length" class="text-xs text-gray-600 italic pt-0.5">â€”</span>
                       <template x-for="f in current.diff.test_files.shared" :key="f">
                         <span class="px-2 py-0.5 rounded text-xs font-mono bg-gray-800/60 text-gray-400 border border-gray-700" x-text="f"></span>
                       </template>
@@ -549,12 +549,12 @@
                   <div class="px-4 py-2.5 flex items-start gap-3">
                     <span class="text-xs uppercase tracking-wide min-w-[72px] pt-0.5" style="color:rgba(129,140,248,.7)">Model A</span>
                     <span class="px-2 py-0.5 rounded text-xs" style="background:rgba(79,70,229,.12);color:#a5b4fc;border:1px solid rgba(99,102,241,.18)"
-                      x-text="current.diff.prd.a || '—'"></span>
+                      x-text="current.diff.prd.a || 'â€”'"></span>
                   </div>
                   <div class="px-4 py-2.5 flex items-start gap-3">
                     <span class="text-xs uppercase tracking-wide min-w-[72px] pt-0.5" style="color:rgba(52,211,153,.7)">Model B</span>
                     <span class="px-2 py-0.5 rounded text-xs" style="background:rgba(16,185,129,.08);color:#6ee7b7;border:1px solid rgba(52,211,153,.15)"
-                      x-text="current.diff.prd.b || '—'"></span>
+                      x-text="current.diff.prd.b || 'â€”'"></span>
                   </div>
                 </div>
               </div>
@@ -608,10 +608,10 @@
   </template><!-- /current -->
 </div><!-- /detail view -->
 
-<!-- ── ARTIFACT DIFF VIEW ─────────────────────────────────────────────────── -->
+<!-- â”€â”€ ARTIFACT DIFF VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 <div x-show="view === 'diff'" x-cloak>
   <div class="px-6 py-5">
-    <button @click="view='list'" class="text-sm text-gray-500 hover:text-white transition mb-5 block">← All Compares</button>
+    <button @click="view='list'" class="text-sm text-gray-500 hover:text-white transition mb-5 block">â† All Compares</button>
     <h1 class="text-xl font-semibold mb-1">Artifact Diff</h1>
     <p class="text-gray-400 text-sm mb-6">Compare the output artifacts of any two completed engine runs.</p>
 
@@ -619,12 +619,12 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-xs font-medium text-indigo-400 uppercase tracking-wide mb-1.5">Run A</label>
-          <input x-model="diffRunA" type="text" placeholder="run_id…"
+          <input x-model="diffRunA" type="text" placeholder="run_idâ€¦"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 font-mono" />
         </div>
         <div>
           <label class="block text-xs font-medium text-emerald-400 uppercase tracking-wide mb-1.5">Run B</label>
-          <input x-model="diffRunB" type="text" placeholder="run_id…"
+          <input x-model="diffRunB" type="text" placeholder="run_idâ€¦"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500 font-mono" />
         </div>
       </div>
@@ -635,7 +635,7 @@
         :disabled="diffLoading || !diffRunA.trim() || !diffRunB.trim()"
         class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 rounded-lg transition">
         <span x-show="!diffLoading">Compare</span>
-        <span x-show="diffLoading" x-cloak>Comparing…</span>
+        <span x-show="diffLoading" x-cloak>Comparingâ€¦</span>
       </button>
 
       <template x-if="diffResult">
@@ -661,7 +661,7 @@
                   <th class="px-3 py-2 text-left">File</th>
                   <th class="px-3 py-2 text-left">Status</th>
                   <th class="px-3 py-2 text-right font-mono">+</th>
-                  <th class="px-3 py-2 text-right font-mono">−</th>
+                  <th class="px-3 py-2 text-right font-mono">âˆ’</th>
                 </tr>
               </thead>
               <tbody>
@@ -780,7 +780,7 @@ function comparePage() {
           await this.openDetail(data.compare_id);
         }
       } catch(e) {
-        this.formError = 'Network error — is the server running?';
+        this.formError = 'Network error â€” is the server running?';
       }
       this.formLoading = false;
     },
@@ -817,8 +817,8 @@ function comparePage() {
       return this.current?.diff?.summary?.[field]?.winner === side;
     },
 
-    fmtCost(v) { return v != null ? '€' + Number(v).toFixed(4) : '—'; },
-    fmtDur(v)  { return v != null ? Number(v).toFixed(1) + 's' : '—'; },
+    fmtCost(v) { return v != null ? 'â‚¬' + Number(v).toFixed(4) : 'â€”'; },
+    fmtDur(v)  { return v != null ? Number(v).toFixed(1) + 's' : 'â€”'; },
   };
 }
 </script>

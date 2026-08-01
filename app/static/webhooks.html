@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>antcrew — Webhooks</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>antcrew â€” Webhooks</title>
+<link href="/static/tailwind.css" rel="stylesheet">
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
@@ -63,9 +63,9 @@
 <!-- Error banner -->
 <div x-show="error" class="px-6 mb-4">
   <div class="bg-red-950 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-300 flex items-center gap-3">
-    <span>⚠</span>
+    <span>âš </span>
     <span x-text="error"></span>
-    <button @click="error = null" class="ml-auto text-xs text-red-400 hover:text-red-200">✕</button>
+    <button @click="error = null" class="ml-auto text-xs text-red-400 hover:text-red-200">âœ•</button>
   </div>
 </div>
 
@@ -74,12 +74,12 @@
   <label class="text-sm text-gray-400" data-i18n="whk.workspace">Workspace:</label>
   <select x-model="selectedWsId" @change="loadHooks()"
     class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-    <option value="">— select —</option>
+    <option value="">â€” select â€”</option>
     <template x-for="ws in workspaces" :key="ws.id">
       <option :value="ws.id" x-text="`${ws.name} (${ws.slug})`"></option>
     </template>
   </select>
-  <span x-show="loading" class="text-xs text-gray-500 animate-pulse">loading…</span>
+  <span x-show="loading" class="text-xs text-gray-500 animate-pulse">loadingâ€¦</span>
 </div>
 
 <!-- Webhooks table -->
@@ -118,7 +118,7 @@
                   <span class="inline-block mr-1 px-2 py-0.5 rounded text-xs bg-gray-700 text-gray-300 font-mono" x-text="ev"></span>
                 </template>
               </td>
-              <td class="px-4 py-3 text-gray-400 text-xs" x-text="hook.label || '—'"></td>
+              <td class="px-4 py-3 text-gray-400 text-xs" x-text="hook.label || 'â€”'"></td>
               <td class="px-4 py-3">
                 <span :class="hook.enabled ? 'text-green-400' : 'text-gray-500'" class="text-xs font-medium"
                   x-text="hook.enabled ? 'active' : 'disabled'"></span>
@@ -154,10 +154,10 @@
   <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
     <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
       <span class="text-sm font-medium text-gray-300">Delivery log</span>
-      <button @click="deliveries = []; deliveriesHookId = null" class="text-xs text-gray-500 hover:text-gray-300">✕ Close</button>
+      <button @click="deliveries = []; deliveriesHookId = null" class="text-xs text-gray-500 hover:text-gray-300">âœ• Close</button>
     </div>
     <template x-if="deliveriesLoading">
-      <div class="px-4 py-6 text-center text-gray-500 text-sm animate-pulse">Loading…</div>
+      <div class="px-4 py-6 text-center text-gray-500 text-sm animate-pulse">Loadingâ€¦</div>
     </template>
     <template x-if="!deliveriesLoading && deliveries.length === 0">
       <div class="px-4 py-6 text-center text-gray-500 text-sm">No deliveries recorded yet.</div>
@@ -176,7 +176,7 @@
         <tbody>
           <template x-for="d in deliveries" :key="d.id">
             <tr class="border-t border-gray-800 hover:bg-gray-800/30 transition">
-              <td class="px-4 py-2 font-mono text-xs text-gray-400" x-text="(d.run_id || '').slice(0,12) + '…'"></td>
+              <td class="px-4 py-2 font-mono text-xs text-gray-400" x-text="(d.run_id || '').slice(0,12) + 'â€¦'"></td>
               <td class="px-4 py-2">
                 <span class="text-xs px-2 py-0.5 rounded-full font-medium"
                   :class="{
@@ -188,7 +188,7 @@
                   x-text="d.status"></span>
               </td>
               <td class="px-4 py-2 text-right text-gray-500 text-xs" x-text="d.attempts"></td>
-              <td class="px-4 py-2 text-xs text-red-400 truncate max-w-xs" :title="d.last_error" x-text="d.last_error || '—'"></td>
+              <td class="px-4 py-2 text-xs text-red-400 truncate max-w-xs" :title="d.last_error" x-text="d.last_error || 'â€”'"></td>
               <td class="px-4 py-2 text-right text-gray-500 text-xs" x-text="fmtDate(d.created_at)"></td>
             </tr>
           </template>
@@ -243,7 +243,7 @@
         class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed
                text-white text-sm font-medium px-4 py-2 rounded-lg transition">
         <span x-show="!saving" data-i18n="whk.modal.register">Register</span>
-        <span x-show="saving" x-cloak data-i18n="whk.modal.registering">Registering…</span>
+        <span x-show="saving" x-cloak data-i18n="whk.modal.registering">Registeringâ€¦</span>
       </button>
     </div>
     <p x-show="formError" class="text-xs text-red-400 mt-2" x-text="formError"></p>
@@ -393,7 +393,7 @@ function webhooks() {
     },
 
     fmtDate(iso) {
-      if (!iso) return '—';
+      if (!iso) return 'â€”';
       try { return new Date(iso).toLocaleString(); } catch { return iso; }
     },
   };
