@@ -59,10 +59,16 @@
       <h1 class="text-xl font-semibold" data-i18n="cmp.title">Model Compare</h1>
       <p class="text-gray-400 text-sm mt-0.5" data-i18n="cmp.subtitle">Run the same request against two LLM backends — diff cost, speed, and output artifacts.</p>
     </div>
-    <button @click="view='new'"
-      class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-      <span data-i18n="cmp.new">+ New Compare</span>
-    </button>
+    <div class="flex items-center gap-2">
+      <button @click="view='diff'; diffResult=null; diffError=''"
+        class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 text-sm font-medium px-4 py-2 rounded-lg transition">
+        Artifact Diff
+      </button>
+      <button @click="view='new'"
+        class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        <span data-i18n="cmp.new">+ New Compare</span>
+      </button>
+    </div>
   </div>
 
   <div class="px-6 pb-8">
@@ -602,6 +608,85 @@
   </template><!-- /current -->
 </div><!-- /detail view -->
 
+<!-- ── ARTIFACT DIFF VIEW ─────────────────────────────────────────────────── -->
+<div x-show="view === 'diff'" x-cloak>
+  <div class="px-6 py-5">
+    <button @click="view='list'" class="text-sm text-gray-500 hover:text-white transition mb-5 block">← All Compares</button>
+    <h1 class="text-xl font-semibold mb-1">Artifact Diff</h1>
+    <p class="text-gray-400 text-sm mb-6">Compare the output artifacts of any two completed engine runs.</p>
+
+    <div class="max-w-2xl bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-indigo-400 uppercase tracking-wide mb-1.5">Run A</label>
+          <input x-model="diffRunA" type="text" placeholder="run_id…"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 font-mono" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-emerald-400 uppercase tracking-wide mb-1.5">Run B</label>
+          <input x-model="diffRunB" type="text" placeholder="run_id…"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-emerald-500 font-mono" />
+        </div>
+      </div>
+
+      <div x-show="diffError" x-cloak class="bg-red-950 border border-red-800 rounded-lg px-4 py-2 text-red-300 text-sm" x-text="diffError"></div>
+
+      <button @click="compareArtifacts()"
+        :disabled="diffLoading || !diffRunA.trim() || !diffRunB.trim()"
+        class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 rounded-lg transition">
+        <span x-show="!diffLoading">Compare</span>
+        <span x-show="diffLoading" x-cloak>Comparing…</span>
+      </button>
+
+      <template x-if="diffResult">
+        <div class="space-y-4 pt-1">
+          <!-- Summary chips -->
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-xs text-gray-400">Summary:</span>
+            <span class="px-2 py-0.5 rounded bg-yellow-900/40 text-yellow-300 text-xs font-mono"
+                  x-text="diffResult.summary.changed + ' changed'"></span>
+            <span class="px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-xs font-mono"
+                  x-text="diffResult.summary.added + ' added'"></span>
+            <span class="px-2 py-0.5 rounded bg-red-900/40 text-red-300 text-xs font-mono"
+                  x-text="diffResult.summary.removed + ' removed'"></span>
+            <span class="px-2 py-0.5 rounded bg-gray-800 text-gray-500 text-xs font-mono"
+                  x-text="diffResult.summary.unchanged + ' unchanged'"></span>
+          </div>
+
+          <!-- File table -->
+          <div class="overflow-x-auto rounded-lg border border-gray-800">
+            <table class="w-full text-xs">
+              <thead class="bg-gray-900 border-b border-gray-800">
+                <tr class="text-gray-400 uppercase tracking-wide">
+                  <th class="px-3 py-2 text-left">File</th>
+                  <th class="px-3 py-2 text-left">Status</th>
+                  <th class="px-3 py-2 text-right font-mono">+</th>
+                  <th class="px-3 py-2 text-right font-mono">−</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="f in diffResult.files" :key="f.file_path">
+                  <tr class="border-t border-gray-800 hover:bg-gray-800/30">
+                    <td class="px-3 py-2 font-mono text-gray-300 max-w-xs truncate" x-text="f.file_path"></td>
+                    <td class="px-3 py-2 font-semibold" :class="diffStatusClass(f.status)" x-text="f.status"></td>
+                    <td class="px-3 py-2 text-right font-mono text-emerald-400"
+                        x-text="f.lines_added > 0 ? '+' + f.lines_added : ''"></td>
+                    <td class="px-3 py-2 text-right font-mono text-red-400"
+                        x-text="f.lines_removed > 0 ? '-' + f.lines_removed : ''"></td>
+                  </tr>
+                </template>
+                <template x-if="diffResult.files.length === 0">
+                  <tr><td colspan="4" class="px-3 py-6 text-center text-gray-600">No artifacts found in either run.</td></tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
+
 <script>
 function comparePage() {
   return {
@@ -613,6 +698,7 @@ function comparePage() {
     form: { team: 'DevTeam', model_a: 'claude', model_b: 'gpt-4o', request: '', max_cost_usd: '' },
     formLoading: false,
     formError: '',
+    diffRunA: '', diffRunB: '', diffLoading: false, diffError: '', diffResult: null,
 
     apiHeaders(extra = {}) {
       const k = localStorage.getItem('antcrew_api_key');
@@ -697,6 +783,29 @@ function comparePage() {
         this.formError = 'Network error — is the server running?';
       }
       this.formLoading = false;
+    },
+
+    async compareArtifacts() {
+      const a = this.diffRunA.trim(), b = this.diffRunB.trim();
+      if (!a || !b) { this.diffError = 'Both run IDs are required'; return; }
+      this.diffLoading = true; this.diffError = ''; this.diffResult = null;
+      try {
+        const r = await fetch(`/runs/compare-artifacts?run_a=${encodeURIComponent(a)}&run_b=${encodeURIComponent(b)}`, {
+          headers: this.apiHeaders(),
+        });
+        if (!r.ok) { const e = await r.json().catch(() => ({})); this.diffError = e.detail || `HTTP ${r.status}`; }
+        else { this.diffResult = await r.json(); }
+      } catch(e) { this.diffError = e.message; }
+      this.diffLoading = false;
+    },
+
+    diffStatusClass(status) {
+      return {
+        added:     'text-emerald-400',
+        removed:   'text-red-400',
+        changed:   'text-yellow-300',
+        unchanged: 'text-gray-500',
+      }[status] || 'text-gray-400';
     },
 
     totalItems(diff) {

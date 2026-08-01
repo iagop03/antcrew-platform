@@ -116,6 +116,93 @@ async def index(
     )
 
 
+@router.get("/compare-artifacts")
+async def compare_artifacts(
+    run_a: str = Query(..., description="First run_id"),
+    run_b: str = Query(..., description="Second run_id"),
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Return a file-level diff between artifacts of two engine runs.
+
+    For each file present in either run, returns: status (added/removed/changed/unchanged),
+    lines_added, lines_removed. File content is NOT returned — only statistics.
+    Supports MemoryStore runs (state.code_artifacts) and FilesystemStore runs (output_dir).
+    """
+    import difflib
+
+    run_a_obj = await get_run(session, run_a)
+    run_b_obj = await get_run(session, run_b)
+    if not run_a_obj:
+        raise RunNotFoundError(run_a)
+    if not run_b_obj:
+        raise RunNotFoundError(run_b)
+    _assert_run_access(run_a_obj, ctx)
+    _assert_run_access(run_b_obj, ctx)
+
+    def _collect_artifacts(run: "Run") -> dict[str, str]:
+        """Return {file_path: content} for all artifacts in a run."""
+        result: dict[str, str] = {}
+        out_dir = _engine_output_dir(run)
+        if out_dir and out_dir.exists():
+            for p in sorted(out_dir.rglob("*")):
+                if p.is_file() and not any(part in _ENGINE_SKIP_DIRS for part in p.parts):
+                    try:
+                        result[str(p.relative_to(out_dir))] = p.read_text(encoding="utf-8", errors="replace")
+                    except OSError:
+                        pass
+        elif run.state:
+            s = run.state
+            for key in ("code_artifacts", "test_artifacts", "doc_artifacts"):
+                for art in s.get(key) or []:
+                    fp = art.get("file_path", "")
+                    if fp:
+                        result[fp] = art.get("content", "")
+        return result
+
+    arts_a = _collect_artifacts(run_a_obj)
+    arts_b = _collect_artifacts(run_b_obj)
+    all_paths = sorted(set(arts_a) | set(arts_b))
+
+    diff_entries = []
+    for path in all_paths:
+        if path in arts_a and path not in arts_b:
+            status = "removed"
+            lines_added = lines_removed = 0
+        elif path not in arts_a and path in arts_b:
+            status = "added"
+            lines_added = len(arts_b[path].splitlines())
+            lines_removed = 0
+        else:
+            lines_a = arts_a[path].splitlines(keepends=True)
+            lines_b = arts_b[path].splitlines(keepends=True)
+            if lines_a == lines_b:
+                status = "unchanged"
+                lines_added = lines_removed = 0
+            else:
+                status = "changed"
+                opcodes = difflib.SequenceMatcher(None, lines_a, lines_b).get_opcodes()
+                lines_added = sum(j2 - j1 for tag, _, _, j1, j2 in opcodes if tag in ("insert", "replace"))
+                lines_removed = sum(i2 - i1 for tag, i1, i2, _, _ in opcodes if tag in ("delete", "replace"))
+        diff_entries.append({
+            "file_path": path,
+            "status": status,
+            "lines_added": lines_added,
+            "lines_removed": lines_removed,
+        })
+
+    changed = sum(1 for e in diff_entries if e["status"] == "changed")
+    added = sum(1 for e in diff_entries if e["status"] == "added")
+    removed = sum(1 for e in diff_entries if e["status"] == "removed")
+    return {
+        "run_a": run_a,
+        "run_b": run_b,
+        "summary": {"changed": changed, "added": added, "removed": removed,
+                    "unchanged": len(diff_entries) - changed - added - removed},
+        "files": diff_entries,
+    }
+
+
 @router.get("/{run_id}", response_model=Run)
 async def detail(
     run_id: str,
@@ -471,90 +558,3 @@ async def replay(
         created_by=ctx.created_by,
     )
     return {"run_id": new_run_id, "replayed_from": run_id}
-
-
-@router.get("/compare-artifacts")
-async def compare_artifacts(
-    run_a: str = Query(..., description="First run_id"),
-    run_b: str = Query(..., description="Second run_id"),
-    session: AsyncSession = Depends(get_session),
-    ctx: WorkspaceContext = Depends(get_workspace_context),
-) -> dict:
-    """Return a file-level diff between artifacts of two engine runs.
-
-    For each file present in either run, returns: status (added/removed/changed/unchanged),
-    lines_added, lines_removed. File content is NOT returned — only statistics.
-    Supports MemoryStore runs (state.code_artifacts) and FilesystemStore runs (output_dir).
-    """
-    import difflib
-
-    run_a_obj = await get_run(session, run_a)
-    run_b_obj = await get_run(session, run_b)
-    if not run_a_obj:
-        raise RunNotFoundError(run_a)
-    if not run_b_obj:
-        raise RunNotFoundError(run_b)
-    _assert_run_access(run_a_obj, ctx)
-    _assert_run_access(run_b_obj, ctx)
-
-    def _collect_artifacts(run: "Run") -> dict[str, str]:
-        """Return {file_path: content} for all artifacts in a run."""
-        result: dict[str, str] = {}
-        out_dir = _engine_output_dir(run)
-        if out_dir and out_dir.exists():
-            for p in sorted(out_dir.rglob("*")):
-                if p.is_file() and not any(part in _ENGINE_SKIP_DIRS for part in p.parts):
-                    try:
-                        result[str(p.relative_to(out_dir))] = p.read_text(encoding="utf-8", errors="replace")
-                    except OSError:
-                        pass
-        elif run.state:
-            s = run.state
-            for key in ("code_artifacts", "test_artifacts", "doc_artifacts"):
-                for art in s.get(key) or []:
-                    fp = art.get("file_path", "")
-                    if fp:
-                        result[fp] = art.get("content", "")
-        return result
-
-    arts_a = _collect_artifacts(run_a_obj)
-    arts_b = _collect_artifacts(run_b_obj)
-    all_paths = sorted(set(arts_a) | set(arts_b))
-
-    diff_entries = []
-    for path in all_paths:
-        if path in arts_a and path not in arts_b:
-            status = "removed"
-            lines_added = lines_removed = 0
-        elif path not in arts_a and path in arts_b:
-            status = "added"
-            lines_added = len(arts_b[path].splitlines())
-            lines_removed = 0
-        else:
-            lines_a = arts_a[path].splitlines(keepends=True)
-            lines_b = arts_b[path].splitlines(keepends=True)
-            if lines_a == lines_b:
-                status = "unchanged"
-                lines_added = lines_removed = 0
-            else:
-                status = "changed"
-                opcodes = difflib.SequenceMatcher(None, lines_a, lines_b).get_opcodes()
-                lines_added = sum(j2 - j1 for tag, _, _, j1, j2 in opcodes if tag in ("insert", "replace"))
-                lines_removed = sum(i2 - i1 for tag, i1, i2, _, _ in opcodes if tag in ("delete", "replace"))
-        diff_entries.append({
-            "file_path": path,
-            "status": status,
-            "lines_added": lines_added,
-            "lines_removed": lines_removed,
-        })
-
-    changed = sum(1 for e in diff_entries if e["status"] == "changed")
-    added = sum(1 for e in diff_entries if e["status"] == "added")
-    removed = sum(1 for e in diff_entries if e["status"] == "removed")
-    return {
-        "run_a": run_a,
-        "run_b": run_b,
-        "summary": {"changed": changed, "added": added, "removed": removed,
-                    "unchanged": len(diff_entries) - changed - added - removed},
-        "files": diff_entries,
-    }

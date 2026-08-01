@@ -100,6 +100,11 @@
     <span>Schedules</span>
     <span x-show="schedules.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="schedules.length"></span>
   </button>
+  <button @click="tab='security'"
+    :class="tab==='security' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
+    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
+    <span>Security</span>
+  </button>
   <button @click="tab='profile'"
     :class="tab==='profile' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
     class="px-1 py-3 text-sm border-b-2 -mb-px transition-colors">
@@ -644,6 +649,61 @@
     </div>
   </div>
 
+  <!-- ── SECURITY ── -->
+  <div x-show="tab==='security'" class="max-w-xl">
+    <div class="mb-5">
+      <h2 class="text-base font-semibold mb-1">Quick Security Audit</h2>
+      <p class="text-sm text-gray-400">Run a one-click security audit on any GitHub repository. No prior configuration required.</p>
+    </div>
+
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-5 space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">GitHub Repository</label>
+        <input x-model="auditForm.github_repo" type="text" placeholder="owner/repo"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 font-mono" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">GitHub Token (PAT)</label>
+        <input x-model="auditForm.github_token" type="password" placeholder="ghp_…"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500 font-mono" />
+        <p class="text-xs text-gray-600 mt-1">Needs <code class="text-gray-500">repo:read</code> scope. Never stored.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">Branch</label>
+          <input x-model="auditForm.github_branch" type="text" placeholder="main"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5">Max Cost (USD)</label>
+          <input x-model="auditForm.max_cost_usd" type="number" step="0.5" placeholder="5.00"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-indigo-500" />
+        </div>
+      </div>
+
+      <div x-show="auditError" x-cloak
+        class="bg-red-950 border border-red-800 rounded-lg px-4 py-2 text-red-300 text-sm" x-text="auditError"></div>
+
+      <template x-if="auditResult">
+        <div class="bg-indigo-950/50 border border-indigo-800/60 rounded-lg px-4 py-3 space-y-1">
+          <p class="text-sm text-indigo-300 font-medium">Audit started</p>
+          <p class="text-xs text-gray-400">Run ID:
+            <a :href="'/run/' + auditResult.run_id" class="text-indigo-400 underline font-mono" x-text="auditResult.run_id.slice(0,8)"></a>
+          </p>
+          <p class="text-xs text-gray-400">Repo: <span class="text-gray-300" x-text="auditResult.github_repo"></span></p>
+          <p class="text-xs text-gray-500" x-text="auditResult.message"></p>
+        </div>
+      </template>
+
+      <button @click="runQuickAudit()"
+        :disabled="auditLoading || !auditForm.github_repo.trim() || !auditForm.github_token.trim()"
+        class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2.5 rounded-lg transition">
+        <span x-show="!auditLoading">Run Quick Audit</span>
+        <span x-show="auditLoading" x-cloak>Launching audit…</span>
+      </button>
+    </div>
+  </div>
+
   <!-- ── PERFIL ── -->
   <div x-show="tab==='profile'" class="max-w-md">
     <p x-show="profileMsg" class="mb-4 text-sm px-3 py-2 rounded-lg"
@@ -1138,6 +1198,10 @@ function settings() {
     // MFA
     mfaEnabled: false, mfaSetup: null, mfaCode: '', mfaMsg: '', mfaError: false,
     mfaLoading: false, showDisableMfa: false,
+
+    // Security / Quick Audit
+    auditForm: { github_repo: '', github_token: '', github_branch: 'main', max_cost_usd: '5' },
+    auditLoading: false, auditError: '', auditResult: null,
 
     apiHeaders() {
       const h = { 'Content-Type': 'application/json' };
@@ -1704,6 +1768,25 @@ function settings() {
         else { this.mfaEnabled = false; this.showDisableMfa = false; this.mfaCode = ''; this.mfaMsg = 'MFA disabled.'; }
       } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
       this.mfaLoading = false;
+    },
+
+    /* ── Security ── */
+    async runQuickAudit() {
+      this.auditLoading = true; this.auditError = ''; this.auditResult = null;
+      try {
+        const body = {
+          github_repo: this.auditForm.github_repo.trim(),
+          github_token: this.auditForm.github_token.trim(),
+          github_branch: this.auditForm.github_branch.trim() || 'main',
+        };
+        if (this.auditForm.max_cost_usd) body.max_cost_usd = parseFloat(this.auditForm.max_cost_usd);
+        const r = await fetch('/security/quick-audit', {
+          method: 'POST', headers: this.apiHeaders(), body: JSON.stringify(body),
+        });
+        if (!r.ok) { const e = await r.json().catch(() => ({})); this.auditError = e.detail || `HTTP ${r.status}`; }
+        else { this.auditResult = await r.json(); }
+      } catch(e) { this.auditError = e.message; }
+      this.auditLoading = false;
     },
   };
 }

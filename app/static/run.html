@@ -232,6 +232,46 @@
               Download artifacts (.zip)
             </a>
           </template>
+
+          <!-- Replay -->
+          <template x-if="run.status === 'success' || run.status === 'error'">
+            <div class="border border-gray-800 rounded-xl overflow-hidden">
+              <button @click="showReplay = !showReplay; replayError = ''; replayResult = null"
+                class="w-full flex items-center justify-between px-3 py-2.5 bg-gray-900 hover:bg-gray-800 transition text-sm text-gray-300">
+                <span class="flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                  </svg>
+                  Replay run
+                </span>
+                <span class="text-gray-600 text-xs" x-text="showReplay ? '▲' : '▼'"></span>
+              </button>
+              <div x-show="showReplay" x-cloak class="px-3 pb-3 pt-2 bg-gray-900/50 space-y-2.5 border-t border-gray-800">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Override model (blank = original)</label>
+                  <input x-model="replayModel" type="text" placeholder="e.g. claude or gpt-4o"
+                    class="w-full bg-gray-800 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-indigo-500" />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Override goal (blank = original)</label>
+                  <textarea x-model="replayGoal" rows="2" placeholder="Describe the new goal…"
+                    class="w-full bg-gray-800 border border-gray-700 rounded px-2.5 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+                </div>
+                <div x-show="replayError" x-cloak class="text-xs text-red-400" x-text="replayError"></div>
+                <template x-if="replayResult">
+                  <div class="text-xs text-emerald-400">
+                    Replayed as <a :href="'/run/' + replayResult.run_id" class="underline" x-text="replayResult.run_id.slice(0,8)"></a>
+                  </div>
+                </template>
+                <button @click="triggerReplay()"
+                  :disabled="replayLoading"
+                  class="w-full bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded transition">
+                  <span x-show="!replayLoading">Launch replay</span>
+                  <span x-show="replayLoading" x-cloak>Launching…</span>
+                </button>
+              </div>
+            </div>
+          </template>
         </div>
       </template>
 
@@ -415,6 +455,12 @@ function runDetail() {
     hitlEditedJson: '',
     hitlSubmitting: false,
     budget: null,
+    showReplay: false,
+    replayModel: '',
+    replayGoal: '',
+    replayLoading: false,
+    replayError: '',
+    replayResult: null,
 
     async init() {
       const match = location.pathname.match(/^\/run\/(.+?)\/?$/);
@@ -589,6 +635,21 @@ function runDetail() {
         const r = await fetch(`/runs/${this.runId}/cancel`, { method: 'POST', headers: this.apiHeaders() });
         if (r.ok) this.run = await r.json();
       } catch {}
+    },
+
+    async triggerReplay() {
+      this.replayLoading = true; this.replayError = ''; this.replayResult = null;
+      try {
+        const body = {};
+        if (this.replayModel.trim()) body.model = this.replayModel.trim();
+        if (this.replayGoal.trim()) body.goal = this.replayGoal.trim();
+        const r = await fetch(`/runs/${this.runId}/replay`, {
+          method: 'POST', headers: this.apiHeaders(), body: JSON.stringify(body),
+        });
+        if (!r.ok) { const e = await r.json(); this.replayError = e.detail || `HTTP ${r.status}`; }
+        else { this.replayResult = await r.json(); }
+      } catch(e) { this.replayError = e.message; }
+      this.replayLoading = false;
     },
 
     payloadSummary(payload) {
