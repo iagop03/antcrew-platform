@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#3730a3">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>antcrew — Prueba gratuita</title>
 <style>
@@ -378,7 +381,8 @@ main {
   color: var(--text);
 }
 </style>
-</head>
+    <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}</script>
+  </head>
 <body>
 
 <nav>

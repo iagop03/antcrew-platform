@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#3730a3">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pipelines — antcrew</title>
 <link rel="stylesheet" href="/static/tailwind.css">
@@ -36,7 +39,8 @@ body{overflow:hidden}
 .ac-nav.ac-on{background:rgba(31,41,55,.95);color:#fff}
 .ac-nav .ti{font-size:14px;flex-shrink:0}
 </style>
-</head>
+    <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}</script>
+  </head>
 <body class="bg-gray-950 text-gray-100 flex flex-col h-screen" x-data="app()" x-init="init()"
   @keydown.window="onKeyDown($event)">
 

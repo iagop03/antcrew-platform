@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 _STATIC = Path(__file__).parent.parent / "static"
 
@@ -88,3 +88,13 @@ async def compare_page():
 @router.get("/compare/{compare_id}")
 async def compare_detail_page(compare_id: str):
     return _html("compare.html")
+
+
+@router.get("/sw.js")
+async def service_worker():
+    content = (_STATIC / "sw.js").read_bytes()
+    return Response(
+        content=content,
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"},
+    )

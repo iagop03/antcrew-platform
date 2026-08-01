@@ -22,9 +22,13 @@ on:
 
 jobs:
   # ── Step 1: run tests before any deploy ────────────────────────────────────
+  # Skipped for manual UAT deploys — INT already ran the full suite on the same commit.
   test:
     name: Test (Python 3.11)
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' ||
+      github.event.inputs.environment != 'uat'
     services:
       postgres:
         image: postgres:16
@@ -56,6 +60,9 @@ jobs:
   build:
     name: Build image (${{ (github.event_name == 'push' && 'int') || github.event.inputs.environment }})
     needs: test
+    if: |
+      always() &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -205,10 +212,15 @@ jobs:
             --type cx23 \
             --image "$SNAPSHOT_ID" \
             --location nbg1 \
-            --ssh-key github-actions-uat \
-            --wait
+            --ssh-key github-actions-uat
 
-          UAT_IP=$(hcloud server describe antcrew-uat -o json | jq -r '.public_net.ipv4.ip')
+          # Wait until Hetzner assigns the IP (usually immediate, but can lag a few seconds)
+          for i in $(seq 1 12); do
+            UAT_IP=$(hcloud server describe antcrew-uat -o json | jq -r '.public_net.ipv4.ip // empty')
+            [ -n "$UAT_IP" ] && break
+            sleep 5
+          done
+          [ -z "$UAT_IP" ] && { echo "::error::Server has no IP after 60 s"; exit 1; }
           echo "UAT_IP=$UAT_IP" >> "$GITHUB_ENV"
           echo "Server ready: $UAT_IP"
 
