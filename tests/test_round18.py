@@ -26,10 +26,11 @@ from app.models.run import Run, Workspace
 
 @pytest.mark.asyncio
 async def test_slack_config_blocks_public_host_without_enc_key(monkeypatch):
-    """Public host + SLACK_BOT_TOKEN + no enc key → RuntimeError."""
+    """Public host + SLACK_BOT_TOKEN + no enc key → RuntimeError in prod."""
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
     monkeypatch.delenv("SLACK_TOKEN_ENCRYPTION_KEY", raising=False)
     monkeypatch.setenv("HOST", "0.0.0.0")
+    monkeypatch.setenv("APP_ENV", "prod")
 
     from app.main import _check_slack_config
     with pytest.raises(RuntimeError, match="SLACK_TOKEN_ENCRYPTION_KEY"):

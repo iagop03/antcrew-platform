@@ -104,7 +104,7 @@ async def _check_stripe_config() -> None:
     host      = os.environ.get("HOST", "127.0.0.1")
     is_public = host not in ("127.0.0.1", "localhost", "::1")
 
-    if is_public and APP_ENV == "prod":
+    if is_public and os.environ.get("APP_ENV", "dev") == "prod":
         raise RuntimeError(
             "STRIPE_SECRET_KEY is set but STRIPE_WEBHOOK_SECRET is missing. "
             "Starting in production without webhook signature verification would allow "
@@ -137,7 +137,7 @@ async def _check_slack_config() -> None:
     host = os.environ.get("HOST", "127.0.0.1")
     is_public = host not in ("127.0.0.1", "localhost", "::1")
 
-    if is_public and APP_ENV == "prod":
+    if is_public and os.environ.get("APP_ENV", "dev") == "prod":
         raise RuntimeError(
             "SLACK_BOT_TOKEN is set but SLACK_TOKEN_ENCRYPTION_KEY is missing. "
             "The Slack bot token would be stored in plaintext in the database, "
@@ -263,7 +263,7 @@ async def _check_byok_config() -> None:
     host = os.environ.get("HOST", "127.0.0.1")
     is_public = host not in ("127.0.0.1", "localhost", "::1")
 
-    if is_public and APP_ENV == "prod":
+    if is_public and os.environ.get("APP_ENV", "dev") == "prod":
         raise RuntimeError(
             "Customer LLM keys are stored in plaintext but BYOK_ENCRYPTION_KEY is not set. "
             "API keys are high-value credentials. "
@@ -300,7 +300,7 @@ async def _check_proxy_config() -> None:
     if any_proxy:
         host = os.environ.get("HOST", "127.0.0.1")
         is_public = host not in ("127.0.0.1", "localhost", "::1")
-        if is_public and APP_ENV == "prod":
+        if is_public and os.environ.get("APP_ENV", "dev") == "prod":
             raise RuntimeError(
                 "Proxy-mode workspaces exist but BYOK_ENCRYPTION_KEY is not set. "
                 "Proxy tokens would be stored in plaintext — set BYOK_ENCRYPTION_KEY "
@@ -324,7 +324,7 @@ async def _check_mor_config() -> None:
     host = os.environ.get("HOST", "127.0.0.1")
     is_public = host not in ("127.0.0.1", "localhost", "::1")
 
-    if is_public and APP_ENV == "prod":
+    if is_public and os.environ.get("APP_ENV", "dev") == "prod":
         raise RuntimeError(
             "LEMON_SQUEEZY_WEBHOOK_SECRET is not set. "
             "Starting in production without webhook signature verification would allow "
@@ -354,7 +354,7 @@ async def _check_cors_config() -> None:
 
     host = os.environ.get("HOST", "127.0.0.1")
     is_public = host not in ("127.0.0.1", "localhost", "::1")
-    if is_public and APP_ENV == "prod":
+    if is_public and os.environ.get("APP_ENV", "dev") == "prod":
         raise RuntimeError(
             "CORS_ORIGINS=* is not allowed on a public host. "
             "Set CORS_ORIGINS to a comma-separated list of allowed origins "
