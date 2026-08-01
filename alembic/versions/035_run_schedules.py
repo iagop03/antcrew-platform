@@ -12,7 +12,7 @@ def upgrade() -> None:
     op.create_table(
         "run_schedule",
         sa.Column("id", sa.Integer(), nullable=False, primary_key=True),
-        sa.Column("workspace_id", sa.Integer(), nullable=False, index=True),
+        sa.Column("workspace_id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("goal", sa.Text(), nullable=False),
         sa.Column("model", sa.String(), nullable=False, server_default="claude"),
