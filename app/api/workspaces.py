@@ -97,6 +97,18 @@ class UpdateDefaultRepo(BaseModel):
         return v
 
 
+class UpdateTicketConfig(BaseModel):
+    ticket_prefix: str
+
+    @field_validator("ticket_prefix")
+    @classmethod
+    def prefix_valid(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not _re.match(r"^[A-Z0-9]{1,8}$", v):
+            raise ValueError("ticket_prefix must be 1–8 uppercase letters/digits (e.g. PROJ)")
+        return v
+
+
 class UpdateHitlDefault(BaseModel):
     hitl_default: bool
 
@@ -174,6 +186,7 @@ class WorkspacePublic(BaseModel):
     byok_managed_fallback: bool = False
     is_trial: bool = True
     byok_providers: list[str] = []
+    ticket_prefix: str = "TKT"
     created_at: datetime
 
     @model_validator(mode="before")
@@ -204,6 +217,7 @@ class WorkspacePublic(BaseModel):
                 "byok_managed_fallback": getattr(data, "byok_managed_fallback", False),
                 "is_trial": getattr(data, "is_trial", True),
                 "byok_providers": getattr(data, "_byok_providers", []),
+                "ticket_prefix": getattr(data, "ticket_prefix", "TKT"),
                 "created_at": data.created_at,
             }
         return data
@@ -384,6 +398,29 @@ async def set_default_repo(
     if not ws:
         raise WorkspaceNotFoundError(workspace_id)
     ws.default_repo_url = body.default_repo_url
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+    return ws
+
+
+@router.patch("/{workspace_id}/ticket-config", response_model=WorkspacePublic,
+              dependencies=[Depends(require_role("admin"))])
+async def set_ticket_config(
+    workspace_id: int,
+    body: UpdateTicketConfig,
+    session: AsyncSession = Depends(get_session),
+):
+    """Set the ticket ID prefix for this workspace (e.g. 'PROJ' → PROJ-00001).
+
+    The prefix applies to all new tickets created in the workspace. Changing it
+    does not renumber existing tickets.
+    """
+    result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
+    ws = result.first()
+    if not ws:
+        raise WorkspaceNotFoundError(workspace_id)
+    ws.ticket_prefix = body.ticket_prefix
     session.add(ws)
     await session.commit()
     await session.refresh(ws)

@@ -334,7 +334,8 @@ async def _store_result(result) -> None:
                 if db_run:
                     db_run.state = state_dict
                     session.add(db_run)
-                await upsert_tickets_from_run(session, run_id, raw_state)
+                ws_id = db_run.workspace_id if db_run else None
+                await upsert_tickets_from_run(session, run_id, raw_state, workspace_id=ws_id)
                 await session.commit()  # single commit for state + tickets
             return
         except Exception as exc:

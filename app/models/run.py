@@ -39,6 +39,8 @@ class Workspace(SQLModel, table=True):
     proxy_token_enc: Optional[str] = Field(default=None)    # Fernet-encrypted UUID token sent to the proxy
     is_trial: bool = Field(default=True)  # workspace is on the free-trial credit; costs at TRIAL_MULTIPLIER
     owner_user_id: Optional[int] = Field(default=None, index=True)  # user.id of the registering user
+    ticket_prefix: str = Field(default="TKT")   # e.g. "PROJ" → ticket display IDs are PROJ-00001
+    ticket_counter: int = Field(default=0)       # incremented atomically on each new ticket
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -92,6 +94,9 @@ class Ticket(SQLModel, table=True):
     ticket_type: str = Field(default="task")          # task | manual_action | bug
     blocking: bool = Field(default=False)             # when True, blocks the run until resolved
     assignee: Optional[str] = Field(default=None)    # email of the human responsible
+    # Workspace-scoped display ID (e.g. "PROJ-00001") — set on creation, null for legacy tickets
+    workspace_id: Optional[int] = Field(default=None, index=True)
+    display_id: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
 

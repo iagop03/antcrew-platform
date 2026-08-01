@@ -1,10 +1,14 @@
 """REST endpoints for the ticket kanban."""
 from __future__ import annotations
 
+import asyncio
+import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.exceptions import TicketNotFoundError
 from pydantic import BaseModel, field_validator
@@ -13,8 +17,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, ws_accessible, require_role
 from app.core.database import get_session
-from app.models.run import Run, Ticket
-from app.services.runs import list_tickets
+from app.models.run import Run, Ticket, Workspace
+from app.services.runs import list_tickets, _claim_display_id
 
 router = APIRouter(prefix="/tickets", tags=["tickets"], dependencies=[Depends(require_api_key)])
 
@@ -70,6 +74,11 @@ async def create_manual_action(
     if ctx.workspace_ids is not None and not ws_accessible(run.workspace_id, ctx):
         raise HTTPException(403, "Run is not accessible with the current API key")
 
+    workspace_id = run.workspace_id
+    display_id: Optional[str] = None
+    if workspace_id is not None:
+        display_id = await _claim_display_id(session, workspace_id)
+
     ticket_id = str(uuid.uuid4())
     ticket = Ticket(
         ticket_id=ticket_id,
@@ -81,6 +90,8 @@ async def create_manual_action(
         assignee=body.assignee,
         priority=body.priority,
         status="open",
+        workspace_id=workspace_id,
+        display_id=display_id,
     )
     session.add(ticket)
 
@@ -208,3 +219,100 @@ async def export_ticket(
         raise HTTPException(422, str(exc))
     except Exception as exc:
         raise HTTPException(502, f"Export failed: {exc}")
+
+
+def _parse_github_repo(url: str) -> str | None:
+    """Extract 'owner/repo' from a GitHub URL or SSH remote. Returns None if not parseable."""
+    url = url.strip().removesuffix(".git")
+    # HTTPS: https://github.com/owner/repo
+    m = re.match(r"https?://(?:www\.)?github\.com/([^/]+/[^/]+)", url)
+    if m:
+        return m.group(1)
+    # SSH: git@github.com:owner/repo
+    m = re.match(r"git@github\.com:([^/]+/[^/]+)", url)
+    if m:
+        return m.group(1)
+    return None
+
+
+@router.get("/{ticket_id}/commits")
+async def get_linked_commits(
+    ticket_id: str,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Search GitHub for commits and PRs mentioning this ticket's display_id.
+
+    Requires GITHUB_TOKEN environment variable and a repo URL on the workspace
+    (default_repo_url). Returns up to 10 commits and 5 PRs.
+    """
+    result = await session.exec(select(Ticket).where(Ticket.ticket_id == ticket_id))
+    ticket = result.first()
+    if not ticket:
+        raise TicketNotFoundError(ticket_id)
+    if ctx.workspace_ids is not None:
+        run_result = await session.exec(select(Run).where(Run.run_id == ticket.run_id))
+        run = run_result.first()
+        if run is None or not ws_accessible(run.workspace_id, ctx):
+            raise HTTPException(403, "This ticket is not accessible with the current API key")
+
+    if not ticket.display_id:
+        return {"display_id": None, "commits": [], "pull_requests": [], "error": "no_display_id"}
+
+    # Resolve workspace for repo URL
+    ws_id = ticket.workspace_id
+    if ws_id is None:
+        run_result = await session.exec(select(Run).where(Run.run_id == ticket.run_id))
+        run = run_result.first()
+        ws_id = run.workspace_id if run else None
+
+    repo_slug: str | None = None
+    if ws_id is not None:
+        ws_result = await session.exec(select(Workspace).where(Workspace.id == ws_id))
+        ws = ws_result.first()
+        if ws and ws.default_repo_url:
+            repo_slug = _parse_github_repo(ws.default_repo_url)
+
+    if not repo_slug:
+        return {"display_id": ticket.display_id, "commits": [], "pull_requests": [], "error": "no_repo_configured"}
+
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        return {"display_id": ticket.display_id, "commits": [], "pull_requests": [], "error": "no_github_token"}
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    query = f"{ticket.display_id} repo:{repo_slug}"
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        commits_resp, prs_resp = await asyncio.gather(
+            client.get("https://api.github.com/search/commits", params={"q": query, "per_page": 10}, headers=headers),
+            client.get("https://api.github.com/search/issues", params={"q": f"{query} type:pr", "per_page": 5}, headers=headers),
+        )
+
+    commits = []
+    if commits_resp.status_code == 200:
+        for item in commits_resp.json().get("items", []):
+            commits.append({
+                "sha": item["sha"][:7],
+                "message": item["commit"]["message"].split("\n")[0],
+                "author": item["commit"]["author"]["name"],
+                "date": item["commit"]["author"]["date"],
+                "url": item["html_url"],
+            })
+
+    pull_requests = []
+    if prs_resp.status_code == 200:
+        for item in prs_resp.json().get("items", []):
+            pull_requests.append({
+                "number": item["number"],
+                "title": item["title"],
+                "state": item["state"],
+                "url": item["html_url"],
+                "created_at": item["created_at"],
+            })
+
+    return {"display_id": ticket.display_id, "commits": commits, "pull_requests": pull_requests}

@@ -5,11 +5,26 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import case, func, or_, select as sa_select
+from sqlalchemy import case, func, or_, select as sa_select, text
 from sqlmodel import select, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.run import Run, Event as DBEvent, Ticket, HitlReview
+
+
+async def _claim_display_id(session: AsyncSession, workspace_id: int) -> str:
+    """Atomically increment workspace ticket_counter and return the display_id string."""
+    result = await session.execute(
+        text(
+            "UPDATE workspace SET ticket_counter = ticket_counter + 1 "
+            "WHERE id = :wid RETURNING ticket_prefix, ticket_counter"
+        ),
+        {"wid": workspace_id},
+    )
+    row = result.first()
+    if not row:
+        raise ValueError(f"workspace {workspace_id} not found")
+    return f"{row.ticket_prefix}-{row.ticket_counter:05d}"
 
 
 def _utcnow() -> datetime:
@@ -155,6 +170,7 @@ async def upsert_tickets_from_run(
     session: AsyncSession,
     run_id: str,
     run_state: dict,
+    workspace_id: Optional[int] = None,
 ) -> int:
     """Extract tickets from a RunResult state and upsert by ticket_id.
 
@@ -196,6 +212,9 @@ async def upsert_tickets_from_run(
             existing.updated_at = _utcnow()
             session.add(existing)
         else:
+            display_id: Optional[str] = None
+            if workspace_id is not None:
+                display_id = await _claim_display_id(session, workspace_id)
             session.add(Ticket(
                 ticket_id=tid, run_id=run_id,
                 title=p["title"], description=p["description"],
@@ -203,6 +222,8 @@ async def upsert_tickets_from_run(
                 prd_title=prd_title,
                 acceptance_criteria=ac_str,
                 dependencies=deps_str,
+                workspace_id=workspace_id,
+                display_id=display_id,
             ))
 
     return len(parsed)

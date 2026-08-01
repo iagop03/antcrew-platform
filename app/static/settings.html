@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐜</text></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>antcrew · Settings</title>
 <link rel="stylesheet" href="/static/tailwind.css">
@@ -929,6 +930,15 @@
           <input x-model="editWsForm.default_repo_url" type="url" placeholder="https://github.com/org/repo"
             class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
         </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1.5">Prefijo de tickets <span class="text-gray-700">— 1–8 letras/dígitos</span></label>
+          <div class="flex items-center gap-2">
+            <input x-model="editWsForm.ticket_prefix" type="text" placeholder="TKT" maxlength="8"
+              class="w-32 bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-indigo-500 transition-colors"
+              @input="editWsForm.ticket_prefix = editWsForm.ticket_prefix.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+            <span class="text-gray-600 text-xs font-mono" x-text="(editWsForm.ticket_prefix||'TKT')+'-00001'"></span>
+          </div>
+        </div>
         <label class="flex items-center gap-2.5 text-sm cursor-pointer">
           <input type="checkbox" x-model="editWsForm.hitl_default"
             class="w-4 h-4 rounded bg-gray-800 border-gray-600 text-indigo-500">
@@ -1172,7 +1182,7 @@ function settings() {
     workspaces: [], wsLoading: false, wsError: '',
     showCreateWs: false, editingWs: null,
     createWsForm: { name: '', slug: '', max_cost_usd: '', hitl_default: false },
-    editWsForm: { max_cost_usd: '', hitl_default: false, default_repo_url: '', add_credit: '', exit_trial: false },
+    editWsForm: { max_cost_usd: '', hitl_default: false, default_repo_url: '', ticket_prefix: 'TKT', add_credit: '', exit_trial: false },
     wsFormError: '',
 
     me: null,
@@ -1387,6 +1397,7 @@ function settings() {
         max_cost_usd: ws.max_cost_usd != null ? String(ws.max_cost_usd) : '',
         hitl_default: ws.hitl_default,
         default_repo_url: ws.default_repo_url || '',
+        ticket_prefix: ws.ticket_prefix || 'TKT',
         add_credit: '',
         exit_trial: false,
       };
@@ -1401,6 +1412,7 @@ function settings() {
           fetch(`/workspaces/${id}/budget`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ max_cost_usd: budget }) }),
           fetch(`/workspaces/${id}/hitl`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ hitl_default: this.editWsForm.hitl_default }) }),
           fetch(`/workspaces/${id}/repo`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ default_repo_url: this.editWsForm.default_repo_url || null }) }),
+          fetch(`/workspaces/${id}/ticket-config`, { method: 'PATCH', headers: this.apiHeaders(), body: JSON.stringify({ ticket_prefix: this.editWsForm.ticket_prefix || 'TKT' }) }),
         ];
         const addCredit = parseFloat(this.editWsForm.add_credit || '0');
         if (this.editingWs.is_trial && (this.editWsForm.exit_trial || addCredit > 0)) {

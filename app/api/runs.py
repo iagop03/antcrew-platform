@@ -84,7 +84,7 @@ async def upload_run(
     await session.refresh(run)
 
     if body.state:
-        await upsert_tickets_from_run(session, run.run_id, body.state)
+        await upsert_tickets_from_run(session, run.run_id, body.state, workspace_id=run.workspace_id)
         await session.commit()
 
     return run

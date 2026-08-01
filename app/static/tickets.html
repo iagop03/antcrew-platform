@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐜</text></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tickets — antcrew</title>
 <link rel="stylesheet" href="/static/tailwind.css">
@@ -110,7 +111,9 @@
           <template x-for="t in ticketsByStatus(col.status)" :key="t.ticket_id">
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 cursor-pointer hover:border-gray-500 transition"
                  @click="openTicket(t)">
-              <div class="font-mono text-xs text-gray-500 mb-1" x-text="t.ticket_id"></div>
+              <div class="font-mono text-xs mb-1"
+                :class="t.display_id ? 'text-indigo-400' : 'text-gray-600'"
+                x-text="t.display_id || t.ticket_id.slice(0,8)"></div>
               <div class="text-sm text-white leading-snug" x-text="t.title"></div>
               <div class="flex items-center gap-2 mt-2">
                 <span class="text-xs px-1.5 py-0.5 rounded"
@@ -152,7 +155,12 @@
       <div>
         <div class="flex items-start justify-between mb-4">
           <div>
-            <div class="font-mono text-xs text-gray-500 mb-1" x-text="selected.ticket_id"></div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-mono text-sm font-bold"
+                :class="selected.display_id ? 'text-indigo-400' : 'text-gray-600'"
+                x-text="selected.display_id || selected.ticket_id.slice(0,8)"></span>
+              <span x-show="selected.display_id" class="font-mono text-xs text-gray-600" x-text="selected.ticket_id.slice(0,8)"></span>
+            </div>
             <h2 class="text-lg font-semibold" x-text="selected.title"></h2>
             <p class="text-sm text-gray-400 mt-1" x-text="selected.prd_title"></p>
           </div>
@@ -211,6 +219,51 @@
           </div>
         </template>
 
+        <!-- Linked commits (only when display_id is available) -->
+        <template x-if="selected.display_id">
+          <div class="mb-4 border-t border-gray-800 pt-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-gray-400 uppercase tracking-wide">Commits &amp; PRs vinculados</span>
+              <button @click="loadCommits(selected.ticket_id)"
+                :disabled="commitsLoading"
+                class="text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-50 transition"
+                x-text="commitsLoaded ? 'Actualizar' : 'Cargar'"></button>
+            </div>
+            <template x-if="commitsLoading">
+              <p class="text-xs text-gray-600 animate-pulse">Buscando en GitHub…</p>
+            </template>
+            <template x-if="!commitsLoading && commitsError">
+              <p class="text-xs text-gray-600" x-text="commitsError"></p>
+            </template>
+            <template x-if="!commitsLoading && commitsLoaded && commits.length === 0 && pullRequests.length === 0">
+              <p class="text-xs text-gray-600">Sin resultados en GitHub para <span class="font-mono" x-text="selected.display_id"></span>.</p>
+            </template>
+            <template x-if="!commitsLoading && commits.length > 0">
+              <div class="space-y-1 mb-2">
+                <template x-for="c in commits" :key="c.sha">
+                  <a :href="c.url" target="_blank" rel="noopener"
+                    class="flex items-start gap-2 text-xs rounded px-2 py-1.5 bg-gray-800 hover:bg-gray-700 transition group">
+                    <span class="font-mono text-gray-500 group-hover:text-gray-300 shrink-0" x-text="c.sha"></span>
+                    <span class="text-gray-300 truncate" x-text="c.message"></span>
+                  </a>
+                </template>
+              </div>
+            </template>
+            <template x-if="!commitsLoading && pullRequests.length > 0">
+              <div class="space-y-1">
+                <template x-for="pr in pullRequests" :key="pr.number">
+                  <a :href="pr.url" target="_blank" rel="noopener"
+                    class="flex items-center gap-2 text-xs rounded px-2 py-1.5 bg-gray-800 hover:bg-gray-700 transition">
+                    <span class="font-mono text-gray-500" x-text="'#'+pr.number"></span>
+                    <span :class="pr.state === 'open' ? 'text-green-400' : 'text-purple-400'" x-text="pr.state"></span>
+                    <span class="text-gray-300 truncate" x-text="pr.title"></span>
+                  </a>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+
         <div class="text-xs text-gray-600 flex gap-4">
           <span>Priority: <span class="text-gray-400" x-text="selected.priority"></span></span>
           <a :href="'/run/' + selected.run_id" class="text-indigo-400 hover:underline">
@@ -235,6 +288,11 @@ function kanban() {
     exportTargets: [],
     exporting: false,
     exportResult: null,
+    commits: [],
+    pullRequests: [],
+    commitsLoading: false,
+    commitsLoaded: false,
+    commitsError: '',
     runIdFilter: new URLSearchParams(location.search).get('run_id') || null,
     ticketsOffset: 0,
     ticketsLimit: 100,
@@ -316,6 +374,26 @@ function kanban() {
       this.selected = { ...t };
       this.moveError = '';
       this.exportResult = null;
+      this.commits = [];
+      this.pullRequests = [];
+      this.commitsLoaded = false;
+      this.commitsError = '';
+    },
+
+    async loadCommits(ticketId) {
+      this.commitsLoading = true;
+      this.commitsError = '';
+      try {
+        const r = await fetch(`/tickets/${ticketId}/commits`, { headers: this.apiHeaders() });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { this.commitsError = d.detail || `HTTP ${r.status}`; return; }
+        if (d.error === 'no_repo_configured') { this.commitsError = 'Sin repositorio configurado en el workspace.'; return; }
+        if (d.error === 'no_github_token') { this.commitsError = 'GITHUB_TOKEN no configurado.'; return; }
+        this.commits = d.commits || [];
+        this.pullRequests = d.pull_requests || [];
+        this.commitsLoaded = true;
+      } catch(e) { this.commitsError = e.message; }
+      finally { this.commitsLoading = false; }
     },
 
     async exportTicket(ticketId, target) {
