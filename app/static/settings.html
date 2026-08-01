@@ -94,6 +94,12 @@
     class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
     <span data-i18n="tab.llm">LLM Mode</span>
   </button>
+  <button @click="tab='schedules'"
+    :class="tab==='schedules' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
+    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
+    <span>Schedules</span>
+    <span x-show="schedules.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="schedules.length"></span>
+  </button>
   <button @click="tab='profile'"
     :class="tab==='profile' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
     class="px-1 py-3 text-sm border-b-2 -mb-px transition-colors">
@@ -524,6 +530,120 @@
     </div>
   </div>
 
+  <!-- ── SCHEDULES ── -->
+  <div x-show="tab==='schedules'">
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-sm text-gray-400">Recurring engine runs triggered by a cron expression</span>
+      <button @click="openCreateSchedule()"
+        class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New schedule
+      </button>
+    </div>
+
+    <p x-show="schedulesError" class="text-red-400 text-sm mb-3" x-text="schedulesError"></p>
+    <div x-show="schedulesLoading" class="text-gray-600 text-sm py-8 text-center">Loading…</div>
+
+    <div x-show="!schedulesLoading && schedules.length === 0 && !schedulesError"
+      class="border border-dashed border-gray-800 rounded-lg py-12 text-center text-gray-600 text-sm">
+      No schedules yet.
+    </div>
+
+    <!-- Schedule list -->
+    <div x-show="!schedulesLoading && schedules.length > 0" class="flex flex-col gap-2">
+      <template x-for="s in schedules" :key="s.id">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-sm font-medium text-white truncate" x-text="s.name"></span>
+                <span class="text-xs font-mono px-1.5 py-0.5 rounded"
+                  :class="s.enabled ? 'bg-teal-900/50 text-teal-300' : 'bg-gray-800 text-gray-500'"
+                  x-text="s.enabled ? 'active' : 'paused'"></span>
+              </div>
+              <p class="text-xs text-gray-500 truncate" x-text="s.goal"></p>
+              <div class="flex items-center gap-3 mt-2 text-xs text-gray-600" style="font-variant-numeric:tabular-nums">
+                <span class="font-mono" x-text="s.cron_expr"></span>
+                <span>·</span>
+                <span x-text="s.model"></span>
+                <template x-if="s.max_cost_usd != null">
+                  <span>· max $<span x-text="s.max_cost_usd.toFixed(2)"></span></span>
+                </template>
+                <span>·</span>
+                <span>next <span x-text="fmtDateShort(s.next_run_at)"></span></span>
+              </div>
+              <div x-show="s.last_run_id" class="mt-1">
+                <a :href="'/run/' + s.last_run_id" class="text-xs text-indigo-400 hover:text-indigo-300">
+                  last run ↗
+                </a>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button @click="toggleSchedule(s)"
+                class="px-2.5 py-1 text-xs rounded-md border transition-colors"
+                :class="s.enabled
+                  ? 'border-gray-700 text-gray-400 hover:border-amber-600 hover:text-amber-400'
+                  : 'border-gray-700 text-gray-400 hover:border-teal-600 hover:text-teal-400'"
+                x-text="s.enabled ? 'Pause' : 'Resume'">
+              </button>
+              <button @click="deleteSchedule(s)"
+                class="px-2.5 py-1 text-xs rounded-md border border-gray-700 text-gray-500 hover:border-red-700 hover:text-red-400 transition-colors">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Create schedule inline form -->
+    <div x-show="showCreateSchedule" class="mt-4 bg-gray-900 border border-gray-700 rounded-xl p-5">
+      <h3 class="text-sm font-semibold mb-4">New schedule</h3>
+      <div class="flex flex-col gap-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Name</label>
+            <input x-model="createScheduleForm.name" type="text" placeholder="nightly audit"
+              class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Model</label>
+            <input x-model="createScheduleForm.model" type="text" placeholder="claude"
+              class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Goal</label>
+          <textarea x-model="createScheduleForm.goal" rows="2" placeholder="Audit security vulnerabilities in the codebase"
+            class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 transition-colors resize-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Cron expression</label>
+            <input x-model="createScheduleForm.cron_expr" type="text" placeholder="0 2 * * *"
+              class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+            <p class="text-xs text-gray-700 mt-0.5">UTC — <a href="https://crontab.guru" target="_blank" class="text-indigo-500 hover:underline">crontab.guru</a></p>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Max cost (USD, optional)</label>
+            <input x-model="createScheduleForm.max_cost_usd" type="number" step="0.01" min="0" placeholder="—"
+              class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:border-indigo-500 transition-colors">
+          </div>
+        </div>
+        <p x-show="schedFormError" class="text-red-400 text-xs" x-text="schedFormError"></p>
+        <div class="flex gap-2 justify-end">
+          <button @click="showCreateSchedule=false"
+            class="px-3 py-1.5 text-sm text-gray-500 hover:text-white transition-colors">Cancel</button>
+          <button @click="createSchedule()"
+            :disabled="!createScheduleForm.name.trim() || !createScheduleForm.goal.trim() || !createScheduleForm.cron_expr.trim()"
+            class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm rounded-md transition-colors">
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── PERFIL ── -->
   <div x-show="tab==='profile'" class="max-w-md">
     <p x-show="profileMsg" class="mb-4 text-sm px-3 py-2 rounded-lg"
@@ -571,6 +691,80 @@
             Change password
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- MFA section -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="text-sm font-medium">Two-factor authentication (TOTP)</h3>
+        <span class="text-xs font-medium px-2 py-0.5 rounded-full"
+          :class="mfaEnabled ? 'bg-teal-900/60 text-teal-300' : 'bg-gray-800 text-gray-500'"
+          x-text="mfaEnabled ? 'Enabled' : 'Disabled'"></span>
+      </div>
+      <p class="text-xs text-gray-600 mb-4">Require a 6-digit code from your authenticator app on every login.</p>
+
+      <!-- Setup flow: show secret + provisioning URI -->
+      <div x-show="mfaSetup && !mfaEnabled" class="mb-4 p-4 bg-gray-800/60 border border-gray-700 rounded-lg">
+        <p class="text-xs text-gray-400 mb-3">Scan this code with your authenticator app, then verify below.</p>
+        <div class="mb-3">
+          <a :href="mfaSetup.provisioning_uri"
+            class="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+            Open in authenticator app
+          </a>
+        </div>
+        <div class="mb-3">
+          <p class="text-xs text-gray-500 mb-1">Or enter manually:</p>
+          <code class="block bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-xs font-mono text-gray-200 tracking-widest select-all" x-text="mfaSetup.secret"></code>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Verify — enter the 6-digit code</label>
+          <div class="flex gap-2">
+            <input x-model="mfaCode" type="text" inputmode="numeric" maxlength="6" placeholder="000000"
+              @keydown.enter="enableMfa()"
+              class="w-32 bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm font-mono text-center tracking-widest focus:outline-none focus:border-indigo-500 transition-colors">
+            <button @click="enableMfa()" :disabled="mfaCode.length !== 6 || mfaLoading"
+              class="px-3 py-1.5 bg-teal-700 hover:bg-teal-600 disabled:opacity-40 text-white text-xs rounded-md transition-colors">
+              Activate
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disable flow -->
+      <div x-show="mfaEnabled && showDisableMfa" class="mb-4 p-4 bg-gray-800/60 border border-amber-800/40 rounded-lg">
+        <p class="text-xs text-amber-300/80 mb-3">Enter the current code from your authenticator app to disable MFA.</p>
+        <div class="flex gap-2">
+          <input x-model="mfaCode" type="text" inputmode="numeric" maxlength="6" placeholder="000000"
+            @keydown.enter="disableMfa()"
+            class="w-32 bg-gray-800 border border-gray-700 rounded-md px-3 py-1.5 text-sm font-mono text-center tracking-widest focus:outline-none focus:border-amber-600 transition-colors">
+          <button @click="disableMfa()" :disabled="mfaCode.length !== 6 || mfaLoading"
+            class="px-3 py-1.5 bg-red-800 hover:bg-red-700 disabled:opacity-40 text-white text-xs rounded-md transition-colors">
+            Disable MFA
+          </button>
+          <button @click="showDisableMfa=false; mfaCode=''"
+            class="px-3 py-1.5 text-xs text-gray-500 hover:text-white transition-colors">Cancel</button>
+        </div>
+      </div>
+
+      <p x-show="mfaMsg" class="text-xs mb-3"
+        :class="mfaError ? 'text-red-400' : 'text-teal-400'"
+        x-text="mfaMsg"></p>
+
+      <div class="flex gap-2">
+        <button x-show="!mfaEnabled && !mfaSetup" @click="setupMfa()"
+          class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-md transition-colors">
+          Set up MFA
+        </button>
+        <button x-show="!mfaEnabled && mfaSetup" @click="mfaSetup=null; mfaCode=''; mfaMsg=''"
+          class="px-3 py-1.5 border border-gray-700 text-gray-400 hover:text-white text-xs rounded-md transition-colors">
+          Cancel setup
+        </button>
+        <button x-show="mfaEnabled && !showDisableMfa" @click="showDisableMfa=true; mfaCode=''; mfaMsg=''"
+          class="px-3 py-1.5 border border-red-800/60 text-red-400 hover:border-red-600 text-xs rounded-md transition-colors">
+          Disable MFA
+        </button>
       </div>
     </div>
   </div>
@@ -936,6 +1130,15 @@ function settings() {
     addKeyForm: { provider: 'anthropic', api_key: '', base_url: '', confirm_overwrite: false },
     matrixData: [], matrixRows: [], matrixLoading: false,
 
+    // Schedules
+    schedules: [], schedulesLoading: false, schedulesError: '',
+    showCreateSchedule: false, schedFormError: '',
+    createScheduleForm: { name: '', goal: '', model: 'claude', cron_expr: '', max_cost_usd: '' },
+
+    // MFA
+    mfaEnabled: false, mfaSetup: null, mfaCode: '', mfaMsg: '', mfaError: false,
+    mfaLoading: false, showDisableMfa: false,
+
     apiHeaders() {
       const h = { 'Content-Type': 'application/json' };
       if (this.apiKey) h['X-Api-Key'] = this.apiKey;
@@ -962,8 +1165,9 @@ function settings() {
         this.me = await meR.json();
         this.profileForm.display_name = this.me.display_name || '';
         this.profileForm.email = this.me.email || '';
+        this.mfaEnabled = this.me.mfa_enabled || false;
       }
-      await Promise.all([this.loadWorkspaces(), this.loadKeys()]);
+      await Promise.all([this.loadWorkspaces(), this.loadKeys(), this.loadSchedules()]);
     },
 
     async saveProfile() {
@@ -1397,6 +1601,109 @@ function settings() {
     fmtDate(d) {
       if (!d) return '—';
       return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    },
+
+    fmtDateShort(d) {
+      if (!d) return '—';
+      const dt = new Date(d + (d.endsWith('Z') ? '' : 'Z'));
+      return dt.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+    },
+
+    /* ── Schedules ── */
+    async loadSchedules() {
+      this.schedulesLoading = true; this.schedulesError = '';
+      try {
+        const r = await fetch('/run-schedules/', { headers: this.apiHeaders() });
+        if (!r.ok) throw new Error(await r.text());
+        this.schedules = await r.json();
+      } catch(e) { this.schedulesError = e.message; }
+      this.schedulesLoading = false;
+    },
+
+    openCreateSchedule() {
+      this.schedFormError = '';
+      this.createScheduleForm = { name: '', goal: '', model: 'claude', cron_expr: '', max_cost_usd: '' };
+      this.showCreateSchedule = true;
+    },
+
+    async createSchedule() {
+      this.schedFormError = '';
+      const f = this.createScheduleForm;
+      const body = {
+        name: f.name.trim(),
+        goal: f.goal.trim(),
+        model: f.model.trim() || 'claude',
+        cron_expr: f.cron_expr.trim(),
+      };
+      if (f.max_cost_usd) body.max_cost_usd = parseFloat(f.max_cost_usd);
+      try {
+        const r = await fetch('/run-schedules/', { method: 'POST', headers: this.apiHeaders(), body: JSON.stringify(body) });
+        if (!r.ok) {
+          const e = await r.json();
+          this.schedFormError = e.detail || JSON.stringify(e);
+          return;
+        }
+        this.showCreateSchedule = false;
+        await this.loadSchedules();
+      } catch(e) { this.schedFormError = e.message; }
+    },
+
+    async toggleSchedule(s) {
+      try {
+        const r = await fetch(`/run-schedules/${s.id}`, {
+          method: 'PATCH', headers: this.apiHeaders(),
+          body: JSON.stringify({ enabled: !s.enabled }),
+        });
+        if (r.ok) await this.loadSchedules();
+      } catch(e) { this.schedulesError = e.message; }
+    },
+
+    async deleteSchedule(s) {
+      if (!confirm(`Delete schedule "${s.name}"? This cannot be undone.`)) return;
+      try {
+        const r = await fetch(`/run-schedules/${s.id}`, { method: 'DELETE', headers: this.apiHeaders() });
+        if (r.status === 204 || r.ok) await this.loadSchedules();
+      } catch(e) { this.schedulesError = e.message; }
+    },
+
+    /* ── MFA ── */
+    async setupMfa() {
+      this.mfaMsg = ''; this.mfaError = false; this.mfaSetup = null; this.mfaCode = '';
+      try {
+        const r = await fetch('/auth/mfa/setup', { credentials: 'same-origin' });
+        if (!r.ok) { const e = await r.json(); this.mfaMsg = e.detail || 'Error loading setup'; this.mfaError = true; return; }
+        this.mfaSetup = await r.json();
+        this.mfaEnabled = this.mfaSetup.mfa_enabled;
+      } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
+    },
+
+    async enableMfa() {
+      if (!this.mfaSetup) return;
+      this.mfaMsg = ''; this.mfaError = false; this.mfaLoading = true;
+      try {
+        const r = await fetch('/auth/mfa/enable', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: this.mfaSetup.secret, code: this.mfaCode }),
+        });
+        if (!r.ok) { const e = await r.json(); this.mfaMsg = e.detail || 'Invalid code'; this.mfaError = true; }
+        else { this.mfaEnabled = true; this.mfaSetup = null; this.mfaCode = ''; this.mfaMsg = 'MFA enabled. Codes required at next login.'; }
+      } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
+      this.mfaLoading = false;
+    },
+
+    async disableMfa() {
+      this.mfaMsg = ''; this.mfaError = false; this.mfaLoading = true;
+      try {
+        const r = await fetch('/auth/mfa/disable', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: this.mfaCode }),
+        });
+        if (!r.ok) { const e = await r.json(); this.mfaMsg = e.detail || 'Invalid code'; this.mfaError = true; }
+        else { this.mfaEnabled = false; this.showDisableMfa = false; this.mfaCode = ''; this.mfaMsg = 'MFA disabled.'; }
+      } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
+      this.mfaLoading = false;
     },
   };
 }

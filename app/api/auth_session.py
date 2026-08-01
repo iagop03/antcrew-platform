@@ -982,8 +982,10 @@ async def me(
         email = api_key.email
 
     display_name: Optional[str] = None
+    mfa_enabled: bool = False
     if user_session.user_id is not None and user:
         display_name = user.display_name
+        mfa_enabled = bool(user.mfa_enabled)
 
     return {
         "email": email,
@@ -991,6 +993,7 @@ async def me(
         "workspace_id": api_key.workspace_id,
         "role": api_key.role,
         "email_verified": email_verified,
+        "mfa_enabled": mfa_enabled,
         "session_expires_at": user_session.expires_at.isoformat() + "Z",
     }
 
