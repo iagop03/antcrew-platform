@@ -196,7 +196,7 @@ jobs:
           echo "Creating server from snapshot $SNAPSHOT_ID…"
           hcloud server create \
             --name antcrew-uat \
-            --type cx22 \
+            --type cx23 \
             --image "$SNAPSHOT_ID" \
             --location nbg1 \
             --ssh-key github-actions-uat \
