@@ -10,6 +10,13 @@ name: UAT — on-demand start
 
 on:
   workflow_dispatch:
+    inputs:
+      hours:
+        description: Auto-shutdown after N hours
+        required: false
+        default: '1'
+        type: choice
+        options: ['1', '2', '4', '8']
 
 jobs:
   start:
@@ -85,10 +92,10 @@ jobs:
 
           docker compose -f docker-compose.uat.yml up -d --remove-orphans 2>/dev/null || true
 
-          # Cancel any pending shutdown and schedule a fresh 60-minute window
+          # Cancel any pending shutdown and schedule a fresh window
           shutdown -c 2>/dev/null || true
-          shutdown -h +60
-          echo "Services running. Auto-shutdown reset to 60 minutes from now."
+          shutdown -h +$(( ${{ github.event.inputs.hours || '1' }} * 60 ))
+          echo "Services running. Auto-shutdown in ${{ github.event.inputs.hours || '1' }} hour(s)."
           REMOTE
 
           echo "UAT live at http://$UAT_IP:8000 (auto-shuts down in 60 min)"

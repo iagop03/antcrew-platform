@@ -13,6 +13,12 @@ on:
         required: true
         type: choice
         options: [int, uat, prod]
+      uat_hours:
+        description: UAT auto-shutdown after N hours (UAT only)
+        required: false
+        default: '1'
+        type: choice
+        options: ['1', '2', '4', '8']
 
 jobs:
   # ── Step 1: run tests before any deploy ────────────────────────────────────
@@ -241,6 +247,7 @@ jobs:
           scp -i ~/.ssh/hetzner_uat docker-compose.uat.yml root@"$UAT_IP":/opt/antcrew/
 
           # Login to GHCR, pull image, start services, schedule shutdown
+          SHUTDOWN_MINS=$(( ${{ github.event.inputs.uat_hours || '1' }} * 60 ))
           ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" bash <<REMOTE
           set -euo pipefail
           cd /opt/antcrew
@@ -250,12 +257,11 @@ jobs:
           echo "PLATFORM_IMAGE=$PLATFORM_IMAGE" > /opt/antcrew/.platform-image-env
           docker compose -f docker-compose.uat.yml pull platform
           docker compose -f docker-compose.uat.yml up -d --remove-orphans
-          # Auto-shutdown in 60 minutes
-          shutdown -h +60
-          echo "Deploy complete. Server auto-shuts down in 60 minutes."
+          shutdown -h +$SHUTDOWN_MINS
+          echo "Deploy complete. Server auto-shuts down in $SHUTDOWN_MINS minutes."
           REMOTE
 
-          echo "UAT live at http://$UAT_IP:8000 (auto-shuts down in 60 min)"
+          echo "UAT live at http://$UAT_IP:8000 (auto-shuts down in $SHUTDOWN_MINS min)"
 
       # ── INT / PROD: Fly.io ────────────────────────────────────────────────────
 
