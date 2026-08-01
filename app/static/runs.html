@@ -469,12 +469,14 @@ function dashboard() {
     connectWs() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const k = localStorage.getItem('antcrew_api_key') || '';
-      this.ws = new WebSocket(`${proto}://${location.host}/ws/events`);
-      this.ws.onopen = () => {
+      const ws = new WebSocket(`${proto}://${location.host}/ws/events`);
+      this.ws = ws;
+      ws.onopen = () => {
+        if (this.ws !== ws) return;
         this.wsConnected = true; this._wsBackoff = 1000;
-        if (k) this.ws.send(JSON.stringify({ auth: k }));
+        if (k) ws.send(JSON.stringify({ auth: k }));
       };
-      this.ws.onmessage = (e) => {
+      ws.onmessage = (e) => {
         const ev = JSON.parse(e.data);
         if (ev.type === 'ping') return;
         if (ev.type === 'hitl.review_required') {
@@ -494,7 +496,8 @@ function dashboard() {
           this.loadStats();
         }
       };
-      this.ws.onclose = () => {
+      ws.onclose = () => {
+        if (this.ws !== ws) return;
         this.wsConnected = false;
         setTimeout(() => this.connectWs(), this._wsBackoff);
         this._wsBackoff = Math.min(this._wsBackoff * 2, 30000);

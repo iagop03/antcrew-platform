@@ -896,76 +896,80 @@ async def trial_register(
     }
 
 
+def _html(name: str) -> FileResponse:
+    return FileResponse(_STATIC / name, media_type="text/html; charset=utf-8")
+
+
 @app.get("/login")
 async def login_page():
-    return FileResponse(_STATIC / "login.html")
+    return _html("login.html")
 
 
 @app.get("/trial")
 async def trial_page():
-    return FileResponse(_STATIC / "trial.html")
+    return _html("trial.html")
 
 
 @app.get("/")
 async def landing():
-    return FileResponse(_STATIC / "landing.html")
+    return _html("landing.html")
 
 
 @app.get("/dashboard")
 async def dashboard():
-    return FileResponse(_STATIC / "index.html")
+    return _html("index.html")
 
 
 @app.get("/run/{run_id}")
 async def run_detail(run_id: str):
-    return FileResponse(_STATIC / "run.html")
+    return _html("run.html")
 
 
 @app.get("/tickets")
 async def tickets_page():
-    return FileResponse(_STATIC / "tickets.html")
+    return _html("tickets.html")
 
 
 @app.get("/reviews")
 async def reviews_page():
-    return FileResponse(_STATIC / "reviews.html")
+    return _html("reviews.html")
 
 
 @app.get("/evals")
 async def evals_page():
-    return FileResponse(_STATIC / "evals.html")
+    return _html("evals.html")
 
 
 @app.get("/webhooks")
 async def webhooks_page():
-    return FileResponse(_STATIC / "webhooks.html")
+    return _html("webhooks.html")
 
 
 @app.get("/onboard")
 async def onboard_page():
-    return FileResponse(_STATIC / "onboard.html")
+    return _html("onboard.html")
 
 
 @app.get("/settings")
 async def settings_page():
-    return FileResponse(_STATIC / "settings.html")
+    return _html("settings.html")
 
 
 @app.get("/pipelines")
 async def pipelines_page():
-    return FileResponse(_STATIC / "pipelines.html")
+    return _html("pipelines.html")
 
 
 @app.get("/runs")
 async def runs_page():
-    return FileResponse(_STATIC / "runs.html")
+    return _html("runs.html")
 
 
 @app.get("/compare")
 async def compare_page():
-    return FileResponse(_STATIC / "compare.html")
+    return _html("compare.html")
 
 
 @app.get("/compare/{compare_id}")
 async def compare_detail_page(compare_id: str):
-    return FileResponse(_STATIC / "compare.html")
+    return _html("compare.html")
