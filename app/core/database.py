@@ -34,12 +34,16 @@ elif DB_URL.startswith("postgresql://"):
     DB_URL = "postgresql+asyncpg://" + DB_URL[len("postgresql://"):]
     _ssl = True
 
-if "sslmode=" in DB_URL:
+# Strip query params asyncpg doesn't understand (sslmode, channel_binding, etc.)
+_STRIP_PARAMS = {"sslmode", "channel_binding", "connect_timeout", "application_name"}
+if any(f"{p}=" in DB_URL for p in _STRIP_PARAMS):
     from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
     _parsed = urlparse(DB_URL)
     _params = parse_qs(_parsed.query, keep_blank_values=True)
     _sslmode = _params.pop("sslmode", ["disable"])[0]
-    _ssl = _sslmode in ("require", "verify-ca", "verify-full")
+    _ssl = _ssl or (_sslmode in ("require", "verify-ca", "verify-full"))
+    for _p in ("channel_binding", "connect_timeout", "application_name"):
+        _params.pop(_p, None)
     DB_URL = urlunparse(_parsed._replace(query=urlencode({k: v[0] for k, v in _params.items()})))
 
 _connect_args: dict = {"ssl": True} if _ssl else {}
