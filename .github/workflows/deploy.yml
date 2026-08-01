@@ -261,8 +261,8 @@ jobs:
       - name: Deploy application to UAT
         if: needs.build.outputs.env_name == 'uat'
         env:
-          UAT_DATABASE_URL: ${{ secrets.UAT_DATABASE_URL }}
-          UAT_SECRET_KEY: ${{ secrets.UAT_SECRET_KEY }}
+          UAT_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          UAT_SECRET_KEY: ${{ secrets.SECRET_KEY }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
           PLATFORM_IMAGE: ghcr.io/${{ github.repository }}:uat-latest
