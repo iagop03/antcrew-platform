@@ -224,6 +224,27 @@ jobs:
           echo "UAT_IP=$UAT_IP" >> "$GITHUB_ENV"
           echo "Server ready: $UAT_IP"
 
+      - name: Update platform-uat.antcrew.org DNS
+        if: needs.build.outputs.env_name == 'uat'
+        env:
+          CLOUDFLARE_TOKEN: ${{ secrets.CLOUDFLARE_TOKEN }}
+        run: |
+          ZONE=$(curl -sf -H "Authorization: Bearer $CLOUDFLARE_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones?name=antcrew.org" \
+            | jq -r '.result[0].id')
+          RECORD_ID=$(curl -sf -H "Authorization: Bearer $CLOUDFLARE_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records?type=A&name=platform-uat.antcrew.org" \
+            | jq -r '.result[0].id // empty')
+          BODY="{\"type\":\"A\",\"name\":\"platform-uat\",\"content\":\"$UAT_IP\",\"ttl\":60,\"proxied\":true}"
+          if [ -n "$RECORD_ID" ]; then
+            curl -sf -X PUT -H "Authorization: Bearer $CLOUDFLARE_TOKEN" -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records/$RECORD_ID" -d "$BODY"
+          else
+            curl -sf -X POST -H "Authorization: Bearer $CLOUDFLARE_TOKEN" -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" -d "$BODY"
+          fi
+          echo "DNS updated: platform-uat.antcrew.org → $UAT_IP (proxied)"
+
       - name: Wait for SSH
         if: needs.build.outputs.env_name == 'uat'
         run: |
