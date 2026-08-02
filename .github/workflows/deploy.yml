@@ -271,6 +271,11 @@ jobs:
           UAT_DATABASE_URL: ${{ secrets.DATABASE_URL }}
           UAT_SECRET_KEY: ${{ secrets.SECRET_KEY }}
           UAT_PLATFORM_API_KEY: ${{ secrets.PLATFORM_API_KEY }}
+          UAT_SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          UAT_SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          UAT_SMTP_USER: ${{ secrets.SMTP_USER }}
+          UAT_SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          UAT_SMTP_FROM: ${{ secrets.SMTP_FROM }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
           PLATFORM_IMAGE: ghcr.io/${{ github.repository }}:uat-latest
@@ -281,6 +286,11 @@ jobs:
           DATABASE_URL=${UAT_DATABASE_URL}
           SECRET_KEY=${UAT_SECRET_KEY}
           PLATFORM_API_KEY=${UAT_PLATFORM_API_KEY}
+          SMTP_HOST=${UAT_SMTP_HOST}
+          SMTP_PORT=${UAT_SMTP_PORT}
+          SMTP_USER=${UAT_SMTP_USER}
+          SMTP_PASSWORD=${UAT_SMTP_PASSWORD}
+          SMTP_FROM=${UAT_SMTP_FROM}
           EOF
           ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" "mkdir -p /opt/antcrew"
           scp -i ~/.ssh/hetzner_uat /tmp/env.uat root@"$UAT_IP":/opt/antcrew/.env.uat
