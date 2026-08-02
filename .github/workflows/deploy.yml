@@ -216,13 +216,16 @@ jobs:
 
           # Wait until Hetzner assigns the IP (usually immediate, but can lag a few seconds)
           for i in $(seq 1 12); do
-            UAT_IP=$(hcloud server describe antcrew-uat -o json | jq -r '.public_net.ipv4.ip // empty')
+            SERVER_JSON=$(hcloud server describe antcrew-uat -o json)
+            UAT_IP=$(echo "$SERVER_JSON" | jq -r '.public_net.ipv4.ip // empty')
             [ -n "$UAT_IP" ] && break
             sleep 5
           done
           [ -z "$UAT_IP" ] && { echo "::error::Server has no IP after 60 s"; exit 1; }
+          UAT_SERVER_ID=$(echo "$SERVER_JSON" | jq -r '.id')
           echo "UAT_IP=$UAT_IP" >> "$GITHUB_ENV"
-          echo "Server ready: $UAT_IP"
+          echo "UAT_SERVER_ID=$UAT_SERVER_ID" >> "$GITHUB_ENV"
+          echo "Server ready: $UAT_IP (id=$UAT_SERVER_ID)"
 
       - name: Update platform-uat.antcrew.org DNS
         if: needs.build.outputs.env_name == 'uat'
@@ -303,16 +306,16 @@ jobs:
           # Kill any previous self-delete timer
           [ -f /opt/antcrew/cleanup.pid ] && kill \$(cat /opt/antcrew/cleanup.pid) 2>/dev/null || true
 
-          # Schedule self-deletion via Hetzner API so billing stops immediately
-          # Redirect to /dev/null so SSH file descriptors are not inherited
+          # Schedule self-deletion via Hetzner API so billing stops immediately.
+          # Server ID is passed from the runner (which has hcloud+jq) so the
+          # cleanup script needs no extra tools on the server itself.
+          # Redirect to /dev/null so SSH file descriptors are not inherited.
           (sleep $SHUTDOWN_SECS
-           TOKEN=\$(cat /opt/antcrew/.hcloud_token)
-           SERVER_ID=\$(curl -sf -H "Authorization: Bearer \$TOKEN" \
-             "https://api.hetzner.cloud/v1/servers?name=antcrew-uat" \
-             | jq -r '.servers[0].id // empty')
-           [ -n "\$SERVER_ID" ] && curl -sf -X DELETE \
-             -H "Authorization: Bearer \$TOKEN" \
-             "https://api.hetzner.cloud/v1/servers/\$SERVER_ID"
+           curl -sf -X DELETE \
+             -H "Authorization: Bearer \$(cat /opt/antcrew/.hcloud_token)" \
+             "https://api.hetzner.cloud/v1/servers/$UAT_SERVER_ID" \
+             && echo "Server $UAT_SERVER_ID deleted." \
+             || echo "DELETE failed — check token or server state."
           ) </dev/null >/var/log/uat-cleanup.log 2>&1 &
           echo \$! > /opt/antcrew/cleanup.pid
           disown

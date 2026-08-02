@@ -50,7 +50,8 @@ jobs:
             exit 1
           fi
 
-          STATUS=$(hcloud server describe antcrew-uat -o json | jq -r '.status')
+          SERVER_JSON=$(hcloud server describe antcrew-uat -o json)
+          STATUS=$(echo "$SERVER_JSON" | jq -r '.status')
           echo "Current status: $STATUS"
 
           if [ "$STATUS" = "running" ]; then
@@ -58,11 +59,14 @@ jobs:
           else
             echo "Powering on antcrew-uat…"
             hcloud server poweron antcrew-uat --wait
+            SERVER_JSON=$(hcloud server describe antcrew-uat -o json)
             echo "Server powered on."
           fi
 
-          UAT_IP=$(hcloud server describe antcrew-uat -o json | jq -r '.public_net.ipv4.ip')
+          UAT_IP=$(echo "$SERVER_JSON" | jq -r '.public_net.ipv4.ip')
+          UAT_SERVER_ID=$(echo "$SERVER_JSON" | jq -r '.id')
           echo "UAT_IP=$UAT_IP" >> "$GITHUB_ENV"
+          echo "UAT_SERVER_ID=$UAT_SERVER_ID" >> "$GITHUB_ENV"
 
       - name: Wait for SSH
         run: |
@@ -99,13 +103,11 @@ jobs:
           [ -f /opt/antcrew/cleanup.pid ] && kill \$(cat /opt/antcrew/cleanup.pid) 2>/dev/null || true
 
           (sleep $SHUTDOWN_SECS
-           TOKEN=\$(cat /opt/antcrew/.hcloud_token)
-           SERVER_ID=\$(curl -sf -H "Authorization: Bearer \$TOKEN" \
-             "https://api.hetzner.cloud/v1/servers?name=antcrew-uat" \
-             | jq -r '.servers[0].id // empty')
-           [ -n "\$SERVER_ID" ] && curl -sf -X DELETE \
-             -H "Authorization: Bearer \$TOKEN" \
-             "https://api.hetzner.cloud/v1/servers/\$SERVER_ID"
+           curl -sf -X DELETE \
+             -H "Authorization: Bearer \$(cat /opt/antcrew/.hcloud_token)" \
+             "https://api.hetzner.cloud/v1/servers/$UAT_SERVER_ID" \
+             && echo "Server $UAT_SERVER_ID deleted." \
+             || echo "DELETE failed — check token or server state."
           ) </dev/null >/var/log/uat-cleanup.log 2>&1 &
           echo \$! > /opt/antcrew/cleanup.pid
           disown
