@@ -90,6 +90,11 @@ async def compare_detail_page(compare_id: str):
     return _html("compare.html")
 
 
+@router.get("/admin")
+async def admin_page():
+    return _html("admin.html")
+
+
 @router.get("/sw.js")
 async def service_worker():
     content = (_STATIC / "sw.js").read_bytes()

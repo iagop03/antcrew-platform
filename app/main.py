@@ -40,6 +40,7 @@ from app.api import workspaces_proxy as workspaces_proxy_api
 from app.api import run_schedules as run_schedules_api
 from app.api import pages as pages_api
 from app.api import bootstrap as bootstrap_api
+from app.api import admin as admin_api
 
 # Re-export for backward compatibility — tests import these names from app.main
 from app.core.startup import _check_auth_mode, _check_slack_config  # noqa: F401
@@ -182,6 +183,7 @@ app.include_router(invites_api.router,                 dependencies=_csrf)
 app.include_router(run_schedules_api.router,           dependencies=_csrf)
 app.include_router(pages_api.router)
 app.include_router(bootstrap_api.router)
+app.include_router(admin_api.router)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 

@@ -89,9 +89,32 @@ async def _persist_event(event: "Event") -> None:
                     # Apply billing multiplier: trial ×1.0, byok ×0.4, managed ×3.0
                     if ws_row and raw_cost_usd > 0:
                         from app.core.byok import get_cost_multiplier
+                        from app.models.admin import Campaign
+                        from datetime import timezone as _tz
+                        _now = datetime.now(_tz.utc).replace(tzinfo=None)
+                        _camp = (await session.exec(
+                            select(Campaign)
+                            .where(Campaign.active.is_(True))
+                            .where(Campaign.starts_at <= _now)
+                            .where(Campaign.ends_at >= _now)
+                            .order_by(Campaign.id.desc())
+                            .limit(1)
+                        )).first()
+                        _campaign_mult: Optional[float] = None
+                        if _camp:
+                            ws_created = getattr(ws_row, "created_at", None)
+                            if _camp.target == "all" or (
+                                _camp.target == "new"
+                                and ws_created is not None
+                                and ws_created >= _camp.starts_at
+                            ):
+                                _campaign_mult = _camp.multiplier
                         multiplier = get_cost_multiplier(
                             getattr(ws_row, "llm_key_mode", "managed"),
                             is_trial=getattr(ws_row, "is_trial", False),
+                            multiplier_override=getattr(ws_row, "cost_multiplier_override", None),
+                            multiplier_locked=getattr(ws_row, "multiplier_locked", False),
+                            campaign_multiplier=_campaign_mult,
                         )
                         run.cost_usd = round(raw_cost_usd * multiplier, 6)
                     else:

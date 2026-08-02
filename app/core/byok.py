@@ -138,8 +138,25 @@ async def get_workspace_llm_key_for_model(
     return await get_workspace_llm_key(session, workspace_id, provider)
 
 
-def get_cost_multiplier(llm_key_mode: str, is_trial: bool = False) -> float:
-    """Return the billing multiplier for a workspace."""
+def get_cost_multiplier(
+    llm_key_mode: str,
+    is_trial: bool = False,
+    multiplier_override: Optional[float] = None,
+    multiplier_locked: bool = False,
+    campaign_multiplier: Optional[float] = None,
+) -> float:
+    """Return the billing multiplier for a workspace.
+
+    Priority (highest to lowest):
+      1. multiplier_override  — set by admin per workspace; applies even in trial
+      2. campaign_multiplier  — active campaign; skipped when multiplier_locked=True
+      3. is_trial             — flat TRIAL_MULTIPLIER
+      4. default from llm_key_mode
+    """
+    if multiplier_override is not None:
+        return multiplier_override
+    if campaign_multiplier is not None and not multiplier_locked:
+        return campaign_multiplier
     if is_trial:
         return TRIAL_MULTIPLIER
     if llm_key_mode == "byok":

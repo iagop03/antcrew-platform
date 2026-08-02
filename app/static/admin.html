@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — antcrew</title>
+<link rel="stylesheet" href="/static/tailwind.css">
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<style>[x-cloak]{display:none}</style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="adminApp()" x-init="init()">
+
+<!-- ── Top nav ──────────────────────────────────────────────────────── -->
+<nav class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center gap-4">
+  <span class="font-mono font-bold text-indigo-400 text-lg">antcrew</span>
+  <span class="text-gray-600">/</span>
+  <span class="text-sm font-medium text-gray-300">admin</span>
+  <div class="flex-1"></div>
+  <a href="/dashboard" class="text-xs text-gray-500 hover:text-gray-300 transition">← Dashboard</a>
+</nav>
+
+<!-- ── Loading ──────────────────────────────────────────────────────── -->
+<div x-show="loading" x-cloak class="flex items-center justify-center h-64 text-gray-500 text-sm">
+  Loading…
+</div>
+
+<!-- ── Error (not admin) ─────────────────────────────────────────────── -->
+<div x-show="accessDenied" x-cloak class="flex items-center justify-center h-64">
+  <div class="text-center">
+    <p class="text-red-400 font-medium">Access denied</p>
+    <p class="text-gray-500 text-sm mt-1">You don't have admin access to this page.</p>
+    <a href="/dashboard" class="text-indigo-400 text-sm mt-4 inline-block hover:text-indigo-300">Go to dashboard →</a>
+  </div>
+</div>
+
+<!-- ── Main content ─────────────────────────────────────────────────── -->
+<div x-show="!loading && !accessDenied" x-cloak class="max-w-7xl mx-auto px-6 py-8 space-y-10">
+
+  <!-- Stats -->
+  <div>
+    <h1 class="text-xl font-semibold mb-5">Overview</h1>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <p class="text-xs text-gray-500 mb-1">Workspaces</p>
+        <p class="text-2xl font-mono font-semibold" x-text="stats.workspaces?.total ?? '—'"></p>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <p class="text-xs text-gray-500 mb-1">Trial</p>
+        <p class="text-2xl font-mono font-semibold text-amber-400" x-text="stats.workspaces?.trial ?? '—'"></p>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <p class="text-xs text-gray-500 mb-1">Paid</p>
+        <p class="text-2xl font-mono font-semibold text-emerald-400" x-text="stats.workspaces?.paid ?? '—'"></p>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <p class="text-xs text-gray-500 mb-1">Total cost</p>
+        <p class="text-2xl font-mono font-semibold text-indigo-400"
+           x-text="stats.revenue ? '$' + stats.revenue.total_cost_usd.toFixed(2) : '—'"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Campaigns -->
+  <div>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold">Campaigns</h2>
+      <button @click="showCampaignForm = !showCampaignForm"
+        class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition">
+        + New campaign
+      </button>
+    </div>
+
+    <!-- Create form -->
+    <div x-show="showCampaignForm" x-cloak
+      class="bg-gray-900 border border-indigo-800/50 rounded-xl p-5 mb-4 space-y-4">
+      <h3 class="text-sm font-medium text-indigo-300">New campaign</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Name</label>
+          <input x-model="newCampaign.name" type="text" placeholder="Summer promo"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Multiplier</label>
+          <input x-model.number="newCampaign.multiplier" type="number" step="0.1" min="0" placeholder="0"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Starts at (UTC)</label>
+          <input x-model="newCampaign.starts_at" type="datetime-local"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Ends at (UTC)</label>
+          <input x-model="newCampaign.ends_at" type="datetime-local"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Target</label>
+          <select x-model="newCampaign.target"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+            <option value="all">All workspaces (non-locked)</option>
+            <option value="new">New workspaces only</option>
+          </select>
+        </div>
+      </div>
+      <p x-show="campaignError" x-cloak class="text-red-400 text-xs" x-text="campaignError"></p>
+      <div class="flex gap-3">
+        <button @click="createCampaign()"
+          class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition">
+          Create
+        </button>
+        <button @click="showCampaignForm = false; campaignError = ''"
+          class="text-xs text-gray-400 hover:text-gray-200 transition">
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- Campaign list -->
+    <div x-show="campaigns.length === 0" x-cloak class="text-gray-500 text-sm py-4">
+      No campaigns yet.
+    </div>
+    <div class="overflow-x-auto">
+      <table x-show="campaigns.length > 0" x-cloak class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-gray-500 border-b border-gray-800">
+            <th class="pb-2 pr-4">Name</th>
+            <th class="pb-2 pr-4">Multiplier</th>
+            <th class="pb-2 pr-4">Target</th>
+            <th class="pb-2 pr-4">Starts</th>
+            <th class="pb-2 pr-4">Ends</th>
+            <th class="pb-2 pr-4">Status</th>
+            <th class="pb-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="c in campaigns" :key="c.id">
+            <tr class="border-b border-gray-800/50 hover:bg-gray-900/40 transition">
+              <td class="py-2.5 pr-4 font-medium" x-text="c.name"></td>
+              <td class="py-2.5 pr-4 font-mono text-indigo-300" x-text="'×' + c.multiplier"></td>
+              <td class="py-2.5 pr-4">
+                <span :class="c.target === 'new' ? 'bg-amber-900/40 text-amber-300' : 'bg-gray-800 text-gray-300'"
+                  class="text-xs px-2 py-0.5 rounded-full" x-text="c.target"></span>
+              </td>
+              <td class="py-2.5 pr-4 text-gray-400 text-xs" x-text="fmtDate(c.starts_at)"></td>
+              <td class="py-2.5 pr-4 text-gray-400 text-xs" x-text="fmtDate(c.ends_at)"></td>
+              <td class="py-2.5 pr-4">
+                <span :class="c.active ? 'bg-emerald-900/40 text-emerald-400' : 'bg-gray-800 text-gray-500'"
+                  class="text-xs px-2 py-0.5 rounded-full" x-text="c.active ? 'active' : 'inactive'"></span>
+              </td>
+              <td class="py-2.5">
+                <button @click="toggleCampaign(c)"
+                  :class="c.active ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'"
+                  class="text-xs transition mr-3"
+                  x-text="c.active ? 'Deactivate' : 'Activate'">
+                </button>
+                <button @click="deleteCampaign(c)"
+                  class="text-xs text-red-500 hover:text-red-400 transition">Delete</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Workspaces -->
+  <div>
+    <h2 class="text-lg font-semibold mb-4">Workspaces</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-gray-500 border-b border-gray-800">
+            <th class="pb-2 pr-4">Workspace</th>
+            <th class="pb-2 pr-4">Mode</th>
+            <th class="pb-2 pr-4">Status</th>
+            <th class="pb-2 pr-4">Override ×</th>
+            <th class="pb-2 pr-4">Locked</th>
+            <th class="pb-2 pr-4">Total cost</th>
+            <th class="pb-2 pr-4">Created</th>
+            <th class="pb-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="ws in workspaces" :key="ws.id">
+            <tr class="border-b border-gray-800/50 hover:bg-gray-900/40 transition group">
+              <td class="py-2.5 pr-4">
+                <p class="font-medium" x-text="ws.name"></p>
+                <p class="text-xs text-gray-500" x-text="ws.slug"></p>
+              </td>
+              <td class="py-2.5 pr-4">
+                <span :class="{
+                  'bg-indigo-900/40 text-indigo-300': ws.llm_key_mode === 'managed',
+                  'bg-blue-900/40 text-blue-300': ws.llm_key_mode === 'byok',
+                  'bg-purple-900/40 text-purple-300': ws.llm_key_mode === 'proxy',
+                }" class="text-xs px-2 py-0.5 rounded-full" x-text="ws.llm_key_mode"></span>
+              </td>
+              <td class="py-2.5 pr-4">
+                <span :class="ws.is_trial ? 'bg-amber-900/40 text-amber-300' : 'bg-emerald-900/40 text-emerald-400'"
+                  class="text-xs px-2 py-0.5 rounded-full" x-text="ws.is_trial ? 'trial' : 'paid'"></span>
+              </td>
+              <!-- Multiplier override -->
+              <td class="py-2.5 pr-4">
+                <div x-show="editingWs !== ws.id" class="flex items-center gap-2">
+                  <span class="font-mono text-xs"
+                    :class="ws.cost_multiplier_override !== null ? 'text-indigo-300' : 'text-gray-600'"
+                    x-text="ws.cost_multiplier_override !== null ? '×' + ws.cost_multiplier_override : '—'">
+                  </span>
+                  <button @click="startEdit(ws)"
+                    class="text-xs text-gray-500 hover:text-gray-300 opacity-0 group-hover:opacity-100 transition">
+                    Edit
+                  </button>
+                </div>
+                <div x-show="editingWs === ws.id" x-cloak class="flex items-center gap-2">
+                  <input x-model.number="editOverride" type="number" step="0.1" min="0" placeholder="null"
+                    class="w-20 bg-gray-950 border border-indigo-700 rounded px-2 py-1 text-xs font-mono focus:outline-none">
+                  <button @click="saveOverride(ws)" class="text-xs text-indigo-400 hover:text-indigo-300">Save</button>
+                  <button @click="editingWs = null" class="text-xs text-gray-500 hover:text-gray-300">×</button>
+                </div>
+              </td>
+              <!-- Locked -->
+              <td class="py-2.5 pr-4">
+                <button @click="toggleLock(ws)"
+                  :class="ws.multiplier_locked ? 'text-amber-400 hover:text-amber-300' : 'text-gray-600 hover:text-gray-400'"
+                  class="text-xs transition"
+                  x-text="ws.multiplier_locked ? '🔒 locked' : 'unlock'">
+                </button>
+              </td>
+              <td class="py-2.5 pr-4 font-mono text-xs text-gray-400"
+                x-text="'$' + (ws.total_cost_usd ?? 0).toFixed(4)"></td>
+              <td class="py-2.5 pr-4 text-xs text-gray-500" x-text="fmtDate(ws.created_at)"></td>
+              <td class="py-2.5">
+                <button x-show="ws.is_trial" @click="markPaid(ws)"
+                  class="text-xs text-emerald-500 hover:text-emerald-400 transition">Mark paid</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <p x-show="workspaces.length === 0" x-cloak class="text-gray-500 text-sm py-4">No workspaces found.</p>
+  </div>
+
+  <!-- Users -->
+  <div>
+    <h2 class="text-lg font-semibold mb-4">Users</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-gray-500 border-b border-gray-800">
+            <th class="pb-2 pr-4">Email</th>
+            <th class="pb-2 pr-4">Name</th>
+            <th class="pb-2 pr-4">Admin</th>
+            <th class="pb-2 pr-4">Joined</th>
+            <th class="pb-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="u in users" :key="u.id">
+            <tr class="border-b border-gray-800/50 hover:bg-gray-900/40 transition">
+              <td class="py-2.5 pr-4 font-mono text-xs" x-text="u.email"></td>
+              <td class="py-2.5 pr-4 text-gray-300 text-xs" x-text="u.display_name || '—'"></td>
+              <td class="py-2.5 pr-4">
+                <span x-show="u.is_platform_admin" x-cloak
+                  class="text-xs bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded-full">admin</span>
+              </td>
+              <td class="py-2.5 pr-4 text-xs text-gray-500" x-text="fmtDate(u.created_at)"></td>
+              <td class="py-2.5">
+                <button @click="toggleUserAdmin(u)"
+                  :class="u.is_platform_admin ? 'text-red-500 hover:text-red-400' : 'text-indigo-400 hover:text-indigo-300'"
+                  class="text-xs transition"
+                  x-text="u.is_platform_admin ? 'Revoke admin' : 'Make admin'">
+                </button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <p x-show="users.length === 0" x-cloak class="text-gray-500 text-sm py-4">No users found.</p>
+  </div>
+
+</div>
+
+<script>
+function adminApp() {
+  return {
+    loading: true,
+    accessDenied: false,
+    stats: {},
+    workspaces: [],
+    campaigns: [],
+    users: [],
+    showCampaignForm: false,
+    campaignError: '',
+    newCampaign: { name: '', multiplier: 0, starts_at: '', ends_at: '', target: 'all' },
+    editingWs: null,
+    editOverride: null,
+
+    async init() {
+      try {
+        const [s, w, c, u] = await Promise.all([
+          this.get('/admin/stats'),
+          this.get('/admin/workspaces?limit=200'),
+          this.get('/admin/campaigns'),
+          this.get('/admin/users?limit=200'),
+        ]);
+        this.stats = s;
+        this.workspaces = w;
+        this.campaigns = c;
+        this.users = u;
+      } catch (e) {
+        if (e.status === 403 || e.status === 401) {
+          this.accessDenied = true;
+        }
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async get(url) {
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (!r.ok) { const err = new Error(r.statusText); err.status = r.status; throw err; }
+      return r.json();
+    },
+
+    async post(url, body) {
+      const r = await fetch(url, {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrfToken() },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || r.statusText); }
+      return r.json();
+    },
+
+    async patch(url, body) {
+      const r = await fetch(url, {
+        method: 'PATCH', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrfToken() },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || r.statusText); }
+      return r.json();
+    },
+
+    async del(url) {
+      const r = await fetch(url, {
+        method: 'DELETE', credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': this.csrfToken() },
+      });
+      if (!r.ok && r.status !== 204) { throw new Error(r.statusText); }
+    },
+
+    csrfToken() {
+      return document.cookie.split('; ')
+        .find(c => c.startsWith('csrf_token='))
+        ?.split('=')[1] ?? '';
+    },
+
+    fmtDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    },
+
+    // ── Campaigns ──
+
+    async createCampaign() {
+      this.campaignError = '';
+      try {
+        const body = {
+          ...this.newCampaign,
+          starts_at: this.newCampaign.starts_at ? new Date(this.newCampaign.starts_at).toISOString() : null,
+          ends_at: this.newCampaign.ends_at ? new Date(this.newCampaign.ends_at).toISOString() : null,
+        };
+        const c = await this.post('/admin/campaigns', body);
+        this.campaigns.unshift(c);
+        this.showCampaignForm = false;
+        this.newCampaign = { name: '', multiplier: 0, starts_at: '', ends_at: '', target: 'all' };
+      } catch (e) {
+        this.campaignError = e.message;
+      }
+    },
+
+    async toggleCampaign(c) {
+      const updated = await this.patch(`/admin/campaigns/${c.id}`, { active: !c.active });
+      Object.assign(c, updated);
+    },
+
+    async deleteCampaign(c) {
+      if (!confirm(`Delete campaign "${c.name}"?`)) return;
+      await this.del(`/admin/campaigns/${c.id}`);
+      this.campaigns = this.campaigns.filter(x => x.id !== c.id);
+    },
+
+    // ── Workspaces ──
+
+    startEdit(ws) {
+      this.editingWs = ws.id;
+      this.editOverride = ws.cost_multiplier_override;
+    },
+
+    async saveOverride(ws) {
+      const val = this.editOverride === '' || this.editOverride === null ? null : parseFloat(this.editOverride);
+      const updated = await this.patch(`/admin/workspaces/${ws.id}`, { cost_multiplier_override: val });
+      Object.assign(ws, updated);
+      this.editingWs = null;
+    },
+
+    async toggleLock(ws) {
+      const updated = await this.patch(`/admin/workspaces/${ws.id}`, { multiplier_locked: !ws.multiplier_locked });
+      Object.assign(ws, updated);
+    },
+
+    async markPaid(ws) {
+      if (!confirm(`Mark workspace "${ws.name}" as paid? This removes trial status.`)) return;
+      const updated = await this.patch(`/admin/workspaces/${ws.id}`, { is_trial: false });
+      Object.assign(ws, updated);
+    },
+
+    // ── Users ──
+
+    async toggleUserAdmin(u) {
+      const action = u.is_platform_admin ? 'Revoke admin from' : 'Grant admin to';
+      if (!confirm(`${action} ${u.email}?`)) return;
+      const r = await fetch(`/admin/users/${u.id}/admin?is_admin=${!u.is_platform_admin}`, {
+        method: 'PATCH', credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': this.csrfToken() },
+      });
+      if (!r.ok) { alert('Failed'); return; }
+      const updated = await r.json();
+      Object.assign(u, updated);
+    },
+  };
+}
+</script>
+</body>
+</html>

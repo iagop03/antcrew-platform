@@ -61,6 +61,7 @@ class User(SQLModel, table=True):
     email_verified_at: Optional[datetime] = Field(default=None)
     totp_secret: Optional[str] = Field(default=None)   # base32 TOTP secret; NULL = MFA disabled
     mfa_enabled: bool = Field(default=False)
+    is_platform_admin: bool = Field(default=False)
     created_at: datetime = Field(default_factory=_utcnow)
 
 

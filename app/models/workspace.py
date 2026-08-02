@@ -36,6 +36,8 @@ class Workspace(SQLModel, table=True):
     proxy_url: Optional[str] = Field(default=None)          # antcrew-proxy base URL (e.g. https://proxy.example.com)
     proxy_token_enc: Optional[str] = Field(default=None)    # Fernet-encrypted UUID token sent to the proxy
     is_trial: bool = Field(default=True)  # workspace is on the free-trial credit; costs at TRIAL_MULTIPLIER
+    cost_multiplier_override: Optional[float] = Field(default=None)  # NULL = use default from llm_key_mode
+    multiplier_locked: bool = Field(default=False)  # if True, active campaigns do not apply
     owner_user_id: Optional[int] = Field(default=None, index=True)  # user.id of the registering user
     ticket_prefix: str = Field(default="TKT")   # e.g. "PROJ" → ticket display IDs are PROJ-00001
     ticket_counter: int = Field(default=0)       # incremented atomically on each new ticket
