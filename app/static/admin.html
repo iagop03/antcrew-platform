@@ -7,6 +7,7 @@
 <title>Admin — antcrew</title>
 <link rel="stylesheet" href="/static/tailwind.css">
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>[x-cloak]{display:none}</style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen" x-data="adminApp()" x-init="init()">
@@ -35,35 +36,184 @@
 </div>
 
 <!-- ── Main content ─────────────────────────────────────────────────── -->
-<div x-show="!loading && !accessDenied" x-cloak class="max-w-7xl mx-auto px-6 py-8 space-y-10">
+<div x-show="!loading && !accessDenied" x-cloak class="max-w-7xl mx-auto px-6 py-8">
 
-  <!-- Stats -->
-  <div>
-    <h1 class="text-xl font-semibold mb-5">Overview</h1>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p class="text-xs text-gray-500 mb-1">Workspaces</p>
-        <p class="text-2xl font-mono font-semibold" x-text="stats.workspaces?.total ?? '—'"></p>
-      </div>
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p class="text-xs text-gray-500 mb-1">Trial</p>
-        <p class="text-2xl font-mono font-semibold text-amber-400" x-text="stats.workspaces?.trial ?? '—'"></p>
-      </div>
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p class="text-xs text-gray-500 mb-1">Paid</p>
-        <p class="text-2xl font-mono font-semibold text-emerald-400" x-text="stats.workspaces?.paid ?? '—'"></p>
-      </div>
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p class="text-xs text-gray-500 mb-1">Total cost</p>
-        <p class="text-2xl font-mono font-semibold text-indigo-400"
-           x-text="stats.revenue ? '$' + stats.revenue.total_cost_usd.toFixed(2) : '—'"></p>
-      </div>
+  <!-- Stat cards (always visible) -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-xs text-gray-500 mb-1">Workspaces</p>
+      <p class="text-2xl font-mono font-semibold" x-text="stats.workspaces?.total ?? '—'"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-xs text-gray-500 mb-1">Trial</p>
+      <p class="text-2xl font-mono font-semibold text-amber-400" x-text="stats.workspaces?.trial ?? '—'"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-xs text-gray-500 mb-1">Paid</p>
+      <p class="text-2xl font-mono font-semibold text-emerald-400" x-text="stats.workspaces?.paid ?? '—'"></p>
+    </div>
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <p class="text-xs text-gray-500 mb-1">Total cost</p>
+      <p class="text-2xl font-mono font-semibold text-indigo-400"
+         x-text="stats.revenue ? '$' + stats.revenue.total_cost_usd.toFixed(2) : '—'"></p>
     </div>
   </div>
 
-  <!-- Campaigns -->
-  <div>
-    <div class="flex items-center justify-between mb-4">
+  <!-- Tab bar -->
+  <div class="flex gap-1 border-b border-gray-800 mb-8">
+    <template x-for="tab in tabs" :key="tab.id">
+      <button @click="switchTab(tab.id)"
+        :class="activeTab === tab.id
+          ? 'text-white border-b-2 border-indigo-500 -mb-px'
+          : 'text-gray-500 hover:text-gray-300'"
+        class="px-4 py-2 text-sm font-medium transition"
+        x-text="tab.label">
+      </button>
+    </template>
+  </div>
+
+  <!-- ── TAB: Analytics ────────────────────────────────────────────── -->
+  <div x-show="activeTab === 'analytics'" x-cloak>
+
+    <template x-if="analyticsLoading">
+      <div class="flex items-center justify-center h-40 text-gray-500 text-sm">Loading analytics…</div>
+    </template>
+
+    <template x-if="!analyticsLoading && analytics">
+      <div class="space-y-8">
+
+        <!-- Row 1: Workspaces + Users trend -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Nuevos workspaces / mes</p>
+            <div class="relative h-48">
+              <canvas id="chart-workspaces"></canvas>
+            </div>
+          </div>
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Nuevos usuarios / mes</p>
+            <div class="relative h-48">
+              <canvas id="chart-users"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Runs trend + success rate -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Runs / mes — total vs éxito</p>
+          <div class="relative h-48">
+            <canvas id="chart-runs"></canvas>
+          </div>
+        </div>
+
+        <!-- Row 3: Tickets + Segmentation -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Tickets by status -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Tickets por estado</p>
+            <div class="relative h-48">
+              <canvas id="chart-tickets"></canvas>
+            </div>
+          </div>
+
+          <!-- Use case distribution -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Caso de uso</p>
+            <div class="space-y-2">
+              <template x-for="uc in analytics.use_cases" :key="uc.use_case">
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-400 w-36 shrink-0 truncate" x-text="uc.use_case"></span>
+                  <div class="flex-1 bg-gray-800 rounded-full h-2">
+                    <div class="bg-indigo-500 h-2 rounded-full transition-all"
+                      :style="'width:' + Math.round(uc.count / Math.max(...analytics.use_cases.map(x=>x.count)) * 100) + '%'">
+                    </div>
+                  </div>
+                  <span class="text-xs font-mono text-gray-400 w-6 text-right" x-text="uc.count"></span>
+                </div>
+              </template>
+              <p x-show="analytics.use_cases.length === 0" class="text-xs text-gray-600">Sin datos</p>
+            </div>
+          </div>
+
+          <!-- Team size distribution -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Tamaño de equipo</p>
+            <div class="space-y-2">
+              <template x-for="ts in analytics.team_sizes" :key="ts.team_size">
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-400 w-16 shrink-0" x-text="ts.team_size"></span>
+                  <div class="flex-1 bg-gray-800 rounded-full h-2">
+                    <div class="bg-violet-500 h-2 rounded-full transition-all"
+                      :style="'width:' + Math.round(ts.count / Math.max(...analytics.team_sizes.map(x=>x.count)) * 100) + '%'">
+                    </div>
+                  </div>
+                  <span class="text-xs font-mono text-gray-400 w-6 text-right" x-text="ts.count"></span>
+                </div>
+              </template>
+              <p x-show="analytics.team_sizes.length === 0" class="text-xs text-gray-600">Sin datos</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Feedback summary -->
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Feedback de usuarios</p>
+          <div class="flex items-center gap-10">
+            <div>
+              <p class="text-3xl font-mono font-semibold" x-text="analytics.feedback.total"></p>
+              <p class="text-xs text-gray-500 mt-1">Total eventos</p>
+            </div>
+            <div>
+              <p class="text-3xl font-mono font-semibold text-emerald-400" x-text="analytics.feedback.positive"></p>
+              <p class="text-xs text-gray-500 mt-1">👍 Positivo</p>
+            </div>
+            <div>
+              <p class="text-3xl font-mono font-semibold text-red-400" x-text="analytics.feedback.negative"></p>
+              <p class="text-xs text-gray-500 mt-1">👎 Negativo</p>
+            </div>
+            <div x-show="analytics.feedback.total > 0">
+              <p class="text-3xl font-mono font-semibold text-indigo-400"
+                x-text="Math.round(analytics.feedback.positive / analytics.feedback.total * 100) + '%'"></p>
+              <p class="text-xs text-gray-500 mt-1">Satisfacción</p>
+            </div>
+          </div>
+          <div x-show="feedback.length > 0" class="mt-5 overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="text-left text-gray-500 border-b border-gray-800">
+                  <th class="pb-2 pr-4">Contexto</th>
+                  <th class="pb-2 pr-4">Rating</th>
+                  <th class="pb-2 pr-4">Mensaje</th>
+                  <th class="pb-2">Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="fb in feedback" :key="fb.id">
+                  <tr class="border-b border-gray-800/50">
+                    <td class="py-2 pr-4">
+                      <span class="bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded text-xs" x-text="fb.context"></span>
+                    </td>
+                    <td class="py-2 pr-4">
+                      <span x-show="fb.helpful === true" class="text-emerald-400">👍</span>
+                      <span x-show="fb.helpful === false" class="text-red-400">👎</span>
+                      <span x-show="fb.helpful === null" class="text-gray-600">—</span>
+                    </td>
+                    <td class="py-2 pr-4 text-gray-400 max-w-xs truncate" x-text="fb.message || '—'"></td>
+                    <td class="py-2 text-gray-500" x-text="fmtDate(fb.created_at)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </template>
+  </div>
+
+  <!-- ── TAB: Campaigns ────────────────────────────────────────────── -->
+  <div x-show="activeTab === 'campaigns'" x-cloak class="space-y-4">
+    <div class="flex items-center justify-between mb-2">
       <h2 class="text-lg font-semibold">Campaigns</h2>
       <button @click="showCampaignForm = !showCampaignForm"
         class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition">
@@ -166,8 +316,8 @@
     </div>
   </div>
 
-  <!-- Workspaces -->
-  <div>
+  <!-- ── TAB: Workspaces ───────────────────────────────────────────── -->
+  <div x-show="activeTab === 'workspaces'" x-cloak>
     <h2 class="text-lg font-semibold mb-4">Workspaces</h2>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -201,7 +351,6 @@
                 <span :class="ws.is_trial ? 'bg-amber-900/40 text-amber-300' : 'bg-emerald-900/40 text-emerald-400'"
                   class="text-xs px-2 py-0.5 rounded-full" x-text="ws.is_trial ? 'trial' : 'paid'"></span>
               </td>
-              <!-- Multiplier override -->
               <td class="py-2.5 pr-4">
                 <div x-show="editingWs !== ws.id" class="flex items-center gap-2">
                   <span class="font-mono text-xs"
@@ -220,7 +369,6 @@
                   <button @click="editingWs = null" class="text-xs text-gray-500 hover:text-gray-300">×</button>
                 </div>
               </td>
-              <!-- Locked -->
               <td class="py-2.5 pr-4">
                 <button @click="toggleLock(ws)"
                   :class="ws.multiplier_locked ? 'text-amber-400 hover:text-amber-300' : 'text-gray-600 hover:text-gray-400'"
@@ -243,8 +391,8 @@
     <p x-show="workspaces.length === 0" x-cloak class="text-gray-500 text-sm py-4">No workspaces found.</p>
   </div>
 
-  <!-- Users -->
-  <div>
+  <!-- ── TAB: Users ────────────────────────────────────────────────── -->
+  <div x-show="activeTab === 'users'" x-cloak>
     <h2 class="text-lg font-semibold mb-4">Users</h2>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -252,6 +400,8 @@
           <tr class="text-left text-xs text-gray-500 border-b border-gray-800">
             <th class="pb-2 pr-4">Email</th>
             <th class="pb-2 pr-4">Name</th>
+            <th class="pb-2 pr-4">Caso de uso</th>
+            <th class="pb-2 pr-4">Equipo</th>
             <th class="pb-2 pr-4">Admin</th>
             <th class="pb-2 pr-4">Joined</th>
             <th class="pb-2"></th>
@@ -262,6 +412,8 @@
             <tr class="border-b border-gray-800/50 hover:bg-gray-900/40 transition">
               <td class="py-2.5 pr-4 font-mono text-xs" x-text="u.email"></td>
               <td class="py-2.5 pr-4 text-gray-300 text-xs" x-text="u.display_name || '—'"></td>
+              <td class="py-2.5 pr-4 text-xs text-gray-500" x-text="u.use_case || '—'"></td>
+              <td class="py-2.5 pr-4 text-xs text-gray-500" x-text="u.team_size || '—'"></td>
               <td class="py-2.5 pr-4">
                 <span x-show="u.is_platform_admin" x-cloak
                   class="text-xs bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded-full">admin</span>
@@ -282,17 +434,113 @@
     <p x-show="users.length === 0" x-cloak class="text-gray-500 text-sm py-4">No users found.</p>
   </div>
 
-</div>
+</div><!-- /main -->
 
 <script>
+// ── Chart helpers ──────────────────────────────────────────────────────────
+const _chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6b7280', font: { size: 11 } } },
+    y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6b7280', font: { size: 11 } }, beginAtZero: true },
+  },
+};
+
+function _barChart(id, labels, data, color = '#6366f1') {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  if (ctx._chart) ctx._chart.destroy();
+  ctx._chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: color + '99', borderColor: color, borderWidth: 1.5, borderRadius: 3 }],
+    },
+    options: { ..._chartDefaults },
+  });
+}
+
+function _lineChart(id, labels, datasets) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  if (ctx._chart) ctx._chart.destroy();
+  ctx._chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      ..._chartDefaults,
+      plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 11 } } } },
+    },
+  });
+}
+
+function _doughnutChart(id, labels, data, colors) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  if (ctx._chart) ctx._chart.destroy();
+  ctx._chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: { color: '#9ca3af', font: { size: 10 }, padding: 10, boxWidth: 10 },
+        },
+      },
+    },
+  });
+}
+
+function _drawCharts(analytics) {
+  const periods = analytics.workspaces_by_month.map(d => d.period);
+  const wsCounts = analytics.workspaces_by_month.map(d => d.count);
+  _barChart('chart-workspaces', periods, wsCounts, '#6366f1');
+
+  const uPeriods = analytics.users_by_month.map(d => d.period);
+  const uCounts = analytics.users_by_month.map(d => d.count);
+  _barChart('chart-users', uPeriods, uCounts, '#8b5cf6');
+
+  const rPeriods = analytics.runs_by_month.map(d => d.period);
+  _lineChart('chart-runs', rPeriods, [
+    { label: 'Total', data: analytics.runs_by_month.map(d => d.count), borderColor: '#6366f1', backgroundColor: '#6366f122', fill: true, tension: 0.3 },
+    { label: 'Éxito', data: analytics.runs_by_month.map(d => d.success), borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.3 },
+  ]);
+
+  const ts = analytics.tickets_by_status;
+  const tLabels = Object.keys(ts);
+  const tData = Object.values(ts);
+  const tColors = { open: '#f59e0b', in_progress: '#6366f1', done: '#10b981', blocked: '#ef4444' };
+  _doughnutChart('chart-tickets', tLabels, tData, tLabels.map(l => tColors[l] || '#6b7280'));
+}
+
+// ── Alpine app ─────────────────────────────────────────────────────────────
 function adminApp() {
   return {
     loading: true,
     accessDenied: false,
+    activeTab: 'analytics',
+    tabs: [
+      { id: 'analytics', label: 'Analytics' },
+      { id: 'campaigns', label: 'Campaigns' },
+      { id: 'workspaces', label: 'Workspaces' },
+      { id: 'users', label: 'Users' },
+    ],
     stats: {},
     workspaces: [],
     campaigns: [],
     users: [],
+    analytics: null,
+    analyticsLoading: false,
+    feedback: [],
     showCampaignForm: false,
     campaignError: '',
     newCampaign: { name: '', multiplier: 0, starts_at: '', ends_at: '', target: 'all' },
@@ -311,6 +559,8 @@ function adminApp() {
         this.workspaces = w;
         this.campaigns = c;
         this.users = u;
+        // Load analytics for the default tab
+        await this.loadAnalytics();
       } catch (e) {
         if (e.status === 403 || e.status === 401) {
           this.accessDenied = true;
@@ -318,6 +568,29 @@ function adminApp() {
       } finally {
         this.loading = false;
       }
+    },
+
+    async switchTab(id) {
+      this.activeTab = id;
+      if (id === 'analytics' && !this.analytics) {
+        await this.loadAnalytics();
+      }
+    },
+
+    async loadAnalytics() {
+      if (this.analyticsLoading) return;
+      this.analyticsLoading = true;
+      try {
+        const [a, fb] = await Promise.all([
+          this.get('/admin/analytics'),
+          this.get('/admin/feedback?limit=20'),
+        ]);
+        this.analytics = a;
+        this.feedback = fb;
+        // Charts render after DOM update
+        this.$nextTick(() => _drawCharts(a));
+      } catch (_) {}
+      finally { this.analyticsLoading = false; }
     },
 
     async get(url) {

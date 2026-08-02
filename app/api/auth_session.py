@@ -1060,3 +1060,53 @@ async def update_profile(
         await session.commit()
 
     return {"display_name": user.display_name, "email": user.email}
+
+
+_VALID_USE_CASES = frozenset({
+    "customer_support", "internal_automation", "software_dev", "data_analysis", "other",
+})
+_VALID_TEAM_SIZES = frozenset({"solo", "2-5", "6-15", "15+"})
+
+
+@router.patch("/profile")
+async def update_profile(
+    request: Request,
+    session=Depends(get_session),
+):
+    """Save onboarding profile data (use_case, team_size) for the current user.
+
+    Accepts session cookie (set at registration) so it can be called from the
+    onboarding wizard without requiring a separate login step.
+    """
+    from app.models.run import User
+
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        raise HTTPException(401, "Not authenticated")
+    result = await _resolve_session(token, session)
+    if result is None:
+        raise HTTPException(401, "Session expired or invalid")
+    user_session, _api_key = result
+    if user_session.user_id is None:
+        raise HTTPException(400, "Session not linked to a user account")
+
+    body = await request.json()
+    user = (await session.exec(select(User).where(User.id == user_session.user_id))).first()
+    if user is None:
+        raise HTTPException(404, "User not found")
+
+    use_case = body.get("use_case")
+    team_size = body.get("team_size")
+
+    if use_case is not None:
+        if use_case not in _VALID_USE_CASES:
+            raise HTTPException(422, f"use_case must be one of {sorted(_VALID_USE_CASES)}")
+        user.use_case = use_case
+    if team_size is not None:
+        if team_size not in _VALID_TEAM_SIZES:
+            raise HTTPException(422, f"team_size must be one of {sorted(_VALID_TEAM_SIZES)}")
+        user.team_size = team_size
+
+    session.add(user)
+    await session.commit()
+    return {"ok": True}

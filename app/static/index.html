@@ -10,6 +10,7 @@
 <title>Dashboard — antcrew</title>
 <link rel="stylesheet" href="/static/tailwind.css">
 <script src="/static/i18n.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 <link rel="stylesheet" href="/static/tabler-icons/tabler-icons.min.css">
 <style>[x-cloak]{display:none}</style>
@@ -110,6 +111,63 @@
     </p>
     <p class="text-2xl font-semibold font-mono text-purple-400"
       x-text="budget ? '€' + budget.total_spend_usd.toFixed(2) : (stats.total_cost != null ? '€' + Number(stats.total_cost).toFixed(2) : '—')"></p>
+  </div>
+</div>
+
+<!-- Analytics section -->
+<div class="px-6 mb-6">
+  <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div class="px-4 py-2.5 border-b border-gray-800 flex items-center justify-between">
+      <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Analytics · últimos 30 días</span>
+      <button @click="toggleAnalytics()"
+        class="text-xs text-gray-500 hover:text-white transition flex items-center gap-1">
+        <i class="ti ti-chart-line text-xs"></i>
+        <span x-text="analyticsOpen ? 'Ocultar' : 'Ver'"></span>
+      </button>
+    </div>
+    <div x-show="analyticsOpen" x-cloak>
+      <template x-if="analyticsLoading">
+        <div class="flex items-center justify-center h-32 text-gray-600 text-xs">Cargando…</div>
+      </template>
+      <template x-if="!analyticsLoading && wsAnalytics">
+        <div class="p-4 space-y-5">
+          <!-- Run trend chart -->
+          <div>
+            <p class="text-xs text-gray-500 mb-2">Runs por día — total vs éxito</p>
+            <div class="relative h-36">
+              <canvas id="dash-chart-runs"></canvas>
+            </div>
+          </div>
+          <!-- Tickets by status -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs text-gray-500 mb-2">Tickets por estado</p>
+              <div class="relative h-36">
+                <canvas id="dash-chart-tickets"></canvas>
+              </div>
+            </div>
+            <div class="flex flex-col justify-center gap-3">
+              <template x-for="[status, cnt] in Object.entries(wsAnalytics.tickets_by_status || {})" :key="status">
+                <div class="flex items-center gap-3">
+                  <span class="text-xs w-20 text-gray-400" x-text="status"></span>
+                  <div class="flex-1 bg-gray-800 rounded-full h-1.5">
+                    <div class="h-1.5 rounded-full"
+                      :class="{
+                        'bg-amber-400': status === 'open',
+                        'bg-indigo-400': status === 'in_progress',
+                        'bg-emerald-400': status === 'done',
+                        'bg-red-400': status === 'blocked',
+                      }"
+                      :style="'width:' + _ticketPct(status) + '%'"></div>
+                  </div>
+                  <span class="text-xs font-mono text-gray-500 w-6 text-right" x-text="cnt"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
   </div>
 </div>
 
@@ -318,6 +376,85 @@ function dashFeed() {
       if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
       if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
       return `${Math.floor(diff / 86400)}d ago`;
+    },
+
+    // ── Analytics ──────────────────────────────────────────────────────
+    analyticsOpen: false,
+    analyticsLoading: false,
+    wsAnalytics: null,
+    _analyticsLoaded: false,
+
+    async toggleAnalytics() {
+      this.analyticsOpen = !this.analyticsOpen;
+      if (this.analyticsOpen && !this._analyticsLoaded) {
+        await this.loadAnalytics();
+      }
+    },
+
+    async loadAnalytics() {
+      if (!this.workspace) return;
+      this.analyticsLoading = true;
+      try {
+        const r = await fetch(`/workspaces/${this.workspace.id}/analytics`, { headers: this.apiHeaders() });
+        if (!r.ok) return;
+        this.wsAnalytics = await r.json();
+        this._analyticsLoaded = true;
+        this.$nextTick(() => this._drawDashCharts());
+      } catch {} finally { this.analyticsLoading = false; }
+    },
+
+    _ticketPct(status) {
+      if (!this.wsAnalytics) return 0;
+      const ts = this.wsAnalytics.tickets_by_status || {};
+      const total = Object.values(ts).reduce((a, b) => a + b, 0);
+      return total ? Math.round((ts[status] || 0) / total * 100) : 0;
+    },
+
+    _drawDashCharts() {
+      const data = this.wsAnalytics;
+      if (!data) return;
+
+      // Runs by day
+      const runsCtx = document.getElementById('dash-chart-runs');
+      if (runsCtx) {
+        if (runsCtx._chart) runsCtx._chart.destroy();
+        runsCtx._chart = new Chart(runsCtx, {
+          type: 'line',
+          data: {
+            labels: data.runs_by_day.map(d => d.date),
+            datasets: [
+              { label: 'Total', data: data.runs_by_day.map(d => d.count), borderColor: '#6366f1', backgroundColor: '#6366f122', fill: true, tension: 0.3, pointRadius: 2 },
+              { label: 'Éxito', data: data.runs_by_day.map(d => d.success), borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 2 },
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 10, padding: 8 } } },
+            scales: {
+              x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6b7280', font: { size: 9 }, maxTicksLimit: 7 } },
+              y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#6b7280', font: { size: 10 } }, beginAtZero: true },
+            },
+          },
+        });
+      }
+
+      // Tickets doughnut
+      const tickCtx = document.getElementById('dash-chart-tickets');
+      if (tickCtx) {
+        if (tickCtx._chart) tickCtx._chart.destroy();
+        const ts = data.tickets_by_status || {};
+        const labels = Object.keys(ts);
+        const vals = Object.values(ts);
+        const colors = { open: '#f59e0b', in_progress: '#6366f1', done: '#10b981', blocked: '#ef4444' };
+        tickCtx._chart = new Chart(tickCtx, {
+          type: 'doughnut',
+          data: { labels, datasets: [{ data: vals, backgroundColor: labels.map(l => colors[l] || '#6b7280'), borderWidth: 0, hoverOffset: 4 }] },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: true, position: 'bottom', labels: { color: '#9ca3af', font: { size: 9 }, padding: 8, boxWidth: 8 } } },
+          },
+        });
+      }
     },
   };
 }

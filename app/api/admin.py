@@ -6,17 +6,20 @@ Bootstrap endpoint (POST /admin/make-admin) requires PLATFORM_ADMIN_TOKEN env va
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import Integer, case, extract, func
+from sqlalchemy import select as sa_select
 from sqlmodel import select
 
 from app.core.admin_auth import require_platform_admin
 from app.core.database import get_session
 from app.models.admin import Campaign
 from app.models.auth import User
+from app.models.feedback import UserFeedback
 from app.models.workspace import Workspace
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -84,6 +87,18 @@ class CampaignRow(BaseModel):
     created_at: datetime
 
 
+class FeedbackRow(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    user_id: Optional[int]
+    workspace_id: Optional[int]
+    context: str
+    helpful: Optional[bool]
+    message: Optional[str]
+    created_at: datetime
+
+
 class MakeAdminRequest(BaseModel):
     email: str
     token: str  # must match PLATFORM_ADMIN_TOKEN env var
@@ -96,6 +111,8 @@ class AdminUserRow(BaseModel):
     email: str
     display_name: Optional[str]
     is_platform_admin: bool
+    use_case: Optional[str]
+    team_size: Optional[str]
     created_at: datetime
 
 
@@ -279,6 +296,122 @@ async def delete_campaign(
         raise HTTPException(404, "Campaign not found")
     await session.delete(camp)
     await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Analytics
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics")
+async def admin_analytics(
+    _admin=Depends(require_platform_admin),
+    session=Depends(get_session),
+):
+    """Time-series platform analytics for the last 12 months."""
+    from app.models.run import Run, Ticket
+
+    cutoff = datetime.utcnow() - timedelta(days=365)
+
+    def _by_month(rows):
+        return [
+            {"period": f"{int(r.yr):04d}-{int(r.mo):02d}", "count": int(r.cnt)}
+            for r in rows
+        ]
+
+    yr_ws = extract("year", Workspace.created_at)
+    mo_ws = extract("month", Workspace.created_at)
+    ws_rows = (await session.execute(
+        sa_select(yr_ws.label("yr"), mo_ws.label("mo"), func.count().label("cnt"))
+        .where(Workspace.created_at >= cutoff)
+        .group_by(yr_ws, mo_ws)
+        .order_by(yr_ws, mo_ws)
+    )).all()
+
+    yr_u = extract("year", User.created_at)
+    mo_u = extract("month", User.created_at)
+    user_rows = (await session.execute(
+        sa_select(yr_u.label("yr"), mo_u.label("mo"), func.count().label("cnt"))
+        .where(User.created_at >= cutoff)
+        .group_by(yr_u, mo_u)
+        .order_by(yr_u, mo_u)
+    )).all()
+
+    yr_r = extract("year", Run.created_at)
+    mo_r = extract("month", Run.created_at)
+    run_rows = (await session.execute(
+        sa_select(
+            yr_r.label("yr"),
+            mo_r.label("mo"),
+            func.count().label("cnt"),
+            func.sum(case((Run.status == "success", 1), else_=0)).label("success"),
+        )
+        .where(Run.created_at >= cutoff)
+        .group_by(yr_r, mo_r)
+        .order_by(yr_r, mo_r)
+    )).all()
+
+    tickets_by_status_rows = (await session.execute(
+        sa_select(Ticket.status, func.count().label("cnt")).group_by(Ticket.status)
+    )).all()
+    tickets_by_status = {r.status: int(r.cnt) for r in tickets_by_status_rows}
+
+    use_case_rows = (await session.execute(
+        sa_select(User.use_case, func.count().label("cnt"))
+        .where(User.use_case.isnot(None))
+        .group_by(User.use_case)
+        .order_by(func.count().desc())
+    )).all()
+
+    team_size_rows = (await session.execute(
+        sa_select(User.team_size, func.count().label("cnt"))
+        .where(User.team_size.isnot(None))
+        .group_by(User.team_size)
+        .order_by(func.count().desc())
+    )).all()
+
+    fb_total = (await session.exec(select(func.count()).select_from(UserFeedback))).one()
+    fb_positive = (await session.exec(
+        select(func.count()).select_from(UserFeedback).where(UserFeedback.helpful.is_(True))
+    )).one()
+    fb_negative = (await session.exec(
+        select(func.count()).select_from(UserFeedback).where(UserFeedback.helpful.is_(False))
+    )).one()
+
+    runs_with_success = [
+        {
+            "period": f"{int(r.yr):04d}-{int(r.mo):02d}",
+            "count": int(r.cnt),
+            "success": int(r.success or 0),
+        }
+        for r in run_rows
+    ]
+
+    return {
+        "workspaces_by_month": _by_month(ws_rows),
+        "users_by_month": _by_month(user_rows),
+        "runs_by_month": runs_with_success,
+        "tickets_by_status": tickets_by_status,
+        "use_cases": [{"use_case": r.use_case, "count": int(r.cnt)} for r in use_case_rows],
+        "team_sizes": [{"team_size": r.team_size, "count": int(r.cnt)} for r in team_size_rows],
+        "feedback": {"total": int(fb_total), "positive": int(fb_positive), "negative": int(fb_negative)},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Feedback (admin read-only)
+# ---------------------------------------------------------------------------
+
+@router.get("/feedback", response_model=list[FeedbackRow])
+async def list_feedback(
+    _admin=Depends(require_platform_admin),
+    session=Depends(get_session),
+    limit: int = 100,
+    offset: int = 0,
+):
+    rows = (await session.exec(
+        select(UserFeedback).order_by(UserFeedback.created_at.desc()).offset(offset).limit(limit)
+    )).all()
+    return rows
 
 
 # ---------------------------------------------------------------------------

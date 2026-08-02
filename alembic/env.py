@@ -14,6 +14,7 @@ from sqlmodel import SQLModel
 # Import all models so their tables are registered in SQLModel.metadata
 import app.models.run  # noqa: F401
 import app.models.admin  # noqa: F401
+import app.models.feedback  # noqa: F401
 
 config = context.config
 

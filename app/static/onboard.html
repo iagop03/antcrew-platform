@@ -169,8 +169,66 @@
     </button>
   </div>
 
-  <!-- ── STEP 4 ── API Keys ─────────────────────────────────────────── -->
+  <!-- ── STEP 4 ── Perfil ───────────────────────────────────────────── -->
   <div x-show="step === 4" x-cloak>
+    <h2 class="text-lg font-semibold mb-1">Cuéntanos un poco</h2>
+    <p class="text-gray-400 text-sm mb-6">Nos ayuda a mostrarte los recursos y plantillas más relevantes.</p>
+
+    <!-- Use case -->
+    <div class="mb-5">
+      <label class="block text-xs text-gray-400 mb-2">¿Para qué vas a usar antcrew principalmente?</label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <template x-for="opt in [
+          {id:'software_dev', label:'Desarrollo de software'},
+          {id:'customer_support', label:'Atención al cliente'},
+          {id:'internal_automation', label:'Automatización interna'},
+          {id:'data_analysis', label:'Análisis de datos'},
+          {id:'other', label:'Otro'}
+        ]" :key="opt.id">
+          <label class="flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition"
+            :class="useCase === opt.id
+              ? 'border-indigo-500 bg-indigo-950/40'
+              : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'">
+            <input type="radio" x-model="useCase" :value="opt.id" class="accent-indigo-500 shrink-0">
+            <span class="text-sm" x-text="opt.label"></span>
+          </label>
+        </template>
+      </div>
+    </div>
+
+    <!-- Team size -->
+    <div class="mb-5">
+      <label class="block text-xs text-gray-400 mb-2">¿Cuántas personas hay en tu equipo?</label>
+      <div class="flex gap-2 flex-wrap">
+        <template x-for="sz in ['solo', '2-5', '6-15', '15+']" :key="sz">
+          <button @click="teamSize = sz"
+            :class="teamSize === sz
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-gray-900 text-gray-400 border-gray-700 hover:border-gray-500'"
+            class="px-4 py-2 rounded-lg border text-sm transition"
+            x-text="sz">
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <p x-show="step4Error" x-cloak class="text-red-400 text-xs mb-3" x-text="step4Error"></p>
+
+    <button @click="saveProfile()"
+      :disabled="step4Loading"
+      class="w-full py-2.5 rounded-lg font-medium text-sm transition
+        bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+      <span x-show="!step4Loading">Continuar →</span>
+      <span x-show="step4Loading">Guardando…</span>
+    </button>
+
+    <button @click="step = 5" class="mt-3 w-full text-xs text-gray-600 hover:text-gray-400 transition">
+      Saltar este paso
+    </button>
+  </div>
+
+  <!-- ── STEP 5 ── API Keys ─────────────────────────────────────────── -->
+  <div x-show="step === 5" x-cloak>
     <h2 class="text-lg font-semibold mb-1">Configuración LLM</h2>
     <p class="text-gray-400 text-sm mb-6">¿Cómo quieres que antcrew acceda a los modelos de lenguaje?</p>
 
@@ -234,19 +292,19 @@
       </label>
     </div>
 
-    <p x-show="step4Error" x-cloak class="text-red-400 text-xs mb-3" x-text="step4Error"></p>
+    <p x-show="step5Error" x-cloak class="text-red-400 text-xs mb-3" x-text="step5Error"></p>
 
     <button @click="saveLlmMode()"
-      :disabled="step4Loading"
+      :disabled="step5Loading"
       class="w-full py-2.5 rounded-lg font-medium text-sm transition
         bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-      <span x-show="!step4Loading">Continuar →</span>
-      <span x-show="step4Loading">Guardando…</span>
+      <span x-show="!step5Loading">Continuar →</span>
+      <span x-show="step5Loading">Guardando…</span>
     </button>
   </div>
 
-  <!-- ── STEP 5 ── Listo ──────────────────────────────────────────────── -->
-  <div x-show="step === 5" x-cloak>
+  <!-- ── STEP 6 ── Listo ──────────────────────────────────────────────── -->
+  <div x-show="step === 6" x-cloak>
     <div class="text-center mb-6">
       <div class="text-5xl mb-3">✓</div>
       <h2 class="text-lg font-semibold mb-1">¡Todo listo!</h2>
@@ -348,7 +406,7 @@
 function onboard() {
   return {
     step: 1,
-    steps: ['Cuenta', 'Verificar email', 'Workspace', 'API Keys', 'Listo'],
+    steps: ['Cuenta', 'Verificar email', 'Workspace', 'Perfil', 'API Keys', 'Listo'],
 
     // Step 1
     email: '',
@@ -371,13 +429,19 @@ function onboard() {
     step3Loading: false,
     step3Error: '',
 
-    // Step 4 — LLM
-    llmMode: 'managed',
-    byokManagedFallback: false,
+    // Step 4 — Perfil
+    useCase: '',
+    teamSize: '',
     step4Loading: false,
     step4Error: '',
 
-    // Step 5
+    // Step 5 — LLM
+    llmMode: 'managed',
+    byokManagedFallback: false,
+    step5Loading: false,
+    step5Error: '',
+
+    // Step 6
     inviteEmail: '',
     inviteRole: 'write',
     inviteLoading: false,
@@ -493,9 +557,28 @@ function onboard() {
       }
     },
 
-    async saveLlmMode() {
+    async saveProfile() {
       this.step4Error = '';
       this.step4Loading = true;
+      try {
+        await fetch('/auth/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            use_case: this.useCase || null,
+            team_size: this.teamSize || null,
+          }),
+        });
+        // Proceed even if call fails (non-critical data)
+      } catch {} finally {
+        this.step4Loading = false;
+      }
+      this.step = 5;
+    },
+
+    async saveLlmMode() {
+      this.step5Error = '';
+      this.step5Loading = true;
       try {
         // Only set managed mode via API (byok/proxy require keys configured first)
         if (this.llmMode === 'managed') {
@@ -514,11 +597,11 @@ function onboard() {
           // Store intent in localStorage to prompt Settings config
           localStorage.setItem('antcrew_llm_intent', this.llmMode);
         }
-        this.step = 5;
+        this.step = 6;
       } catch (e) {
-        this.step4Error = e.message;
+        this.step5Error = e.message;
       } finally {
-        this.step4Loading = false;
+        this.step5Loading = false;
       }
     },
 

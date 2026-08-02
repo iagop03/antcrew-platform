@@ -34,6 +34,7 @@ from app.models.review import HitlReview, HitlReviewAssignee, HitlAuditEntry
 from app.models.webhook import WebhookDelivery, WebhookConfig, WebhookEvent
 from app.models.eval import EvalRun, EvalSchedule, CompareRun
 from app.models.security import SecurityAuditConfig, SecurityAuditRun, AuditFinding
+from app.models.feedback import UserFeedback
 
 # ── Core run models ───────────────────────────────────────────────────────────
 

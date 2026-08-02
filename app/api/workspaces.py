@@ -951,3 +951,67 @@ async def hitl_analytics(
         "by_agent": sorted(by_agent.values(), key=lambda x: -(x["rejected"])),
         "by_resolver": by_resolver,
     }
+
+
+# ---------------------------------------------------------------------------
+# Workspace analytics (runs + tickets trend)
+# ---------------------------------------------------------------------------
+
+@router.get("/{workspace_id}/analytics",
+            dependencies=[Depends(require_role("admin", "write"))])
+async def workspace_analytics(
+    workspace_id: int,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> dict:
+    """Returns last-30-day run trend and ticket status distribution for a workspace."""
+    from datetime import timedelta
+
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
+
+    from app.models.run import Ticket
+    from sqlalchemy import Integer, case, cast
+    from sqlalchemy.types import Date
+
+    cutoff = datetime.utcnow() - timedelta(days=30)
+
+    day_expr = cast(Run.created_at, Date)
+    run_rows = (await session.execute(
+        sa_select(
+            day_expr.label("day"),
+            func.count().label("cnt"),
+            func.coalesce(func.sum(Run.cost_usd), 0.0).label("cost"),
+            func.sum(case((Run.status == "success", 1), else_=0)).label("success"),
+        )
+        .where(Run.workspace_id == workspace_id)
+        .where(Run.created_at >= cutoff)
+        .group_by(day_expr)
+        .order_by(day_expr)
+    )).all()
+
+    ticket_rows = (await session.execute(
+        sa_select(Ticket.status, func.count().label("cnt"))
+        .where(Ticket.workspace_id == workspace_id)
+        .group_by(Ticket.status)
+    )).all()
+
+    tickets_by_status = {r.status: int(r.cnt) for r in ticket_rows}
+
+    ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+
+    return {
+        "workspace_id": workspace_id,
+        "runs_by_day": [
+            {
+                "date": str(r.day),
+                "count": int(r.cnt),
+                "success": int(r.success or 0),
+                "failed": int(r.cnt) - int(r.success or 0),
+                "cost": round(float(r.cost or 0), 4),
+            }
+            for r in run_rows
+        ],
+        "tickets_by_status": tickets_by_status,
+        "total_cost_usd": round(float(ws.total_cost_usd) if ws else 0.0, 4),
+    }

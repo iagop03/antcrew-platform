@@ -62,6 +62,8 @@ class User(SQLModel, table=True):
     totp_secret: Optional[str] = Field(default=None)   # base32 TOTP secret; NULL = MFA disabled
     mfa_enabled: bool = Field(default=False)
     is_platform_admin: bool = Field(default=False)
+    use_case: Optional[str] = Field(default=None)   # customer_support | internal_automation | software_dev | data_analysis | other
+    team_size: Optional[str] = Field(default=None)  # solo | 2-5 | 6-15 | 15+
     created_at: datetime = Field(default_factory=_utcnow)
 
 
