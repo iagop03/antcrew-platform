@@ -216,6 +216,23 @@ async def _check_auth_mode() -> None:
     print(msg, flush=True)
 
 
+async def _check_platform_api_key_prod() -> None:
+    """Block prod startup if PLATFORM_API_KEY is set.
+
+    PLATFORM_API_KEY is a dev/ops master key that bypasses all workspace scoping
+    and grants unrestricted admin access to every API. It must never be deployed
+    to production — use per-workspace API keys (POST /api-keys/) instead.
+    """
+    if os.environ.get("PLATFORM_API_KEY") and os.environ.get("APP_ENV") == "prod":
+        raise RuntimeError(
+            "PLATFORM_API_KEY is set in APP_ENV=prod. "
+            "This master key bypasses all workspace scoping and grants unrestricted admin "
+            "access without any DB audit trail. "
+            "Remove it from your production environment and use per-workspace API keys "
+            "(POST /api-keys/) or session-based auth instead."
+        )
+
+
 async def _check_stripe_key_mode() -> None:
     """Block startup if a Stripe test key is used in APP_ENV=prod.
 
@@ -377,6 +394,7 @@ async def run_startup_checks(testing: bool) -> None:
         await _check_auth_mode()
         await _check_cors_config()
         await _check_sandbox_mode()
+        await _check_platform_api_key_prod()
         await _check_stripe_config()
         await _check_stripe_key_mode()
         await _check_mor_config()

@@ -219,6 +219,8 @@ async def register(
 
         # Always create a NEW workspace for this user — never attach to an existing one
         from app.core.byok import TRIAL_CREDIT_USD
+        from app.core.promo import get_active_free_promo
+        _promo = await get_active_free_promo(session)
         slug_base = re.sub(r"[^a-z0-9]+", "-", email.split("@")[0])[:40] or "workspace"
         slug = slug_base
         for _attempt in range(20):
@@ -233,8 +235,8 @@ async def register(
         workspace = Workspace(
             name=email,
             slug=slug,
-            is_trial=True,
-            max_cost_usd=TRIAL_CREDIT_USD,
+            is_trial=_promo is not None,
+            max_cost_usd=TRIAL_CREDIT_USD if _promo is not None else None,
             owner_user_id=user.id,
         )
         session.add(workspace)
@@ -382,6 +384,8 @@ async def login(
 
         if workspace is None:
             # No workspace at all — create one (e.g. registration was incomplete)
+            from app.core.promo import get_active_free_promo
+            _promo2 = await get_active_free_promo(session)
             slug_base = re.sub(r"[^a-z0-9]+", "-", email.split("@")[0])[:40] or "workspace"
             slug = slug_base
             for _attempt in range(20):
@@ -396,8 +400,8 @@ async def login(
             workspace = Workspace(
                 name=email,
                 slug=slug,
-                is_trial=True,
-                max_cost_usd=TRIAL_CREDIT_USD,
+                is_trial=_promo2 is not None,
+                max_cost_usd=TRIAL_CREDIT_USD if _promo2 is not None else None,
                 owner_user_id=user.id,
             )
             session.add(workspace)

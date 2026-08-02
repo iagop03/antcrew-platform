@@ -420,11 +420,19 @@ nav {
   <canvas id="hero-canvas"></canvas>
   <div class="hero-grid">
     <div>
-      <div class="hero-eyebrow">Engineering automation</div>
+      <div class="hero-eyebrow" id="hero-eyebrow">Engineering automation</div>
       <h1 class="hero-headline">El equipo de ingeniería que nunca para</h1>
       <p class="hero-sub">Agentes de IA que analizan, implementan y abren PRs. Con revisión humana integrada cuando lo que importa requiere tu criterio.</p>
+      <!-- promo banner: hidden by default, shown by JS when active promo exists -->
+      <div id="promo-banner" style="display:none;margin-bottom:16px">
+        <span id="promo-badge" style="
+          display:inline-flex;align-items:center;gap:6px;
+          background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.35);
+          color:#a5b4fc;border-radius:999px;padding:4px 12px;font-size:0.78rem;font-weight:500;
+        "></span>
+      </div>
       <div class="hero-actions">
-        <a href="/onboard" class="btn btn-primary">Crear cuenta →</a>
+        <a href="/onboard" class="btn btn-primary" id="hero-cta">Crear cuenta →</a>
         <a href="/login" class="btn btn-ghost">Iniciar sesión</a>
       </div>
     </div>
@@ -652,10 +660,10 @@ nav {
 <!-- CTA -->
 <section class="cta-section">
   <div class="container">
-    <h2 class="cta-title">Tu equipo de IA, listo en minutos</h2>
-    <p class="cta-sub">Crea un workspace, conecta tu repositorio y lanza tu primer run hoy mismo.</p>
+    <h2 class="cta-title" id="cta-title">Tu equipo de IA, listo en minutos</h2>
+    <p class="cta-sub" id="cta-sub">Crea un workspace, conecta tu repositorio y lanza tu primer run hoy mismo.</p>
     <div class="cta-actions">
-      <a href="/onboard" class="btn btn-primary">Crear cuenta →</a>
+      <a href="/onboard" class="btn btn-primary" id="cta-btn">Crear cuenta →</a>
       <a href="/login" class="btn btn-ghost">Iniciar sesión</a>
     </div>
   </div>
@@ -715,6 +723,40 @@ nav {
   let deg = 0;
   function tick() { deg = (deg + 3) % 360; el.style.transform = `rotate(${deg}deg)`; requestAnimationFrame(tick); }
   tick();
+})();
+
+// Promo-aware CTAs
+(function() {
+  fetch('/public/active-promo')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) {
+      if (!d || !d.promo_active) return;
+
+      var endsAt = d.ends_at ? new Date(d.ends_at) : null;
+      var label = endsAt
+        ? 'Prueba gratuita hasta el ' + endsAt.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+        : 'Prueba gratuita activa';
+
+      var banner = document.getElementById('promo-banner');
+      var badge = document.getElementById('promo-badge');
+      if (banner && badge) {
+        badge.textContent = '★ ' + label;
+        banner.style.display = 'block';
+      }
+
+      var heroCta = document.getElementById('hero-cta');
+      if (heroCta) heroCta.textContent = 'Empieza gratis →';
+
+      var ctaTitle = document.getElementById('cta-title');
+      if (ctaTitle) ctaTitle.textContent = 'Empieza gratis hoy';
+
+      var ctaSub = document.getElementById('cta-sub');
+      if (ctaSub) ctaSub.textContent = 'Prueba antcrew sin coste durante la promoción. Sin tarjeta de crédito.';
+
+      var ctaBtn = document.getElementById('cta-btn');
+      if (ctaBtn) ctaBtn.textContent = 'Empieza gratis →';
+    })
+    .catch(function() {});
 })();
 </script>
 </body>

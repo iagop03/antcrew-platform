@@ -90,6 +90,29 @@ async def onboard_bootstrap(
 
 
 # ---------------------------------------------------------------------------
+# Public promo status
+# ---------------------------------------------------------------------------
+
+
+@router.get("/public/active-promo", tags=["public"])
+async def active_promo(session=Depends(get_session)):
+    """Return whether a free-trial promo campaign is currently active.
+
+    Public endpoint — no auth required. Used by the landing page to
+    conditionally show the free-trial CTA.
+    """
+    from app.core.promo import get_active_free_promo
+    camp = await get_active_free_promo(session)
+    if camp is None:
+        return {"promo_active": False, "multiplier": None, "ends_at": None}
+    return {
+        "promo_active": True,
+        "multiplier": camp.multiplier,
+        "ends_at": camp.ends_at.isoformat(),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Public trial registration
 # ---------------------------------------------------------------------------
 
@@ -115,6 +138,16 @@ async def trial_register(
     Creates a workspace + admin API key with TRIAL_CREDIT_USD of free credit.
     Rate-limited to TRIAL_MAX_PER_IP (default 5) registrations per IP per 24 h.
     """
+    # ── Gate: only open when a free promo campaign is active ────────────────
+    from app.core.promo import get_active_free_promo
+    promo = await get_active_free_promo(session)
+    if promo is None:
+        raise HTTPException(
+            404,
+            "No free trial is currently active. "
+            "Check back later or contact the team to request access.",
+        )
+
     # ── IP rate limit ────────────────────────────────────────────────────────
     ip = request.client.host if request.client else "unknown"
     now = time.monotonic()
@@ -141,7 +174,7 @@ async def trial_register(
         slug = f"{base_slug}-{suffix}"
         suffix += 1
 
-    # ── Create workspace ─────────────────────────────────────────────────────
+    # ── Create workspace (trial because promo is active) ─────────────────────
     ws = Workspace(
         name=name,
         slug=slug,

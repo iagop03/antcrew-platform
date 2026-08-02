@@ -183,7 +183,7 @@ app.include_router(invites_api.router,                 dependencies=_csrf)
 app.include_router(run_schedules_api.router,           dependencies=_csrf)
 app.include_router(pages_api.router)
 app.include_router(bootstrap_api.router)
-app.include_router(admin_api.router)
+app.include_router(admin_api.router,  dependencies=_csrf)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
