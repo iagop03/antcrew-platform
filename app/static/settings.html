@@ -62,7 +62,7 @@
 </div>
 
 <!-- API key banner -->
-<div x-show="!apiKey"
+<div x-show="!me && !apiKey"
   class="px-6 py-3 bg-amber-950/40 border-b border-amber-800/40 flex items-center gap-3">
   <span class="text-amber-300 text-xs font-medium shrink-0">API key requerida</span>
   <input x-model="keyInput" type="password" placeholder="Introduce tu PLATFORM_API_KEY o una key de /api-keys/"
@@ -73,7 +73,7 @@
     Guardar
   </button>
 </div>
-<div x-show="apiKey"
+<div x-show="!me && apiKey"
   class="px-6 py-2 border-b border-gray-800/40 flex items-center gap-2 bg-gray-900/30">
   <span class="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0"></span>
   <span class="text-xs text-gray-600 font-mono">X-Api-Key configurada</span>
@@ -1217,6 +1217,11 @@ function settings() {
     auditForm: { github_repo: '', github_token: '', github_branch: 'main', max_cost_usd: '5' },
     auditLoading: false, auditError: '', auditResult: null,
 
+    getCsrfToken() {
+      return document.cookie.split(';').map(c => c.trim())
+        .find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+    },
+
     apiHeaders() {
       const h = { 'Content-Type': 'application/json' };
       if (this.apiKey) h['X-Api-Key'] = this.apiKey;
@@ -1763,11 +1768,11 @@ function settings() {
       try {
         const r = await fetch('/auth/mfa/enable', {
           method: 'POST', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.getCsrfToken() },
           body: JSON.stringify({ secret: this.mfaSetup.secret, code: this.mfaCode }),
         });
         if (!r.ok) { const e = await r.json(); this.mfaMsg = e.detail || 'Invalid code'; this.mfaError = true; }
-        else { this.mfaEnabled = true; this.mfaSetup = null; this.mfaCode = ''; this.mfaMsg = 'MFA enabled. Codes required at next login.'; }
+        else { this.mfaEnabled = true; this.mfaSetup = null; this.mfaCode = ''; this.mfaMsg = 'MFA activado. Se pedirá código en el próximo login.'; }
       } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
       this.mfaLoading = false;
     },
@@ -1777,11 +1782,11 @@ function settings() {
       try {
         const r = await fetch('/auth/mfa/disable', {
           method: 'POST', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.getCsrfToken() },
           body: JSON.stringify({ code: this.mfaCode }),
         });
         if (!r.ok) { const e = await r.json(); this.mfaMsg = e.detail || 'Invalid code'; this.mfaError = true; }
-        else { this.mfaEnabled = false; this.showDisableMfa = false; this.mfaCode = ''; this.mfaMsg = 'MFA disabled.'; }
+        else { this.mfaEnabled = false; this.showDisableMfa = false; this.mfaCode = ''; this.mfaMsg = 'MFA desactivado.'; }
       } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
       this.mfaLoading = false;
     },
