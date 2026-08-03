@@ -59,9 +59,13 @@ class CampaignCreate(BaseModel):
     ends_at: datetime
     target: str = "all"  # all | new
 
-    def validate_target(self) -> "CampaignCreate":
-        if self.target not in ("all", "new"):
-            raise ValueError("target must be 'all' or 'new'")
+    @classmethod
+    def _strip_tz(cls, dt: datetime) -> datetime:
+        return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
+
+    def clean_dates(self) -> "CampaignCreate":
+        self.starts_at = self._strip_tz(self.starts_at)
+        self.ends_at = self._strip_tz(self.ends_at)
         return self
 
 
@@ -248,6 +252,9 @@ async def create_campaign(
 ):
     if body.target not in ("all", "new"):
         raise HTTPException(422, "target must be 'all' or 'new'")
+    if body.multiplier <= 0:
+        raise HTTPException(422, "multiplier must be greater than 0")
+    body.clean_dates()
     if body.ends_at <= body.starts_at:
         raise HTTPException(422, "ends_at must be after starts_at")
 
@@ -277,6 +284,8 @@ async def patch_campaign(
         raise HTTPException(404, "Campaign not found")
 
     for field, value in body.model_dump(exclude_unset=True).items():
+        if isinstance(value, datetime) and value.tzinfo is not None:
+            value = value.replace(tzinfo=None)
         setattr(camp, field, value)
 
     session.add(camp)
