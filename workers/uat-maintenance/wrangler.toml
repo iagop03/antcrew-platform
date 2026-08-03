@@ -1,0 +1,7 @@
+name = "antcrew-uat-maintenance"
+main = "index.js"
+compatibility_date = "2024-09-23"
+
+routes = [
+  { pattern = "platform-uat.antcrew.org/*", zone_name = "antcrew.org" }
+]
