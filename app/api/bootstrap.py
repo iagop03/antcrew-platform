@@ -94,6 +94,23 @@ async def onboard_bootstrap(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/public/llm-modes", tags=["public"])
+async def public_llm_modes(session=Depends(get_session)):
+    """Return which LLM modes are currently enabled for new workspaces.
+
+    Public endpoint — no auth required. Used by onboarding to show only available modes.
+    """
+    from app.models.admin import PlatformConfig
+    cfg = await session.get(PlatformConfig, 1)
+    if cfg is None:
+        return {"managed": True, "byok": True, "proxy": True}
+    return {
+        "managed": cfg.managed_enabled,
+        "byok": cfg.byok_enabled,
+        "proxy": cfg.proxy_enabled,
+    }
+
+
 @router.get("/public/active-campaign", tags=["public"])
 async def active_campaign(session=Depends(get_session)):
     """Return the best active campaign for new users (lowest multiplier), or null.

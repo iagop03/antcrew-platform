@@ -22,6 +22,9 @@ class PlatformConfig(SQLModel, table=True):
     managed_cost_multiplier: float = Field(default=3.0)
     byok_service_multiplier: float = Field(default=0.4)
     proxy_service_multiplier: float = Field(default=0.7)
+    managed_enabled: bool = Field(default=True)
+    byok_enabled: bool = Field(default=True)
+    proxy_enabled: bool = Field(default=True)
     updated_at: datetime = Field(default_factory=_utcnow)
 
 

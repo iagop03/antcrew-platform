@@ -314,21 +314,54 @@
         </div>
       </div>
       <div class="grid grid-cols-3 gap-4">
+        <!-- Managed -->
         <div>
-          <p class="text-xs text-gray-500 mb-1">Managed</p>
-          <div x-show="!editingRates" class="font-mono text-indigo-300 text-sm" x-text="'×' + (billingRates.managed_cost_multiplier ?? 3.0).toFixed(2)"></div>
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-xs text-gray-500">Managed</p>
+            <button @click="toggleMode('managed')" title="Enable / disable Managed mode"
+              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+              :class="billingRates.managed_enabled ? 'bg-indigo-600' : 'bg-gray-700'">
+              <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform"
+                :class="billingRates.managed_enabled ? 'translate-x-5' : 'translate-x-0.5'"></span>
+            </button>
+          </div>
+          <div x-show="!editingRates" class="font-mono text-sm"
+            :class="billingRates.managed_enabled ? 'text-indigo-300' : 'text-gray-600'"
+            x-text="'×' + (billingRates.managed_cost_multiplier ?? 3.0).toFixed(2)"></div>
           <input x-show="editingRates" x-model.number="editRates.managed_cost_multiplier" type="number" step="0.05" min="0.05"
             class="w-full bg-gray-950 border border-gray-700 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-indigo-500">
         </div>
+        <!-- BYOK -->
         <div>
-          <p class="text-xs text-gray-500 mb-1">BYOK</p>
-          <div x-show="!editingRates" class="font-mono text-emerald-400 text-sm" x-text="'×' + (billingRates.byok_service_multiplier ?? 0.4).toFixed(2)"></div>
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-xs text-gray-500">BYOK</p>
+            <button @click="toggleMode('byok')" title="Enable / disable BYOK mode"
+              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+              :class="billingRates.byok_enabled ? 'bg-emerald-600' : 'bg-gray-700'">
+              <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform"
+                :class="billingRates.byok_enabled ? 'translate-x-5' : 'translate-x-0.5'"></span>
+            </button>
+          </div>
+          <div x-show="!editingRates" class="font-mono text-sm"
+            :class="billingRates.byok_enabled ? 'text-emerald-400' : 'text-gray-600'"
+            x-text="'×' + (billingRates.byok_service_multiplier ?? 0.4).toFixed(2)"></div>
           <input x-show="editingRates" x-model.number="editRates.byok_service_multiplier" type="number" step="0.05" min="0.05"
             class="w-full bg-gray-950 border border-gray-700 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-indigo-500">
         </div>
+        <!-- Proxy -->
         <div>
-          <p class="text-xs text-gray-500 mb-1">Proxy</p>
-          <div x-show="!editingRates" class="font-mono text-violet-400 text-sm" x-text="'×' + (billingRates.proxy_service_multiplier ?? 0.7).toFixed(2)"></div>
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-xs text-gray-500">Proxy</p>
+            <button @click="toggleMode('proxy')" title="Enable / disable Proxy mode"
+              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+              :class="billingRates.proxy_enabled ? 'bg-violet-600' : 'bg-gray-700'">
+              <span class="inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform"
+                :class="billingRates.proxy_enabled ? 'translate-x-5' : 'translate-x-0.5'"></span>
+            </button>
+          </div>
+          <div x-show="!editingRates" class="font-mono text-sm"
+            :class="billingRates.proxy_enabled ? 'text-violet-400' : 'text-gray-600'"
+            x-text="'×' + (billingRates.proxy_service_multiplier ?? 0.7).toFixed(2)"></div>
           <input x-show="editingRates" x-model.number="editRates.proxy_service_multiplier" type="number" step="0.05" min="0.05"
             class="w-full bg-gray-950 border border-gray-700 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-indigo-500">
         </div>
@@ -669,7 +702,7 @@ function adminApp() {
     newCampaign: { name: '', multiplier: 0.5, starts_at: '', ends_at: '', target: 'all' },
     editingWs: null,
     editOverride: null,
-    billingRates: { managed_cost_multiplier: 3.0, byok_service_multiplier: 0.4, proxy_service_multiplier: 0.7 },
+    billingRates: { managed_cost_multiplier: 3.0, byok_service_multiplier: 0.4, proxy_service_multiplier: 0.7, managed_enabled: true, byok_enabled: true, proxy_enabled: true },
     editRates: {},
     editingRates: false,
     ratesError: '',
@@ -799,6 +832,18 @@ function adminApp() {
         const updated = await this.patch('/admin/billing-rates', this.editRates);
         this.billingRates = updated;
         this.editingRates = false;
+      } catch (e) {
+        this.ratesError = e.message;
+      }
+    },
+
+    async toggleMode(mode) {
+      const key = `${mode}_enabled`;
+      const newVal = !this.billingRates[key];
+      this.ratesError = '';
+      try {
+        const updated = await this.patch('/admin/billing-rates', { [key]: newVal });
+        this.billingRates = updated;
       } catch (e) {
         this.ratesError = e.message;
       }

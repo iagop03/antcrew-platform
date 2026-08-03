@@ -248,7 +248,7 @@
     <!-- Mode selector -->
     <div class="space-y-3 mb-5">
       <!-- Managed -->
-      <label class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
+      <label x-show="availableModes.managed" class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
         :class="llmMode === 'managed' ? 'border-indigo-500 bg-indigo-950/40' : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'">
         <input type="radio" x-model="llmMode" value="managed" class="mt-0.5 accent-indigo-500 shrink-0">
         <div>
@@ -270,7 +270,7 @@
       </label>
 
       <!-- BYOK -->
-      <label class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
+      <label x-show="availableModes.byok" class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
         :class="llmMode === 'byok' ? 'border-emerald-600 bg-emerald-950/30' : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'">
         <input type="radio" x-model="llmMode" value="byok" class="mt-0.5 accent-emerald-500 shrink-0">
         <div>
@@ -292,7 +292,7 @@
       </label>
 
       <!-- Proxy -->
-      <label class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
+      <label x-show="availableModes.proxy" class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
         :class="llmMode === 'proxy' ? 'border-violet-600 bg-violet-950/30' : 'border-gray-800 bg-gray-900/40 hover:border-gray-700'">
         <input type="radio" x-model="llmMode" value="proxy" class="mt-0.5 accent-violet-500 shrink-0">
         <div>
@@ -464,6 +464,7 @@ function onboard() {
     step5Loading: false,
     step5Error: '',
     activeCampaign: null,
+    availableModes: { managed: true, byok: true, proxy: true },
 
     // Step 6
     inviteEmail: '',
@@ -639,10 +640,23 @@ function onboard() {
 
     async _fetchCampaign() {
       try {
-        const r = await fetch('/public/active-campaign');
-        if (r.ok) {
-          const d = await r.json();
+        const [rc, rm] = await Promise.all([
+          fetch('/public/active-campaign'),
+          fetch('/public/llm-modes'),
+        ]);
+        if (rc.ok) {
+          const d = await rc.json();
           if (d) this.activeCampaign = d;
+        }
+        if (rm.ok) {
+          const modes = await rm.json();
+          this.availableModes = modes;
+          // Auto-select first enabled mode
+          const order = ['managed', 'byok', 'proxy'];
+          if (!modes[this.llmMode]) {
+            const first = order.find(m => modes[m]);
+            if (first) this.llmMode = first;
+          }
         }
       } catch (_) {}
     },

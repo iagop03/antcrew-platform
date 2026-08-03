@@ -95,12 +95,18 @@ class BillingRates(BaseModel):
     managed_cost_multiplier: float
     byok_service_multiplier: float
     proxy_service_multiplier: float
+    managed_enabled: bool
+    byok_enabled: bool
+    proxy_enabled: bool
 
 
 class BillingRatesPatch(BaseModel):
     managed_cost_multiplier: Optional[float] = None
     byok_service_multiplier: Optional[float] = None
     proxy_service_multiplier: Optional[float] = None
+    managed_enabled: Optional[bool] = None
+    byok_enabled: Optional[bool] = None
+    proxy_enabled: Optional[bool] = None
 
 
 class FeedbackRow(BaseModel):
@@ -327,7 +333,21 @@ _DEFAULT_RATES = BillingRates(
     managed_cost_multiplier=3.0,
     byok_service_multiplier=0.4,
     proxy_service_multiplier=0.7,
+    managed_enabled=True,
+    byok_enabled=True,
+    proxy_enabled=True,
 )
+
+
+def _rates_from_cfg(cfg: PlatformConfig) -> BillingRates:
+    return BillingRates(
+        managed_cost_multiplier=cfg.managed_cost_multiplier,
+        byok_service_multiplier=cfg.byok_service_multiplier,
+        proxy_service_multiplier=cfg.proxy_service_multiplier,
+        managed_enabled=cfg.managed_enabled,
+        byok_enabled=cfg.byok_enabled,
+        proxy_enabled=cfg.proxy_enabled,
+    )
 
 
 @router.get("/billing-rates", response_model=BillingRates)
@@ -336,13 +356,7 @@ async def get_billing_rates(
     session=Depends(get_session),
 ):
     cfg = await session.get(PlatformConfig, 1)
-    if cfg is None:
-        return _DEFAULT_RATES
-    return BillingRates(
-        managed_cost_multiplier=cfg.managed_cost_multiplier,
-        byok_service_multiplier=cfg.byok_service_multiplier,
-        proxy_service_multiplier=cfg.proxy_service_multiplier,
-    )
+    return _rates_from_cfg(cfg) if cfg else _DEFAULT_RATES
 
 
 @router.patch("/billing-rates", response_model=BillingRates)
@@ -352,7 +366,7 @@ async def patch_billing_rates(
     session=Depends(get_session),
 ):
     for field, value in body.model_dump(exclude_unset=True).items():
-        if value is not None and value <= 0:
+        if isinstance(value, float) and value <= 0:
             raise HTTPException(422, f"{field} must be greater than 0")
 
     cfg = await session.get(PlatformConfig, 1)
@@ -369,11 +383,7 @@ async def patch_billing_rates(
     session.add(cfg)
     await session.commit()
     await session.refresh(cfg)
-    return BillingRates(
-        managed_cost_multiplier=cfg.managed_cost_multiplier,
-        byok_service_multiplier=cfg.byok_service_multiplier,
-        proxy_service_multiplier=cfg.proxy_service_multiplier,
-    )
+    return _rates_from_cfg(cfg)
 
 
 # ---------------------------------------------------------------------------
