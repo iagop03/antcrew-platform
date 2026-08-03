@@ -198,9 +198,25 @@
 
     <!-- Empty state -->
     <template x-if="!loading && feed.length === 0">
-      <div class="px-4 py-12 text-center">
-        <i class="ti ti-inbox text-3xl text-gray-700 block mb-2"></i>
-        <p class="text-gray-500 text-sm">Sin actividad reciente. Inicia un run para comenzar.</p>
+      <div class="px-6 py-14 text-center">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-950/60 border border-indigo-800/40 mb-5">
+          <i class="ti ti-player-play text-2xl text-indigo-400"></i>
+        </div>
+        <h3 class="text-sm font-semibold text-gray-200 mb-1">Sin actividad todavía</h3>
+        <p class="text-xs text-gray-500 mb-5 max-w-xs mx-auto leading-relaxed">Lanza tu primer run desde la CLI o configura un pipeline para ver la actividad aquí en tiempo real.</p>
+        <div class="flex items-center justify-center gap-3">
+          <a href="/pipelines"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition">
+            <i class="ti ti-sitemap text-xs"></i>
+            Ver pipelines
+          </a>
+          <a href="/settings?tab=llm"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 transition">
+            <i class="ti ti-settings text-xs"></i>
+            Configurar LLM
+          </a>
+        </div>
+        <p class="text-xs text-gray-700 mt-5 font-mono">antcrew run --team mi_equipo --request "Tu tarea"</p>
       </div>
     </template>
 

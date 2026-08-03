@@ -389,7 +389,7 @@ Yes — every run is recorded as a `Run` row with full artifact history. For dee
 
 **Is there MFA?**
 
-No — email + password authentication only. MFA (TOTP/passkeys) is on the roadmap. If your compliance requirements mandate MFA today, deploy behind an SSO/IdP proxy (Cloudflare Access, Tailscale, Authentik).
+Yes — TOTP-based MFA is available. Users can enable it from Settings → Profile or via the post-onboarding setup prompt. Passkeys are on the roadmap. For SSO/SAML, deploy behind an IdP proxy (Cloudflare Access, Tailscale, Authentik).
 
 **Is there a formal SLA?**
 

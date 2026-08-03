@@ -575,21 +575,14 @@ function onboard() {
       this.step5Error = '';
       this.step5Loading = true;
       try {
-        // Only set managed mode via API (byok/proxy require keys configured first)
-        if (this.llmMode === 'managed') {
-          await fetch(`/workspaces/${this.workspaceId}/llm-mode`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey },
-            body: JSON.stringify({ mode: 'managed', byok_managed_fallback: false }),
-          });
-        } else {
-          // For byok/proxy: just save the fallback preference; keys/proxy set in Settings
-          await fetch(`/workspaces/${this.workspaceId}/llm-mode`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'X-Api-Key': this.adminKey },
-            body: JSON.stringify({ mode: 'managed', byok_managed_fallback: this.byokManagedFallback }),
-          }).catch(() => {});
-          // Store intent in localStorage to prompt Settings config
+        const fallback = this.llmMode !== 'managed' ? this.byokManagedFallback : false;
+        await fetch(`/workspaces/${this.workspaceId}/llm-mode`, {
+          method: 'PATCH',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'managed', byok_managed_fallback: fallback }),
+        });
+        if (this.llmMode !== 'managed') {
           localStorage.setItem('antcrew_llm_intent', this.llmMode);
         }
         this.step = 6;
