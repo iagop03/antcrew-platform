@@ -32,6 +32,7 @@ dependencies = [
     "alembic>=1.13",
     "bcrypt>=4.0",
     "pyotp>=2.9",
+    "qrcode>=7.4",
     "croniter>=2.0",
     "antcrew>=0.33.10,<0.34",
     "antcrew-engine>=0.3.11,<0.4",

@@ -732,7 +732,19 @@ async def mfa_setup(
     secret = pyotp.random_base32()
     totp = pyotp.TOTP(secret)
     uri = totp.provisioning_uri(name=user.email, issuer_name=_totp_issuer())
-    return {"secret": secret, "provisioning_uri": uri, "mfa_enabled": user.mfa_enabled}
+
+    import base64, io
+    try:
+        import qrcode
+        import qrcode.image.svg as _qr_svg
+        qr_img = qrcode.make(uri, image_factory=_qr_svg.SvgPathImage, box_size=6, border=2)
+        buf = io.BytesIO()
+        qr_img.save(buf)
+        qr_svg_b64 = base64.b64encode(buf.getvalue()).decode()
+    except Exception:
+        qr_svg_b64 = None
+
+    return {"secret": secret, "provisioning_uri": uri, "mfa_enabled": user.mfa_enabled, "qr_svg_b64": qr_svg_b64}
 
 
 class _MfaEnableRequest(BaseModel):

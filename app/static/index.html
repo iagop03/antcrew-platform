@@ -562,7 +562,14 @@ function dashFeed() {
       <!-- Step 2: scan + verify -->
       <template x-if="mfaSetup">
         <div>
-          <p class="text-xs text-gray-500 mb-3">Escanea el código con tu app de autenticación, o añádelo manualmente.</p>
+          <p class="text-xs text-gray-500 mb-3">Escanea el código QR con tu app de autenticación, o copia el código manualmente.</p>
+          <!-- QR code -->
+          <template x-if="mfaSetup.qr_svg_b64">
+            <div class="flex justify-center mb-3">
+              <img :src="'data:image/svg+xml;base64,' + mfaSetup.qr_svg_b64"
+                class="w-40 h-40 bg-white rounded-xl p-1.5" alt="QR código MFA">
+            </div>
+          </template>
           <a :href="mfaSetup.provisioning_uri"
             class="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 mb-3 transition">
             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
