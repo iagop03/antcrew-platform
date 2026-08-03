@@ -141,9 +141,8 @@ cd antcrew-platform
 # 1. Install deps + apply migrations (once)
 make setup
 
-# 2. Set your API key
+# 2. Set your API key (see docs/platform/configuration.md for all variables)
 export ANTHROPIC_API_KEY=sk-ant-...
-# (or copy .env.example → .env and fill it in)
 
 # 3. Start the dev server (applies any pending migrations, then starts)
 make dev
@@ -267,6 +266,10 @@ curl http://localhost:8000/runs/abc123/artifacts
 | `POST` | `/auth/accept-invite` | Accept a workspace invite by token |
 | `POST` | `/join-requests/{token}/approve` | Admin approves a join request |
 | `POST` | `/join-requests/{token}/reject` | Admin rejects a join request |
+| `GET` | `/auth/mfa/setup` | Get TOTP secret + provisioning URI |
+| `POST` | `/auth/mfa/enable` | Activate TOTP MFA with verified code |
+| `POST` | `/auth/mfa/disable` | Deactivate MFA |
+| `POST` | `/auth/mfa/challenge` | Complete MFA login step (returns session cookie) |
 
 ### Webhooks
 
@@ -306,6 +309,7 @@ Full interactive docs at `/docs` (Swagger UI) and `/redoc`.
 | `SMTP_PASSWORD` | — | SMTP login password |
 | `SMTP_FROM` | `SMTP_USER` | From address for outgoing emails |
 | `SMTP_TLS` | `true` | `true` = STARTTLS · `ssl` = SMTPS · `none` = plain |
+| `PLATFORM_ADMIN_TOKEN` | — | Bootstrap token to grant `is_platform_admin` via `POST /admin/make-admin` |
 
 ---
 
@@ -334,7 +338,7 @@ Built-in SPA served at `/`:
 - **Tickets** — kanban board (open → in_progress → done) with Jira/Linear export
 - **Webhooks** — per-workspace webhook URL management
 
-API key is stored in `localStorage` and sent as `X-Api-Key` on every request. In open mode (no key configured) auth is skipped.
+Browser auth uses a session cookie (`antcrew_session`) set on login. API access uses the `X-Api-Key` header.
 
 ---
 
