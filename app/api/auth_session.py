@@ -232,12 +232,17 @@ async def register(
             slug = f"{slug_base}-{secrets.token_hex(3)}"
         else:
             slug = f"workspace-{secrets.token_hex(6)}"
+        from app.models.admin import PlatformConfig as _PlatformConfig
+        _pcfg = await session.get(_PlatformConfig, 1)
         workspace = Workspace(
             name=email,
             slug=slug,
             is_trial=_promo is not None,
             max_cost_usd=TRIAL_CREDIT_USD if _promo is not None else None,
             owner_user_id=user.id,
+            base_managed_mult=_pcfg.managed_cost_multiplier if _pcfg else 3.0,
+            base_byok_mult=_pcfg.byok_service_multiplier if _pcfg else 0.4,
+            base_proxy_mult=_pcfg.proxy_service_multiplier if _pcfg else 0.7,
         )
         session.add(workspace)
         await session.flush()
@@ -397,12 +402,17 @@ async def login(
                 slug = f"{slug_base}-{secrets.token_hex(3)}"
             else:
                 slug = f"workspace-{secrets.token_hex(6)}"
+            from app.models.admin import PlatformConfig as _PlatformConfig
+            _pcfg2 = await session.get(_PlatformConfig, 1)
             workspace = Workspace(
                 name=email,
                 slug=slug,
                 is_trial=_promo2 is not None,
                 max_cost_usd=TRIAL_CREDIT_USD if _promo2 is not None else None,
                 owner_user_id=user.id,
+                base_managed_mult=_pcfg2.managed_cost_multiplier if _pcfg2 else 3.0,
+                base_byok_mult=_pcfg2.byok_service_multiplier if _pcfg2 else 0.4,
+                base_proxy_mult=_pcfg2.proxy_service_multiplier if _pcfg2 else 0.7,
             )
             session.add(workspace)
             await session.flush()

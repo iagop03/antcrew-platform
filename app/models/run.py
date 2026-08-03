@@ -70,6 +70,7 @@ class Run(SQLModel, table=True):
     finished_at: Optional[datetime] = Field(default=None)
     state: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     client_label: Optional[str] = Field(default=None, index=True)  # cost-center / client tag for spend breakdown
+    model: Optional[str] = Field(default=None, index=True)         # LLM model used (e.g. "claude-sonnet-4-5"); populated when known
 
 
 class Ticket(SQLModel, table=True):

@@ -166,6 +166,43 @@
               </template>
             </div>
           </div>
+
+          <!-- By team -->
+          <template x-if="(wsAnalytics.by_team || []).length > 0">
+            <div>
+              <p class="text-xs text-gray-500 mb-2">Equipos — gasto · runs · tickets (30 días)</p>
+              <div class="space-y-2">
+                <template x-for="t in wsAnalytics.by_team" :key="t.team">
+                  <div>
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs text-gray-300 font-medium" x-text="t.team"></span>
+                      <span class="text-xs text-gray-500 font-mono"
+                        x-text="'$' + t.cost_usd.toFixed(4) + ' · ' + t.runs + 'r · ' + t.tickets + 't'"></span>
+                    </div>
+                    <div class="h-1 rounded-full bg-gray-800">
+                      <div class="h-1 rounded-full bg-indigo-500/70"
+                        :style="'width:' + Math.round(t.cost_usd / Math.max(...(wsAnalytics.by_team || []).map(x=>x.cost_usd||0.001)) * 100) + '%'"></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- By model (only shown when data exists) -->
+          <template x-if="(wsAnalytics.by_model || []).length > 0">
+            <div>
+              <p class="text-xs text-gray-500 mb-2">Modelos LLM — gasto (30 días)</p>
+              <div class="space-y-2">
+                <template x-for="m in wsAnalytics.by_model" :key="m.model">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-mono text-gray-300" x-text="m.model"></span>
+                    <span class="text-xs font-mono text-indigo-300" x-text="'$' + m.cost_usd.toFixed(4)"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
         </div>
       </template>
     </div>

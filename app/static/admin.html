@@ -207,12 +207,135 @@
           </div>
         </div>
 
+        <!-- ── Usage breakdown ── -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+          <!-- By team -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Equipos — runs · tickets · gasto</p>
+            <div x-show="(analytics.by_team || []).length === 0" class="text-xs text-gray-600">Sin datos</div>
+            <div class="space-y-2.5" x-show="(analytics.by_team || []).length > 0">
+              <template x-for="t in analytics.by_team" :key="t.team">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-medium text-gray-300" x-text="t.team"></span>
+                    <span class="text-xs text-gray-500 font-mono"
+                      x-text="'$' + t.cost_usd.toFixed(4) + ' · ' + t.runs + ' runs · ' + t.tickets + ' tickets'"></span>
+                  </div>
+                  <div class="flex h-1.5 rounded-full overflow-hidden bg-gray-800">
+                    <div class="h-full bg-indigo-500/70 rounded-full"
+                      :style="'width:' + Math.round(t.cost_usd / Math.max(...(analytics.by_team || []).map(x=>x.cost_usd||0.001)) * 100) + '%'"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- By LLM mode -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Modo LLM — runs · gasto</p>
+            <div x-show="(analytics.by_llm_mode || []).length === 0" class="text-xs text-gray-600">Sin datos</div>
+            <div class="space-y-2.5" x-show="(analytics.by_llm_mode || []).length > 0">
+              <template x-for="m in analytics.by_llm_mode" :key="m.mode">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-medium px-2 py-0.5 rounded font-mono"
+                      :class="m.mode === 'byok' ? 'bg-emerald-900/50 text-emerald-300' : m.mode === 'proxy' ? 'bg-violet-900/50 text-violet-300' : 'bg-gray-800 text-gray-300'"
+                      x-text="m.mode"></span>
+                    <span class="text-xs text-gray-500 font-mono"
+                      x-text="'$' + m.cost_usd.toFixed(4) + ' · ' + m.runs + ' runs'"></span>
+                  </div>
+                  <div class="flex h-1.5 rounded-full overflow-hidden bg-gray-800">
+                    <div class="h-full rounded-full"
+                      :class="m.mode === 'byok' ? 'bg-emerald-500/70' : m.mode === 'proxy' ? 'bg-violet-500/70' : 'bg-indigo-500/70'"
+                      :style="'width:' + Math.round(m.cost_usd / Math.max(...(analytics.by_llm_mode || []).map(x=>x.cost_usd||0.001)) * 100) + '%'"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- By model -->
+          <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 lg:col-span-2">
+            <p class="text-xs text-gray-500 uppercase tracking-wide mb-4">Modelos LLM — runs · gasto</p>
+            <div x-show="(analytics.by_model || []).length === 0" class="text-xs text-gray-600">Sin datos de modelo disponibles aún — se poblarán automáticamente a medida que el motor envíe información de modelo en los eventos de run.</div>
+            <div class="overflow-x-auto" x-show="(analytics.by_model || []).length > 0">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="text-left text-gray-500 border-b border-gray-800">
+                    <th class="pb-2 pr-6">Modelo</th>
+                    <th class="pb-2 pr-6">Runs</th>
+                    <th class="pb-2 pr-6">Gasto (USD)</th>
+                    <th class="pb-2">Distribución</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="m in analytics.by_model" :key="m.model">
+                    <tr class="border-b border-gray-800/50">
+                      <td class="py-2 pr-6 font-mono text-gray-200" x-text="m.model"></td>
+                      <td class="py-2 pr-6 font-mono text-gray-400" x-text="m.runs"></td>
+                      <td class="py-2 pr-6 font-mono text-indigo-300" x-text="'$' + m.cost_usd.toFixed(4)"></td>
+                      <td class="py-2 w-32">
+                        <div class="h-1.5 rounded-full bg-gray-800">
+                          <div class="h-1.5 rounded-full bg-indigo-500/70"
+                            :style="'width:' + Math.round(m.cost_usd / Math.max(...(analytics.by_model || []).map(x=>x.cost_usd||0.001)) * 100) + '%'"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
       </div>
     </template>
   </div>
 
   <!-- ── TAB: Campaigns ────────────────────────────────────────────── -->
-  <div x-show="activeTab === 'campaigns'" x-cloak class="space-y-4">
+  <div x-show="activeTab === 'campaigns'" x-cloak class="space-y-6">
+
+    <!-- Billing base rates -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-sm font-semibold">Billing base rates</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Default cost multipliers for new workspaces. Existing workspaces keep their rate at sign-up time.</p>
+        </div>
+        <button x-show="!editingRates" @click="editRates = {...billingRates}; editingRates = true"
+          class="text-xs text-indigo-400 hover:text-indigo-300 transition">Edit</button>
+        <div x-show="editingRates" class="flex gap-3">
+          <button @click="saveRates()"
+            class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg transition">Save</button>
+          <button @click="cancelRates()"
+            class="text-xs text-gray-400 hover:text-gray-200 transition">Cancel</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <p class="text-xs text-gray-500 mb-1">Managed</p>
+          <div x-show="!editingRates" class="font-mono text-indigo-300 text-sm" x-text="'×' + (billingRates.managed_cost_multiplier ?? 3.0).toFixed(2)"></div>
+          <input x-show="editingRates" x-model.number="editRates.managed_cost_multiplier" type="number" step="0.05" min="0.05"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <p class="text-xs text-gray-500 mb-1">BYOK</p>
+          <div x-show="!editingRates" class="font-mono text-emerald-400 text-sm" x-text="'×' + (billingRates.byok_service_multiplier ?? 0.4).toFixed(2)"></div>
+          <input x-show="editingRates" x-model.number="editRates.byok_service_multiplier" type="number" step="0.05" min="0.05"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <p class="text-xs text-gray-500 mb-1">Proxy</p>
+          <div x-show="!editingRates" class="font-mono text-violet-400 text-sm" x-text="'×' + (billingRates.proxy_service_multiplier ?? 0.7).toFixed(2)"></div>
+          <input x-show="editingRates" x-model.number="editRates.proxy_service_multiplier" type="number" step="0.05" min="0.05"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+      <p x-show="ratesError" x-cloak class="text-red-400 text-xs mt-3" x-text="ratesError"></p>
+    </div>
+
     <div class="flex items-center justify-between mb-2">
       <h2 class="text-lg font-semibold">Campaigns</h2>
       <button @click="showCampaignForm = !showCampaignForm"
@@ -546,19 +669,25 @@ function adminApp() {
     newCampaign: { name: '', multiplier: 0.5, starts_at: '', ends_at: '', target: 'all' },
     editingWs: null,
     editOverride: null,
+    billingRates: { managed_cost_multiplier: 3.0, byok_service_multiplier: 0.4, proxy_service_multiplier: 0.7 },
+    editRates: {},
+    editingRates: false,
+    ratesError: '',
 
     async init() {
       try {
-        const [s, w, c, u] = await Promise.all([
+        const [s, w, c, u, br] = await Promise.all([
           this.get('/admin/stats'),
           this.get('/admin/workspaces?limit=200'),
           this.get('/admin/campaigns'),
           this.get('/admin/users?limit=200'),
+          this.get('/admin/billing-rates'),
         ]);
         this.stats = s;
         this.workspaces = w;
         this.campaigns = c;
         this.users = u;
+        this.billingRates = br;
         // Load analytics for the default tab
         await this.loadAnalytics();
       } catch (e) {
@@ -654,6 +783,24 @@ function adminApp() {
         this.newCampaign = { name: '', multiplier: 0, starts_at: '', ends_at: '', target: 'all' };
       } catch (e) {
         this.campaignError = e.message;
+      }
+    },
+
+    // ── Billing rates ──
+
+    cancelRates() {
+      this.editingRates = false;
+      this.ratesError = '';
+    },
+
+    async saveRates() {
+      this.ratesError = '';
+      try {
+        const updated = await this.patch('/admin/billing-rates', this.editRates);
+        this.billingRates = updated;
+        this.editingRates = false;
+      } catch (e) {
+        this.ratesError = e.message;
       }
     },
 

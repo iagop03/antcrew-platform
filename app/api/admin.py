@@ -17,7 +17,7 @@ from sqlmodel import select
 
 from app.core.admin_auth import require_platform_admin
 from app.core.database import get_session
-from app.models.admin import Campaign
+from app.models.admin import Campaign, PlatformConfig
 from app.models.auth import User
 from app.models.feedback import UserFeedback
 from app.models.workspace import Workspace
@@ -89,6 +89,18 @@ class CampaignRow(BaseModel):
     target: str
     active: bool
     created_at: datetime
+
+
+class BillingRates(BaseModel):
+    managed_cost_multiplier: float
+    byok_service_multiplier: float
+    proxy_service_multiplier: float
+
+
+class BillingRatesPatch(BaseModel):
+    managed_cost_multiplier: Optional[float] = None
+    byok_service_multiplier: Optional[float] = None
+    proxy_service_multiplier: Optional[float] = None
 
 
 class FeedbackRow(BaseModel):
@@ -308,6 +320,63 @@ async def delete_campaign(
 
 
 # ---------------------------------------------------------------------------
+# Billing rates
+# ---------------------------------------------------------------------------
+
+_DEFAULT_RATES = BillingRates(
+    managed_cost_multiplier=3.0,
+    byok_service_multiplier=0.4,
+    proxy_service_multiplier=0.7,
+)
+
+
+@router.get("/billing-rates", response_model=BillingRates)
+async def get_billing_rates(
+    _admin=Depends(require_platform_admin),
+    session=Depends(get_session),
+):
+    cfg = await session.get(PlatformConfig, 1)
+    if cfg is None:
+        return _DEFAULT_RATES
+    return BillingRates(
+        managed_cost_multiplier=cfg.managed_cost_multiplier,
+        byok_service_multiplier=cfg.byok_service_multiplier,
+        proxy_service_multiplier=cfg.proxy_service_multiplier,
+    )
+
+
+@router.patch("/billing-rates", response_model=BillingRates)
+async def patch_billing_rates(
+    body: BillingRatesPatch,
+    _admin=Depends(require_platform_admin),
+    session=Depends(get_session),
+):
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is not None and value <= 0:
+            raise HTTPException(422, f"{field} must be greater than 0")
+
+    cfg = await session.get(PlatformConfig, 1)
+    if cfg is None:
+        cfg = PlatformConfig(id=1)
+        session.add(cfg)
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is not None:
+            setattr(cfg, field, value)
+
+    from app.models._utils import _utcnow
+    cfg.updated_at = _utcnow()
+    session.add(cfg)
+    await session.commit()
+    await session.refresh(cfg)
+    return BillingRates(
+        managed_cost_multiplier=cfg.managed_cost_multiplier,
+        byok_service_multiplier=cfg.byok_service_multiplier,
+        proxy_service_multiplier=cfg.proxy_service_multiplier,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Analytics
 # ---------------------------------------------------------------------------
 
@@ -386,6 +455,53 @@ async def admin_analytics(
         select(func.count()).select_from(UserFeedback).where(UserFeedback.helpful.is_(False))
     )).one()
 
+    # ── Usage breakdown: by team, by LLM mode, by model ─────────────────────
+    from app.models.run import Run as _Run, Ticket as _Ticket
+
+    team_rows = (await session.execute(
+        sa_select(
+            _Run.team,
+            func.count().label("runs"),
+            func.coalesce(func.sum(_Run.cost_usd), 0.0).label("cost"),
+        )
+        .where(_Run.created_at >= cutoff)
+        .group_by(_Run.team)
+        .order_by(func.coalesce(func.sum(_Run.cost_usd), 0.0).desc())
+    )).all()
+
+    # Tickets per team via run_id join
+    ticket_team_rows = (await session.execute(
+        sa_select(_Run.team, func.count(_Ticket.id).label("tickets"))
+        .join(_Ticket, _Run.run_id == _Ticket.run_id)
+        .where(_Run.created_at >= cutoff)
+        .group_by(_Run.team)
+    )).all()
+    tickets_by_team = {r.team: int(r.tickets) for r in ticket_team_rows}
+
+    mode_rows = (await session.execute(
+        sa_select(
+            Workspace.llm_key_mode,
+            func.count(_Run.id).label("runs"),
+            func.coalesce(func.sum(_Run.cost_usd), 0.0).label("cost"),
+        )
+        .join(Workspace, _Run.workspace_id == Workspace.id)
+        .where(_Run.created_at >= cutoff)
+        .group_by(Workspace.llm_key_mode)
+        .order_by(func.coalesce(func.sum(_Run.cost_usd), 0.0).desc())
+    )).all()
+
+    model_rows = (await session.execute(
+        sa_select(
+            _Run.model,
+            func.count().label("runs"),
+            func.coalesce(func.sum(_Run.cost_usd), 0.0).label("cost"),
+        )
+        .where(_Run.model.isnot(None))
+        .where(_Run.created_at >= cutoff)
+        .group_by(_Run.model)
+        .order_by(func.coalesce(func.sum(_Run.cost_usd), 0.0).desc())
+    )).all()
+
     runs_with_success = [
         {
             "period": f"{int(r.yr):04d}-{int(r.mo):02d}",
@@ -403,6 +519,31 @@ async def admin_analytics(
         "use_cases": [{"use_case": r.use_case, "count": int(r.cnt)} for r in use_case_rows],
         "team_sizes": [{"team_size": r.team_size, "count": int(r.cnt)} for r in team_size_rows],
         "feedback": {"total": int(fb_total), "positive": int(fb_positive), "negative": int(fb_negative)},
+        "by_team": [
+            {
+                "team": r.team,
+                "runs": int(r.runs),
+                "tickets": tickets_by_team.get(r.team, 0),
+                "cost_usd": round(float(r.cost), 4),
+            }
+            for r in team_rows
+        ],
+        "by_llm_mode": [
+            {
+                "mode": r.llm_key_mode,
+                "runs": int(r.runs),
+                "cost_usd": round(float(r.cost), 4),
+            }
+            for r in mode_rows
+        ],
+        "by_model": [
+            {
+                "model": r.model,
+                "runs": int(r.runs),
+                "cost_usd": round(float(r.cost), 4),
+            }
+            for r in model_rows
+        ],
     }
 
 

@@ -144,23 +144,28 @@ def get_cost_multiplier(
     multiplier_override: Optional[float] = None,
     multiplier_locked: bool = False,
     campaign_multiplier: Optional[float] = None,
+    managed_rate: Optional[float] = None,
+    byok_rate: Optional[float] = None,
+    proxy_rate: Optional[float] = None,
 ) -> float:
     """Return the billing multiplier for a workspace.
 
     Priority (highest to lowest):
       1. multiplier_override  — set by admin per workspace; applies even in trial
-      2. campaign_multiplier  — active campaign; skipped when multiplier_locked=True
+      2. campaign_multiplier  — discount factor applied on top of the mode base rate
       3. is_trial             — flat TRIAL_MULTIPLIER
-      4. default from llm_key_mode
+      4. default from llm_key_mode (uses platform-configured rates when provided)
     """
     if multiplier_override is not None:
         return multiplier_override
-    if campaign_multiplier is not None and not multiplier_locked:
-        return campaign_multiplier
     if is_trial:
-        return TRIAL_MULTIPLIER
-    if llm_key_mode == "byok":
-        return BYOK_SERVICE_MULTIPLIER
-    if llm_key_mode == "proxy":
-        return PROXY_SERVICE_MULTIPLIER
-    return MANAGED_COST_MULTIPLIER
+        base = TRIAL_MULTIPLIER
+    elif llm_key_mode == "byok":
+        base = byok_rate if byok_rate is not None else BYOK_SERVICE_MULTIPLIER
+    elif llm_key_mode == "proxy":
+        base = proxy_rate if proxy_rate is not None else PROXY_SERVICE_MULTIPLIER
+    else:
+        base = managed_rate if managed_rate is not None else MANAGED_COST_MULTIPLIER
+    if campaign_multiplier is not None and not multiplier_locked:
+        return round(base * campaign_multiplier, 6)
+    return base

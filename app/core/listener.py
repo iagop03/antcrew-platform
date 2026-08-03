@@ -102,19 +102,30 @@ async def _persist_event(event: "Event") -> None:
                         )).first()
                         _campaign_mult: Optional[float] = None
                         if _camp:
-                            ws_created = getattr(ws_row, "created_at", None)
-                            if _camp.target == "all" or (
-                                _camp.target == "new"
-                                and ws_created is not None
-                                and ws_created >= _camp.starts_at
-                            ):
+                            if _camp.target == "all":
                                 _campaign_mult = _camp.multiplier
+                            elif _camp.target == "new":
+                                # Anti-abuse: check user registration date, not workspace creation date.
+                                # A user who signed up before the campaign cannot get the discount
+                                # just by creating a new workspace.
+                                from app.models.auth import User as _User
+                                _owner_id = getattr(ws_row, "owner_user_id", None)
+                                if _owner_id is not None:
+                                    _user = await session.get(_User, _owner_id)
+                                    _registered_at = getattr(_user, "created_at", None) if _user else None
+                                else:
+                                    _registered_at = getattr(ws_row, "created_at", None)
+                                if _registered_at is not None and _registered_at >= _camp.starts_at:
+                                    _campaign_mult = _camp.multiplier
                         multiplier = get_cost_multiplier(
                             getattr(ws_row, "llm_key_mode", "managed"),
                             is_trial=getattr(ws_row, "is_trial", False),
                             multiplier_override=getattr(ws_row, "cost_multiplier_override", None),
                             multiplier_locked=getattr(ws_row, "multiplier_locked", False),
                             campaign_multiplier=_campaign_mult,
+                            managed_rate=getattr(ws_row, "base_managed_mult", None),
+                            byok_rate=getattr(ws_row, "base_byok_mult", None),
+                            proxy_rate=getattr(ws_row, "base_proxy_mult", None),
                         )
                         run.cost_usd = round(raw_cost_usd * multiplier, 6)
                     else:

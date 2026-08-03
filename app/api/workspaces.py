@@ -1000,6 +1000,41 @@ async def workspace_analytics(
 
     ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
 
+    # ── Usage breakdown by team and model ───────────────────────────────────
+    team_rows = (await session.execute(
+        sa_select(
+            Run.team,
+            func.count().label("runs"),
+            func.coalesce(func.sum(Run.cost_usd), 0.0).label("cost"),
+        )
+        .where(Run.workspace_id == workspace_id)
+        .where(Run.created_at >= cutoff)
+        .group_by(Run.team)
+        .order_by(func.coalesce(func.sum(Run.cost_usd), 0.0).desc())
+    )).all()
+
+    ticket_team_rows = (await session.execute(
+        sa_select(Run.team, func.count(Ticket.id).label("tickets"))
+        .join(Ticket, Run.run_id == Ticket.run_id)
+        .where(Run.workspace_id == workspace_id)
+        .where(Run.created_at >= cutoff)
+        .group_by(Run.team)
+    )).all()
+    tickets_by_team = {r.team: int(r.tickets) for r in ticket_team_rows}
+
+    model_rows = (await session.execute(
+        sa_select(
+            Run.model,
+            func.count().label("runs"),
+            func.coalesce(func.sum(Run.cost_usd), 0.0).label("cost"),
+        )
+        .where(Run.workspace_id == workspace_id)
+        .where(Run.model.isnot(None))
+        .where(Run.created_at >= cutoff)
+        .group_by(Run.model)
+        .order_by(func.coalesce(func.sum(Run.cost_usd), 0.0).desc())
+    )).all()
+
     return {
         "workspace_id": workspace_id,
         "runs_by_day": [
@@ -1014,4 +1049,21 @@ async def workspace_analytics(
         ],
         "tickets_by_status": tickets_by_status,
         "total_cost_usd": round(float(ws.total_cost_usd) if ws else 0.0, 4),
+        "by_team": [
+            {
+                "team": r.team,
+                "runs": int(r.runs),
+                "tickets": tickets_by_team.get(r.team, 0),
+                "cost_usd": round(float(r.cost), 4),
+            }
+            for r in team_rows
+        ],
+        "by_model": [
+            {
+                "model": r.model,
+                "runs": int(r.runs),
+                "cost_usd": round(float(r.cost), 4),
+            }
+            for r in model_rows
+        ],
     }

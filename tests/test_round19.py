@@ -245,7 +245,7 @@ async def test_a9_create_campaign(client: AsyncClient, session: AsyncSession):
         "/admin/campaigns",
         json={
             "name": "Q3 promo",
-            "multiplier": 0.0,
+            "multiplier": 0.8,
             "starts_at": (now - timedelta(hours=1)).isoformat(),
             "ends_at": (now + timedelta(days=30)).isoformat(),
             "target": "all",
@@ -256,7 +256,7 @@ async def test_a9_create_campaign(client: AsyncClient, session: AsyncSession):
     assert r.status_code == 201, r.text
     d = r.json()
     assert d["name"] == "Q3 promo"
-    assert d["multiplier"] == 0.0
+    assert d["multiplier"] == 0.8
     assert d["active"] is True
 
 
@@ -269,7 +269,7 @@ async def test_a9b_create_campaign_invalid_dates(client: AsyncClient, session: A
         "/admin/campaigns",
         json={
             "name": "Bad dates",
-            "multiplier": 0.0,
+            "multiplier": 0.8,
             "starts_at": (now + timedelta(days=1)).isoformat(),
             "ends_at": now.isoformat(),
             "target": "all",
