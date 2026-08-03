@@ -245,6 +245,14 @@ function dashFeed() {
     wsConnected: false,
     _wsBackoff: 1000,
     ws: null,
+
+    // MFA modal
+    showMfaModal: false,
+    mfaSetup: null,
+    mfaCode: '',
+    mfaLoading: false,
+    mfaMsg: '',
+    mfaError: false,
     apiHeaders(extra = {}) {
       const k = localStorage.getItem('antcrew_api_key');
       const h = { 'Content-Type': 'application/json', ...extra };
@@ -262,6 +270,11 @@ function dashFeed() {
           const me = await r.json();
           if (!me.workspace_id) { window.location.replace('/onboard'); return; }
           if (!me.email_verified) { window.location.replace('/login'); return; }
+          // Show MFA setup modal for users who haven't enabled it yet
+          if (!me.mfa_enabled) {
+            const skip = localStorage.getItem('mfa_skip_until');
+            if (!skip || Date.now() > parseInt(skip, 10)) this.showMfaModal = true;
+          }
         } catch { window.location.replace('/'); return; }
       }
       await Promise.all([this.loadWorkspace(), this.loadStats(), this.loadFeed()]);
@@ -457,8 +470,111 @@ function dashFeed() {
         });
       }
     },
+
+    /* ── MFA modal ── */
+    getCsrfToken() {
+      return document.cookie.split(';').map(c => c.trim())
+        .find(c => c.startsWith('csrf_token='))?.split('=')[1] || '';
+    },
+
+    async openMfaSetup() {
+      this.mfaMsg = ''; this.mfaError = false; this.mfaSetup = null; this.mfaCode = '';
+      try {
+        const r = await fetch('/auth/mfa/setup', { credentials: 'same-origin' });
+        if (!r.ok) { const e = await r.json(); this.mfaMsg = e.detail || 'Error'; this.mfaError = true; return; }
+        this.mfaSetup = await r.json();
+      } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
+    },
+
+    async enableMfa() {
+      if (!this.mfaSetup) return;
+      this.mfaMsg = ''; this.mfaError = false; this.mfaLoading = true;
+      try {
+        const r = await fetch('/auth/mfa/enable', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.getCsrfToken() },
+          body: JSON.stringify({ secret: this.mfaSetup.secret, code: this.mfaCode }),
+        });
+        if (!r.ok) { const e = await r.json(); this.mfaMsg = e.detail || 'Código incorrecto'; this.mfaError = true; }
+        else { this.showMfaModal = false; }
+      } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
+      this.mfaLoading = false;
+    },
+
+    skipMfa() {
+      localStorage.setItem('mfa_skip_until', Date.now() + 7 * 24 * 60 * 60 * 1000);
+      this.showMfaModal = false;
+    },
   };
 }
 </script>
+
+<!-- MFA setup modal -->
+<template x-if="showMfaModal">
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,.7);backdrop-filter:blur(4px)">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+
+      <!-- Header -->
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h2 class="text-base font-semibold">Protege tu cuenta</h2>
+          <p class="text-xs text-gray-500 mt-0.5">Activa la autenticación de dos factores (TOTP)</p>
+        </div>
+        <button @click="skipMfa()" class="text-gray-600 hover:text-gray-400 transition ml-3 shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Step 1: CTA -->
+      <template x-if="!mfaSetup">
+        <div>
+          <p class="text-sm text-gray-400 mb-5">Añade una capa extra de seguridad. Necesitarás una app de autenticación (Google Authenticator, Authy, 1Password…).</p>
+          <div class="flex gap-2">
+            <button @click="openMfaSetup()"
+              class="flex-1 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition">
+              Configurar 2FA
+            </button>
+            <button @click="skipMfa()"
+              class="flex-1 py-2 rounded-lg text-sm text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 transition">
+              Ahora no
+            </button>
+          </div>
+          <p class="text-xs text-gray-600 text-center mt-2">Se recordará en 7 días</p>
+        </div>
+      </template>
+
+      <!-- Step 2: scan + verify -->
+      <template x-if="mfaSetup">
+        <div>
+          <p class="text-xs text-gray-500 mb-3">Escanea el código con tu app de autenticación, o añádelo manualmente.</p>
+          <a :href="mfaSetup.provisioning_uri"
+            class="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 mb-3 transition">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+            Abrir en app de autenticación
+          </a>
+          <code class="block bg-gray-950 border border-gray-800 rounded px-3 py-2 text-xs font-mono text-gray-300 tracking-widest select-all mb-4 break-all" x-text="mfaSetup.secret"></code>
+          <label class="block text-xs text-gray-400 mb-1.5">Código de verificación (6 dígitos)</label>
+          <input x-model="mfaCode" type="text" inputmode="numeric" maxlength="6" placeholder="000000"
+            @keydown.enter="enableMfa()"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-xl text-center font-mono tracking-[0.4em] focus:outline-none focus:border-indigo-500 mb-3 placeholder-gray-700">
+          <p x-show="mfaMsg" class="text-xs mb-3" :class="mfaError ? 'text-red-400' : 'text-teal-400'" x-text="mfaMsg"></p>
+          <div class="flex gap-2">
+            <button @click="enableMfa()" :disabled="mfaCode.length !== 6 || mfaLoading"
+              class="flex-1 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition">
+              <span x-show="!mfaLoading">Activar 2FA</span>
+              <span x-show="mfaLoading">Activando…</span>
+            </button>
+            <button @click="skipMfa()"
+              class="px-4 py-2 rounded-lg text-sm text-gray-500 hover:text-white bg-gray-800 hover:bg-gray-700 transition">
+              Saltar
+            </button>
+          </div>
+        </div>
+      </template>
+
+    </div>
+  </div>
+</template>
+
 </body>
 </html>

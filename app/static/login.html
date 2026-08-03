@@ -105,6 +105,41 @@
     </p>
   </div>
 
+  <!-- ── STATE: mfa ─────────────────────────────────────────────────── -->
+  <div x-show="state === 'mfa'" x-cloak>
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8">
+      <h2 class="text-lg font-semibold mb-1">Autenticación de dos factores</h2>
+      <p class="text-gray-400 text-sm mb-6">
+        Introduce el código de 6 dígitos de tu app de autenticación.
+      </p>
+
+      <div class="mb-4">
+        <label class="block text-xs text-gray-400 mb-1.5">Código TOTP</label>
+        <input x-model="mfaCode" type="text" inputmode="numeric" maxlength="6"
+          placeholder="000000"
+          @keydown.enter="doMfaChallenge()"
+          class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-3 text-2xl text-center font-mono tracking-[0.5em] focus:outline-none focus:border-indigo-500 placeholder-gray-700">
+      </div>
+
+      <p x-show="mfaError" x-cloak class="text-red-400 text-xs mb-3" x-text="mfaError"></p>
+
+      <button @click="doMfaChallenge()"
+        :disabled="mfaLoading || mfaCode.length !== 6"
+        class="w-full py-2.5 rounded-lg font-medium text-sm transition
+          bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+        <span x-show="!mfaLoading">Verificar →</span>
+        <span x-show="mfaLoading">Verificando…</span>
+      </button>
+    </div>
+
+    <p class="text-center text-xs text-gray-600 mt-5">
+      <button @click="state = 'login'; mfaCode = ''; mfaError = ''"
+        class="text-gray-500 hover:text-indigo-400 transition">
+        ← Volver al login
+      </button>
+    </p>
+  </div>
+
 </div>
 
 <script>
@@ -122,6 +157,11 @@ function loginApp() {
     verifyError: '',
     resendCooldown: 0,
 
+    mfaToken: '',
+    mfaCode: '',
+    mfaLoading: false,
+    mfaError: '',
+
     async doLogin() {
       this.loginError = '';
       this.loginLoading = true;
@@ -138,6 +178,13 @@ function loginApp() {
           return;
         }
         const data = await r.json();
+        if (data.mfa_required) {
+          this.mfaToken = data.mfa_token;
+          this.mfaCode = '';
+          this.mfaError = '';
+          this.state = 'mfa';
+          return;
+        }
         if (data.email_verified === false) {
           // Account exists but email not verified — send a fresh code and show verify state
           await fetch('/auth/resend-code', { method: 'POST', credentials: 'same-origin' });
@@ -182,6 +229,28 @@ function loginApp() {
         await fetch('/auth/resend-code', { method: 'POST', credentials: 'same-origin' });
         this._startResendCooldown(60);
       } catch {}
+    },
+
+    async doMfaChallenge() {
+      this.mfaError = '';
+      this.mfaLoading = true;
+      try {
+        const r = await fetch('/auth/mfa/challenge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mfa_token: this.mfaToken, code: this.mfaCode.trim() }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          this.mfaError = d.detail || `Error ${r.status}`;
+          return;
+        }
+        window.location.href = '/dashboard';
+      } catch (e) {
+        this.mfaError = 'Error de red — inténtalo de nuevo';
+      } finally {
+        this.mfaLoading = false;
+      }
     },
 
     _startResendCooldown(seconds) {
