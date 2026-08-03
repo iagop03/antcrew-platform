@@ -343,14 +343,6 @@
           :class="llmMode === 'byok' ? 'bg-emerald-900/50 text-emerald-400' : llmMode === 'proxy' ? 'bg-violet-900/50 text-violet-400' : (activeCampaign && activeCampaign.multiplier < 2.5 ? 'bg-emerald-900/50 text-emerald-400' : 'bg-gray-800 text-gray-400')"
           x-text="llmMode === 'managed' ? 'managed ' + (activeCampaign ? '×' + activeCampaign.multiplier.toFixed(1) : '×3.0') : llmMode === 'byok' ? 'byok ×0.4' : 'proxy ×0.7'"></span>
       </div>
-      <div class="flex justify-between items-center">
-        <span class="text-xs text-gray-500">Tu API key (admin)</span>
-        <button @click="copyText(adminKey, 'admin-key')"
-          class="text-xs text-indigo-400 hover:text-indigo-300 transition"
-          x-text="copied === 'admin-key' ? '✓ Copiada' : 'Copiar'"></button>
-      </div>
-      <code class="block text-xs text-gray-400 font-mono break-all bg-gray-950 rounded px-3 py-2"
-        x-text="adminKey"></code>
       <div class="flex justify-between items-center pt-1">
         <span class="text-xs text-gray-500">Plan</span>
         <span class="text-sm font-mono text-emerald-400">Prueba gratuita activa</span>
@@ -392,18 +384,6 @@
       </div>
     </div>
 
-    <!-- Quick start -->
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6">
-      <p class="text-xs text-gray-500 uppercase tracking-wide mb-3">Lanzar un run con revisión</p>
-      <div class="relative">
-        <pre class="text-xs text-gray-300 font-mono overflow-x-auto bg-gray-950 rounded-lg px-4 py-3 leading-relaxed"
-          x-text="curlExample()"></pre>
-        <button @click="copyText(curlExample(), 'curl')"
-          class="absolute top-2 right-2 text-xs text-gray-500 hover:text-indigo-400 transition px-2 py-1 bg-gray-900 rounded"
-          x-text="copied === 'curl' ? '✓' : 'Copiar'"></button>
-      </div>
-    </div>
-
     <div class="flex gap-3">
       <a href="/dashboard"
         class="flex-1 py-2.5 rounded-lg font-medium text-sm text-center transition bg-indigo-600 hover:bg-indigo-500 text-white">
@@ -430,7 +410,6 @@ function onboard() {
     step1Loading: false,
     step1Error: '',
     workspaceId: null,
-    adminKey: '',
 
     // Step 2
     verifyCode: '',
@@ -491,8 +470,6 @@ function onboard() {
         }
         const data = await r.json();
         this.workspaceId = data.workspace_id;
-        this.adminKey = data.api_key;
-        localStorage.setItem('antcrew_api_key', data.api_key);
         this.step = 2;
         this._startResendCooldown(60);
         this._fetchCampaign();
@@ -672,18 +649,6 @@ function onboard() {
       } finally {
         this.inviteLoading = false;
       }
-    },
-
-    curlExample() {
-      return `curl -X POST http://localhost:8000/run/ \\
-  -H "X-Api-Key: ${this.adminKey || '<tu-admin-key>'}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "team": "my_team",
-    "request": "Analiza el módulo de pagos",
-    "hitl": true,
-    "workspace_id": ${this.workspaceId || 1}
-  }'`;
     },
 
     async copyText(text, id) {
