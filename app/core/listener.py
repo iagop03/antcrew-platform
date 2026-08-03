@@ -73,6 +73,7 @@ async def _persist_event(event: "Event") -> None:
                 if run and run.status != "cancelled":
                     # Don't overwrite a cancelled run — cancel_run already set the final status
                     run.status = "success" if event.payload.get("success") else "error"
+                    run.model = event.payload.get("model")
                     raw_cost_usd = event.payload.get("cost_usd", 0.0)
                     run.finished_at = _utcnow()
                     if run.created_at:
@@ -102,8 +103,10 @@ async def _persist_event(event: "Event") -> None:
                         )).first()
                         _campaign_mult: Optional[float] = None
                         if _camp:
+                            # Determine base eligibility (target: all vs new)
+                            _eligible = False
                             if _camp.target == "all":
-                                _campaign_mult = _camp.multiplier
+                                _eligible = True
                             elif _camp.target == "new":
                                 # Anti-abuse: check user registration date, not workspace creation date.
                                 # A user who signed up before the campaign cannot get the discount
@@ -116,7 +119,41 @@ async def _persist_event(event: "Event") -> None:
                                 else:
                                     _registered_at = getattr(ws_row, "created_at", None)
                                 if _registered_at is not None and _registered_at >= _camp.starts_at:
+                                    _eligible = True
+
+                            if _eligible:
+                                if _camp.discount_days is None:
+                                    # No per-workspace window — discount active for full campaign range
                                     _campaign_mult = _camp.multiplier
+                                elif run.workspace_id is not None:
+                                    # Enrollment-based: each workspace gets its own N-day window
+                                    from app.models.admin import CampaignEnrollment
+                                    from datetime import timedelta as _td
+                                    _enr_stmt = (
+                                        select(CampaignEnrollment)
+                                        .where(CampaignEnrollment.campaign_id == _camp.id)
+                                        .where(CampaignEnrollment.workspace_id == run.workspace_id)
+                                    )
+                                    _enr = (await session.exec(_enr_stmt)).first()
+                                    if _enr is None:
+                                        _can_enroll = True
+                                        if _camp.max_participants is not None:
+                                            _all_enr = (await session.exec(
+                                                select(CampaignEnrollment)
+                                                .where(CampaignEnrollment.campaign_id == _camp.id)
+                                            )).all()
+                                            if len(_all_enr) >= _camp.max_participants:
+                                                _can_enroll = False
+                                        if _can_enroll:
+                                            _enr = CampaignEnrollment(
+                                                campaign_id=_camp.id,
+                                                workspace_id=run.workspace_id,
+                                                enrolled_at=_now,
+                                                discount_ends_at=_now + _td(days=_camp.discount_days),
+                                            )
+                                            session.add(_enr)
+                                    if _enr is not None and _enr.discount_ends_at >= _now:
+                                        _campaign_mult = _camp.multiplier
                         multiplier = get_cost_multiplier(
                             getattr(ws_row, "llm_key_mode", "managed"),
                             is_trial=getattr(ws_row, "is_trial", False),

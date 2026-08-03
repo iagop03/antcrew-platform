@@ -58,6 +58,8 @@ class CampaignCreate(BaseModel):
     starts_at: datetime
     ends_at: datetime
     target: str = "all"  # all | new
+    discount_days: Optional[int] = None
+    max_participants: Optional[int] = None
 
     @classmethod
     def _strip_tz(cls, dt: datetime) -> datetime:
@@ -76,6 +78,8 @@ class CampaignPatch(BaseModel):
     ends_at: Optional[datetime] = None
     target: Optional[str] = None
     active: Optional[bool] = None
+    discount_days: Optional[int] = None
+    max_participants: Optional[int] = None
 
 
 class CampaignRow(BaseModel):
@@ -88,6 +92,8 @@ class CampaignRow(BaseModel):
     ends_at: datetime
     target: str
     active: bool
+    discount_days: Optional[int] = None
+    max_participants: Optional[int] = None
     created_at: datetime
 
 
@@ -283,6 +289,8 @@ async def create_campaign(
         ends_at=body.ends_at,
         target=body.target,
         active=True,
+        discount_days=body.discount_days,
+        max_participants=body.max_participants,
     )
     session.add(campaign)
     await session.commit()

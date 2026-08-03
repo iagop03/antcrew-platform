@@ -410,6 +410,18 @@
             <option value="new">New workspaces only</option>
           </select>
         </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Discount days <span class="text-gray-600">(optional)</span></label>
+          <input x-model.number="newCampaign.discount_days" type="number" min="1" placeholder="e.g. 30"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          <p class="text-xs text-gray-600 mt-1">Each workspace gets this many days from their first run. Leave blank for full campaign window.</p>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Max participants <span class="text-gray-600">(optional)</span></label>
+          <input x-model.number="newCampaign.max_participants" type="number" min="1" placeholder="e.g. 100"
+            class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+          <p class="text-xs text-gray-600 mt-1">Cap enrollment count. Only applies when Discount days is set.</p>
+        </div>
       </div>
       <p x-show="campaignError" x-cloak class="text-red-400 text-xs" x-text="campaignError"></p>
       <div class="flex gap-3">
@@ -437,6 +449,8 @@
             <th class="pb-2 pr-4">Target</th>
             <th class="pb-2 pr-4">Starts</th>
             <th class="pb-2 pr-4">Ends</th>
+            <th class="pb-2 pr-4">Discount days</th>
+            <th class="pb-2 pr-4">Max enrolled</th>
             <th class="pb-2 pr-4">Status</th>
             <th class="pb-2"></th>
           </tr>
@@ -452,6 +466,8 @@
               </td>
               <td class="py-2.5 pr-4 text-gray-400 text-xs" x-text="fmtDate(c.starts_at)"></td>
               <td class="py-2.5 pr-4 text-gray-400 text-xs" x-text="fmtDate(c.ends_at)"></td>
+              <td class="py-2.5 pr-4 text-gray-400 text-xs" x-text="c.discount_days ? c.discount_days + 'd' : '—'"></td>
+              <td class="py-2.5 pr-4 text-gray-400 text-xs" x-text="c.max_participants ?? '—'"></td>
               <td class="py-2.5 pr-4">
                 <span :class="c.active ? 'bg-emerald-900/40 text-emerald-400' : 'bg-gray-800 text-gray-500'"
                   class="text-xs px-2 py-0.5 rounded-full" x-text="c.active ? 'active' : 'inactive'"></span>
@@ -699,7 +715,7 @@ function adminApp() {
     feedback: [],
     showCampaignForm: false,
     campaignError: '',
-    newCampaign: { name: '', multiplier: 0.5, starts_at: '', ends_at: '', target: 'all' },
+    newCampaign: { name: '', multiplier: 0.5, starts_at: '', ends_at: '', target: 'all', discount_days: null, max_participants: null },
     editingWs: null,
     editOverride: null,
     billingRates: { managed_cost_multiplier: 3.0, byok_service_multiplier: 0.4, proxy_service_multiplier: 0.7, managed_enabled: true, byok_enabled: true, proxy_enabled: true },
@@ -813,7 +829,7 @@ function adminApp() {
         const c = await this.post('/admin/campaigns', body);
         this.campaigns.unshift(c);
         this.showCampaignForm = false;
-        this.newCampaign = { name: '', multiplier: 0, starts_at: '', ends_at: '', target: 'all' };
+        this.newCampaign = { name: '', multiplier: 0, starts_at: '', ends_at: '', target: 'all', discount_days: null, max_participants: null };
       } catch (e) {
         this.campaignError = e.message;
       }
