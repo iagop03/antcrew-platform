@@ -261,6 +261,7 @@ function dashFeed() {
           if (!r.ok) { window.location.replace('/'); return; }
           const me = await r.json();
           if (!me.workspace_id) { window.location.replace('/onboard'); return; }
+          if (!me.email_verified) { window.location.replace('/login'); return; }
         } catch { window.location.replace('/'); return; }
       }
       await Promise.all([this.loadWorkspace(), this.loadStats(), this.loadFeed()]);

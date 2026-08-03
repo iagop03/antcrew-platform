@@ -94,6 +94,35 @@ async def onboard_bootstrap(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/public/active-campaign", tags=["public"])
+async def active_campaign(session=Depends(get_session)):
+    """Return the best active campaign for new users (lowest multiplier), or null.
+
+    Public endpoint — no auth required. Used by onboarding to show effective pricing.
+    """
+    from app.models.admin import Campaign
+    from datetime import datetime, timezone
+    from sqlalchemy import select as _sa_select
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    camp = (await session.exec(
+        select(Campaign)
+        .where(Campaign.active.is_(True))
+        .where(Campaign.starts_at <= now)
+        .where(Campaign.ends_at >= now)
+        .where(Campaign.target.in_(["all", "new"]))
+        .order_by(Campaign.multiplier.asc())
+        .limit(1)
+    )).first()
+    if camp is None:
+        return None
+    return {
+        "name": camp.name,
+        "multiplier": camp.multiplier,
+        "ends_at": camp.ends_at.isoformat() + "Z",
+    }
+
+
 @router.get("/public/active-promo", tags=["public"])
 async def active_promo(session=Depends(get_session)):
     """Return whether a free-trial promo campaign is currently active.
