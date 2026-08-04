@@ -1,3 +1,42 @@
+# Security Policy
+
+## Reporting a Vulnerability
+
+Please report security vulnerabilities to security@antcrew.org. Do not open public GitHub issues
+for security bugs.
+
+We aim to respond within 72 hours and will coordinate a fix and disclosure timeline with you.
+
+## Cryptographic Choices
+
+### OTP tokens: HMAC-SHA256 (not bcrypt)
+
+One-time password tokens stored in the database use **HMAC-SHA256** rather than bcrypt.
+This is an intentional design decision, not an oversight:
+
+- OTPs are **single-use** — consumed and deleted immediately on first verification.
+- They are **short-lived** (15-minute TTL enforced at the application layer).
+- Access is **rate-limited** at the API level (5 attempts per token before invalidation).
+- The combination of single-use + short TTL + rate-limiting provides equivalent protection
+  to bcrypt's slowness for this specific threat model, while avoiding the latency cost.
+
+bcrypt's purpose is to slow down offline brute-force attacks against long-lived secrets
+(passwords). OTPs are neither long-lived nor subject to meaningful offline attacks once
+they are deleted after use.
+
+### Passwords: bcrypt (cost factor 12)
+
+User account passwords **do** use bcrypt with cost factor 12. This is the appropriate
+algorithm for long-lived secrets that must resist offline dictionary attacks.
+
+### Session tokens / API keys
+
+API keys use cryptographically secure random generation (`secrets.token_urlsafe(32)`).
+They are stored as their raw value (or hashed where noted in the code) and are
+transmitted only over HTTPS.
+
+---
+
 # Security Checklist
 
 This file documents the security patterns established across the antcrew stack.
