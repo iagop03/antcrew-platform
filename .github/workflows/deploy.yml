@@ -280,6 +280,7 @@ jobs:
           UAT_GH_APP_ID: ${{ secrets.GH_APP_ID }}
           UAT_GH_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
           UAT_GH_WEBHOOK_SECRET: ${{ secrets.GH_WEBHOOK_SECRET }}
+          UAT_DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
           PLATFORM_IMAGE: ghcr.io/${{ github.repository }}:uat-latest
@@ -298,6 +299,7 @@ jobs:
           GITHUB_APP_ID=${UAT_GH_APP_ID}
           GITHUB_PRIVATE_KEY=${UAT_GH_PRIVATE_KEY}
           GITHUB_WEBHOOK_SECRET=${UAT_GH_WEBHOOK_SECRET}
+          DEEPSEEK_API_KEY=${UAT_DEEPSEEK_API_KEY}
           EOF
           ssh -i ~/.ssh/hetzner_uat root@"$UAT_IP" "mkdir -p /opt/antcrew"
           scp -i ~/.ssh/hetzner_uat /tmp/env.uat root@"$UAT_IP":/opt/antcrew/.env.uat
@@ -347,6 +349,40 @@ jobs:
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
         if: needs.build.outputs.env_name != 'uat'
+
+      - name: Push secrets to Fly.io
+        if: needs.build.outputs.env_name != 'uat'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          S_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          S_SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          S_PLATFORM_API_KEY: ${{ secrets.PLATFORM_API_KEY }}
+          S_SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          S_SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          S_SMTP_USER: ${{ secrets.SMTP_USER }}
+          S_SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          S_SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          # GH_ prefix because GitHub reserves GITHUB_* for its own vars
+          S_GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          S_GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          S_GH_WEBHOOK_SECRET: ${{ secrets.GH_WEBHOOK_SECRET }}
+          S_DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          APP="antcrew-${{ needs.build.outputs.env_name }}"
+          flyctl secrets set \
+            DATABASE_URL="$S_DATABASE_URL" \
+            SECRET_KEY="$S_SECRET_KEY" \
+            PLATFORM_API_KEY="$S_PLATFORM_API_KEY" \
+            SMTP_HOST="$S_SMTP_HOST" \
+            SMTP_PORT="$S_SMTP_PORT" \
+            SMTP_USER="$S_SMTP_USER" \
+            SMTP_PASSWORD="$S_SMTP_PASSWORD" \
+            SMTP_FROM="$S_SMTP_FROM" \
+            GITHUB_APP_ID="$S_GH_APP_ID" \
+            GITHUB_PRIVATE_KEY="$S_GH_APP_PRIVATE_KEY" \
+            GITHUB_WEBHOOK_SECRET="$S_GH_WEBHOOK_SECRET" \
+            DEEPSEEK_API_KEY="$S_DEEPSEEK_API_KEY" \
+            --app "$APP" --stage
 
       - name: Deploy to Fly.io
         if: needs.build.outputs.env_name != 'uat'
