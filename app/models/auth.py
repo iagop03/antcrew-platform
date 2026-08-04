@@ -39,6 +39,9 @@ class WorkspaceMembership(SQLModel, table=True):
     When a key has membership rows, the set of accessible workspace IDs is the union of
     all memberships. The key's own workspace_id remains its primary workspace (used for
     creating new resources). Keys with no memberships fall back to workspace_id scoping.
+
+    user_id mirrors the owner of the associated api_key and enables direct user-scoped
+    membership lookups (populated by migration 047, made NOT NULL by migration 048).
     """
 
     __tablename__ = "workspace_membership"
@@ -46,6 +49,7 @@ class WorkspaceMembership(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     api_key_id: int = Field(index=True)
     workspace_id: int = Field(index=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
     created_at: datetime = Field(default_factory=_utcnow)
 
 

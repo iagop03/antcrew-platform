@@ -120,6 +120,7 @@ async def _authenticate(raw_key: Optional[str], session) -> WorkspaceContext:
             workspace_id = key.workspace_id
             label = key.label
             role = key.role
+            key_user_id = key.user_id  # may be None for service/anonymous keys
 
             # Upgrade legacy key: set prefix and/or rehash sha256 → bcrypt
             if key.key_prefix is None or _is_legacy_hash(key.key_hash):
@@ -137,9 +138,22 @@ async def _authenticate(raw_key: Optional[str], session) -> WorkspaceContext:
                         pass
 
             from app.models.run import WorkspaceMembership
-            memberships = (await session.exec(
+            memberships = list((await session.exec(
                 select(WorkspaceMembership).where(WorkspaceMembership.api_key_id == key_id)
-            )).all()
+            )).all())
+
+            # Also resolve memberships tied directly to the user (user_id path).
+            # This covers memberships created after migration 047 and memberships
+            # shared across multiple API keys belonging to the same user.
+            if key_user_id is not None:
+                known_ws = {m.workspace_id for m in memberships}
+                user_memberships = (await session.exec(
+                    select(WorkspaceMembership).where(
+                        WorkspaceMembership.user_id == key_user_id
+                    )
+                )).all()
+                memberships += [m for m in user_memberships if m.workspace_id not in known_ws]
+
             return WorkspaceContext(
                 workspace_id=workspace_id,
                 created_by=label,
@@ -206,9 +220,20 @@ async def _session_context(token: str, session) -> Optional[WorkspaceContext]:
     if key is None:
         return None
 
-    memberships = (await session.exec(
+    memberships = list((await session.exec(
         select(WorkspaceMembership).where(WorkspaceMembership.api_key_id == key.id)
-    )).all()
+    )).all())
+
+    # Also resolve memberships tied directly to the session user (user_id path).
+    # This covers memberships granted to the user account rather than to a specific key.
+    if user_session.user_id is not None:
+        known_ws = {m.workspace_id for m in memberships}
+        user_memberships = (await session.exec(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.user_id == user_session.user_id
+            )
+        )).all()
+        memberships += [m for m in user_memberships if m.workspace_id not in known_ws]
 
     return WorkspaceContext(
         workspace_id=key.workspace_id,
