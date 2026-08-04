@@ -382,6 +382,28 @@ async def _check_cors_config() -> None:
     )
 
 
+async def _check_rate_limit_workers() -> None:
+    """Warn when multiple workers are configured alongside the in-memory rate limiter.
+
+    The rate limiter uses a per-process sliding window — each worker process has
+    its own independent bucket, so the effective limit is RATE_LIMIT_RPM × workers.
+    This is only a warning (not a hard error) because single-process deployments
+    (Fly.io with min_machines=1) are the current production topology; replace the
+    limiter with a Redis-backed implementation before enabling horizontal scaling.
+    """
+    rpm = int(os.environ.get("RATE_LIMIT_RPM", "60"))
+    if rpm <= 0:
+        return
+    workers = int(os.environ.get("ANTCREW_WORKERS", "1"))
+    if workers > 1:
+        log.warning(
+            "rate_limit: ANTCREW_WORKERS=%d but rate limiter is in-memory — "
+            "effective limit is %d RPM per process (%d × %d). "
+            "Replace with a Redis-backed implementation before horizontal scaling.",
+            workers, rpm, rpm, workers,
+        )
+
+
 async def run_startup_checks(testing: bool) -> None:
     """Run all startup health checks in order.
 
@@ -401,3 +423,4 @@ async def run_startup_checks(testing: bool) -> None:
         await _check_slack_config()
         await _check_byok_config()
         await _check_proxy_config()
+        await _check_rate_limit_workers()

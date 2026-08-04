@@ -585,7 +585,7 @@ function onboard() {
       this.step4Error = '';
       this.step4Loading = true;
       try {
-        await fetch('/auth/profile', {
+        await fetch('/auth/profile/onboarding', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -9,6 +9,7 @@ Routes (no prefix — full paths used):
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -36,6 +37,10 @@ from app.models.run import (
 router = APIRouter(tags=["invites"])
 
 _VALID_ROLES = frozenset({"admin", "write", "read", "reviewer"})
+
+
+def _hash_join_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def _utcnow() -> datetime:
@@ -172,7 +177,8 @@ async def create_join_request(
 
     token = secrets.token_urlsafe(32)
     join_req = WorkspaceJoinRequest(
-        token=token,
+        token=None,
+        token_hash=_hash_join_token(token),
         workspace_id=ws.id,
         requester_email=requester_email,
         requested_role=body.requested_role,
@@ -222,10 +228,18 @@ async def approve_join_request(
     now = _utcnow()
     join_req = (await session.exec(
         select(WorkspaceJoinRequest).where(
-            WorkspaceJoinRequest.token == token,
+            WorkspaceJoinRequest.token_hash == _hash_join_token(token),
             WorkspaceJoinRequest.status == "pending",
         )
     )).first()
+    if join_req is None:
+        # Fallback for legacy rows stored with plaintext token.
+        join_req = (await session.exec(
+            select(WorkspaceJoinRequest).where(
+                WorkspaceJoinRequest.token == token,
+                WorkspaceJoinRequest.status == "pending",
+            )
+        )).first()
     if not join_req:
         raise HTTPException(404, "Join request not found or already resolved")
     if not ws_accessible(join_req.workspace_id, ctx):
@@ -283,10 +297,17 @@ async def reject_join_request(
     now = _utcnow()
     join_req = (await session.exec(
         select(WorkspaceJoinRequest).where(
-            WorkspaceJoinRequest.token == token,
+            WorkspaceJoinRequest.token_hash == _hash_join_token(token),
             WorkspaceJoinRequest.status == "pending",
         )
     )).first()
+    if join_req is None:
+        join_req = (await session.exec(
+            select(WorkspaceJoinRequest).where(
+                WorkspaceJoinRequest.token == token,
+                WorkspaceJoinRequest.status == "pending",
+            )
+        )).first()
     if not join_req:
         raise HTTPException(404, "Join request not found or already resolved")
     if not ws_accessible(join_req.workspace_id, ctx):

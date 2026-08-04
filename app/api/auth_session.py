@@ -1084,8 +1084,8 @@ _VALID_USE_CASES = frozenset({
 _VALID_TEAM_SIZES = frozenset({"solo", "2-5", "6-15", "15+"})
 
 
-@router.patch("/profile")
-async def update_profile(
+@router.patch("/profile/onboarding")
+async def update_onboarding_profile(
     request: Request,
     session=Depends(get_session),
 ):

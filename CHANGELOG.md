@@ -1,5 +1,39 @@
 # Changelog — antcrew-platform
 
+## v0.6.7 (2026-08-04)
+
+### Added
+
+- **GitHub App integration** — workspace admins can install the Antcrew GitHub App and link it to a workspace. Installation is stored in the new `github_installation` table (migration 050). Three new public routes (no API key): `GET /github/callback` (post-install OAuth redirect), `POST /webhooks/github` (HMAC-SHA256-verified lifecycle events). Two protected routes: `GET /github/installations`, `DELETE /github/installations/{id}`.
+
+- **Write-back PR auto-open** — when a run with `write_back=true` has a linked GitHub App installation, the runner fetches a per-installation access token (RS256 JWT → GitHub token exchange), uses it for git authentication, and after a successful push automatically opens a pull request via `POST /repos/{owner}/{repo}/pulls`. The `pr_url` and `pr_number` are stored in `run.state["write_back_result"]` and surfaced as a clickable link in `run.html`.
+
+- **`GET /github/installations`** accepts optional `workspace_id` query parameter to filter by workspace.
+
+### Security
+
+- **`WorkspaceJoinRequest.token` no longer stored in plaintext** (`app/models/auth.py`, `app/api/invites.py`) — join-request tokens are now stored as SHA-256 hashes (`token_hash`). The raw token is generated, embedded in admin approval/rejection email links, and immediately discarded. Approve/reject endpoints look up by hash first, with a plaintext fallback for legacy rows. Migration 051 adds the `token_hash` column (nullable, unique index) and makes the legacy `token` column nullable.
+
+- **Dead endpoint eliminated** (`app/api/auth_session.py`) — the second `@router.patch("/profile")` handler (lines 1087–1128) was unreachable because FastAPI routes to the first matching path. Renamed to `@router.patch("/profile/onboarding")` so the onboarding wizard's `use_case` / `team_size` write actually reaches the handler. Frontend updated (`onboard.html`: `/auth/profile` → `/auth/profile/onboarding`).
+
+- **Rate-limiter multi-worker warning** (`app/core/startup.py`) — startup now logs a warning when `ANTCREW_WORKERS > 1` and `RATE_LIMIT_RPM > 0`, because the in-memory limiter is per-process and the effective cap is `RPM × workers`. This makes the limitation visible in production logs without changing runtime behavior.
+
+- **Workspace isolation on API-key endpoints** (`app/api/api_keys.py`, `app/api/pipeline.py`, `app/api/billing.py`, `app/api/workspaces_members.py`) — all handlers now inject `WorkspaceContext` and call `ws_accessible()` / `ws_filter()` to prevent cross-workspace data access via workspace-scoped API keys.
+
+- **Session credential storage** (`app/api/auth_session.py`) — `register()` now stores only the `token_hash` via `_create_session()` and never writes a plaintext `UserSession` row. Password-change session revocation uses primary-key comparison (`id != current_id`) instead of a NULL-unsafe token-column comparison.
+
+- **MFA secret guard** (`app/api/auth_session.py`) — `_sign_mfa_token()` raises `RuntimeError` immediately if `SECRET_KEY` is not set, preventing silent MFA bypass.
+
+- **`verify_email` race-condition fix** (`app/api/auth_session.py`) — `verification is None` check now happens before any attribute access on the verification object.
+
+### Fixed
+
+- **Lint errors in `antcrew` package** — removed unused imports (`json`, `PRD`), added missing `DiscoveryContext` import in `discover_cmd.py`, fixed import ordering (I001) in `agents/ui_design.py` and `__init__.py`.
+
+- **`test_pipeline.py`** — `mock_dispatch.assert_called_once_with(...)` assertion updated to include `write_back=False`.
+
+---
+
 ## v0.6.6 (2026-08-04)
 
 ### Added

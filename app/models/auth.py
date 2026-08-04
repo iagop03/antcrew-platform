@@ -124,7 +124,8 @@ class WorkspaceJoinRequest(SQLModel, table=True):
     __tablename__ = "workspace_join_request"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    token: str = Field(unique=True, index=True)    # for approve/reject one-click URL
+    token: Optional[str] = Field(default=None, unique=True, index=True, nullable=True)  # legacy plaintext; NULL for new rows
+    token_hash: Optional[str] = Field(default=None, unique=True, index=True, nullable=True)  # SHA-256
     workspace_id: int = Field(index=True)
     requester_email: str = Field(index=True)
     requested_role: str = Field(default="write")

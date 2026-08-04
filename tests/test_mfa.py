@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
+
+# SECRET_KEY is required by _sign_mfa_token; set a deterministic test value.
+os.environ.setdefault("SECRET_KEY", "test-mfa-secret-do-not-use-in-prod")
 
 import pytest
 import pyotp
