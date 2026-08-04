@@ -505,6 +505,14 @@
                 <template x-if="!writeBackResult.pushed && writeBackResult.push_error">
                   <div class="text-red-400 font-mono text-xs break-all" x-text="writeBackResult.push_error"></div>
                 </template>
+                <template x-if="writeBackResult.pr_url">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-gray-600 shrink-0">PR</span>
+                    <a :href="writeBackResult.pr_url" target="_blank" rel="noopener"
+                       class="text-indigo-300 hover:text-indigo-200 underline underline-offset-2 font-mono text-xs truncate"
+                       x-text="'#' + writeBackResult.pr_number + ' → GitHub'"></a>
+                  </div>
+                </template>
               </div>
             </div>
           </template>
