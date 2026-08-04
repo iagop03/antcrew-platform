@@ -14,7 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from sqlalchemy import func, select as sa_select
 
-from app.core.auth import require_api_key, require_role, get_workspace_context, WorkspaceContext, ws_accessible
+from app.core.auth import require_api_key, require_role, get_workspace_context, WorkspaceContext, ws_accessible, ws_filter
 from app.core.database import get_session
 from app.core.security import validate_external_url
 from app.models.run import Workspace, Run, HitlReview, WebhookConfig, WebhookEvent, WebhookDelivery
@@ -237,8 +237,12 @@ class WebhookConfigOut(BaseModel):
 
 
 @router.get("/", response_model=list[WorkspacePublic])
-async def list_workspaces(session: AsyncSession = Depends(get_session)):
-    result = await session.exec(select(Workspace))
+async def list_workspaces(
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    stmt = ws_filter(select(Workspace), Workspace.id, ctx)
+    result = await session.exec(stmt)
     return list(result.all())
 
 
