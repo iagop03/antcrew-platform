@@ -89,12 +89,12 @@
     '@media(max-width:767px){' +
       '#ac-sb{transform:translateX(-100%);transition:transform .22s ease,width .2s ease;}' +
       '#ac-sb.open{transform:translateX(0);}' +
-      'body{padding-left:0!important;}' +
+      'body{padding-left:0!important;padding-top:44px;}' +
       '#ac-sb-bd{display:none!important;position:fixed;inset:0;z-index:49;background:rgba(0,0,0,.55);}' +
       '#ac-sb-bd.open{display:block!important;}' +
       '#ac-sb-mbar{display:flex!important;}' +
     '}' +
-    '#ac-sb-mbar{display:none;position:sticky;top:0;z-index:40;height:44px;' +
+    '#ac-sb-mbar{display:none;position:fixed;top:0;left:0;right:0;z-index:40;height:44px;' +
       'align-items:center;gap:8px;padding:0 12px;' +
       'background:rgba(3,7,18,.96);border-bottom:1px solid rgba(31,41,55,.8);' +
       'backdrop-filter:blur(10px);}';
@@ -162,9 +162,22 @@
   hdr.innerHTML =
     '<a href="/dashboard" id="ac-sb-la" style="flex:1;display:flex;align-items:center;' +
       'gap:8px;text-decoration:none;overflow:hidden;min-width:0;">' +
-      '<img id="ac-sb-ant" src="/static/favicon.svg" alt="antcrew" ' +
-        'style="width:24px;height:24px;flex-shrink:0;display:none;' +
-        'filter:brightness(0) invert(1);">' +
+      '<span id="ac-sb-ant" style="width:24px;height:24px;flex-shrink:0;display:none;">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="24" height="24">' +
+          '<g transform="rotate(-30,50,52)">' +
+            '<ellipse cx="50" cy="72" rx="14" ry="18" fill="white"/>' +
+            '<ellipse cx="50" cy="52" rx="8" ry="7.5" fill="white"/>' +
+            '<circle cx="50" cy="37" r="10" fill="white"/>' +
+            '<line x1="45" y1="28" x2="32" y2="15" stroke="white" stroke-width="1.5" stroke-linecap="round"/>' +
+            '<line x1="55" y1="28" x2="68" y2="15" stroke="white" stroke-width="1.5" stroke-linecap="round"/>' +
+            '<polyline points="42,47 28,44 22,37" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<polyline points="42,53 26,53 20,47" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<polyline points="42,59 28,62 22,71" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<polyline points="58,47 72,44 78,37" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<polyline points="58,53 74,53 80,47" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<polyline points="58,59 72,62 78,71" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</g></svg>' +
+      '</span>' +
       '<span id="ac-sb-lt" style="font-family:monospace;font-weight:700;color:#818cf8;' +
         'font-size:.875rem;white-space:nowrap;overflow:hidden;flex:1;">antcrew</span>' +
     '</a>' +

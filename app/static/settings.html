@@ -1309,7 +1309,7 @@ function settings() {
       try {
         const r = await fetch('/auth/profile', {
           method: 'PATCH', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.getCsrfToken() },
           body: JSON.stringify({ display_name: this.profileForm.display_name }),
         });
         if (!r.ok) { const e = await r.json(); this.profileError = true; this.profileMsg = e.detail || 'Error al guardar'; return; }
@@ -1324,7 +1324,7 @@ function settings() {
       try {
         const r = await fetch('/auth/profile', {
           method: 'PATCH', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.getCsrfToken() },
           body: JSON.stringify({ current_password: this.pwForm.current, new_password: this.pwForm.newPw }),
         });
         if (!r.ok) { const e = await r.json(); this.profileError = true; this.profileMsg = e.detail || 'Error al cambiar contraseña'; return; }
