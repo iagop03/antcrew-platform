@@ -291,7 +291,8 @@ async def register(
         raise
     except Exception as exc:
         await session.rollback()
-        raise HTTPException(500, f"Registration failed: {exc}") from exc
+        log.error("register: unexpected error for email %s: %s", email, exc)
+        raise HTTPException(500, "Registration failed — please try again") from exc
 
     # Send email verification code (fire-and-forget; don't fail registration on SMTP error)
     import asyncio as _asyncio

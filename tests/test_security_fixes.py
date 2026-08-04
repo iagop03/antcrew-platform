@@ -66,18 +66,30 @@ def test_connection_enqueue_passes_own_workspace():
         deregister_run("run-ws1")
 
 
-def test_connection_enqueue_unknown_run_id_passes():
-    """Events with an unknown run_id (not in _run_workspace cache) pass through.
+def test_connection_enqueue_unknown_run_id_dropped_for_scoped_client():
+    """Events with an unknown run_id are dropped for workspace-scoped connections.
 
-    This is the conservative fallback: if a runner didn't call register_run we
-    don't drop events, which avoids silently losing legitimate output during
-    restarts or version skew.
+    Fail-closed: if a run is not in the workspace map (deregistered or unregistered),
+    workspace-scoped clients do not receive the event. Global-access connections
+    (workspace_ids=None) still receive all events.
     """
     from antcrew import Event
     from app.api.stream import _Connection
 
     ws = MagicMock()
     conn = _Connection(ws, workspace_ids=frozenset({1}))
+    event = Event("agent.start", run_id="unknown-run", thread_id="t")
+    conn.enqueue(event)
+    assert conn._queue.qsize() == 0, "unknown run_id must be dropped for scoped client"
+
+
+def test_connection_enqueue_unknown_run_id_passes_for_global_client():
+    """Global-access connections (workspace_ids=None) still receive events for unknown runs."""
+    from antcrew import Event
+    from app.api.stream import _Connection
+
+    ws = MagicMock()
+    conn = _Connection(ws, workspace_ids=None)
     event = Event("agent.start", run_id="unknown-run", thread_id="t")
     conn.enqueue(event)
     assert conn._queue.qsize() == 1

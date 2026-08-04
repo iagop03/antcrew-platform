@@ -345,7 +345,10 @@ async def github_push_webhook(
     secret = os.environ.get("GITHUB_WEBHOOK_SECRET", "")
     payload_bytes = await request.body()
 
-    if secret:
+    if not secret:
+        if os.environ.get("APP_ENV", "dev") not in ("dev", "development", "local"):
+            raise HTTPException(403, "GITHUB_WEBHOOK_SECRET is not configured — webhook rejected")
+    else:
         sig_header = request.headers.get("X-Hub-Signature-256", "")
         if not _verify_github_sig(payload_bytes, sig_header, secret):
             raise HTTPException(401, "Invalid webhook signature")

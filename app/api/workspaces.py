@@ -268,7 +268,13 @@ async def create_workspace(body: CreateWorkspace, session: AsyncSession = Depend
 
 
 @router.get("/{workspace_id}", response_model=WorkspacePublic)
-async def get_workspace(workspace_id: int, session: AsyncSession = Depends(get_session)):
+async def get_workspace(
+    workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -281,9 +287,12 @@ async def get_workspace(workspace_id: int, session: AsyncSession = Depends(get_s
 async def update_workspace_name(
     workspace_id: int,
     body: UpdateWorkspaceName,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Update a workspace's display name and optionally its slug."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -307,6 +316,7 @@ async def update_workspace_name(
 async def set_budget(
     workspace_id: int,
     body: UpdateBudget,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Set or clear the spending limit for a workspace.
@@ -314,6 +324,8 @@ async def set_budget(
     Pass ``max_cost_usd: null`` to remove the limit.
     Once the limit is reached, POST /run/ will return 422 for this workspace.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -389,6 +401,7 @@ async def workspace_spend(
 async def set_default_repo(
     workspace_id: int,
     body: UpdateDefaultRepo,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Set or clear the default repo URL for a workspace.
@@ -397,6 +410,8 @@ async def set_default_repo(
     clone this repository and inject its contents as context.
     Pass ``default_repo_url: null`` to clear the default.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -413,6 +428,7 @@ async def set_default_repo(
 async def set_ticket_config(
     workspace_id: int,
     body: UpdateTicketConfig,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Set the ticket ID prefix for this workspace (e.g. 'PROJ' → PROJ-00001).
@@ -420,6 +436,8 @@ async def set_ticket_config(
     The prefix applies to all new tickets created in the workspace. Changing it
     does not renumber existing tickets.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -436,6 +454,7 @@ async def set_ticket_config(
 async def set_hitl_default(
     workspace_id: int,
     body: UpdateHitlDefault,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Enable or disable HITL by default for all runs in this workspace.
@@ -443,6 +462,8 @@ async def set_hitl_default(
     When ``hitl_default: true``, POST /run/ requests that don't explicitly set
     ``hitl: false`` will automatically pause for human review at every agent.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -459,6 +480,7 @@ async def set_hitl_default(
 async def set_hitl_timeout(
     workspace_id: int,
     body: UpdateHitlTimeout,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Set or clear the per-workspace HITL review timeout.
@@ -466,6 +488,8 @@ async def set_hitl_timeout(
     When set, overrides the global ``HITL_TIMEOUT_S`` env var for all runs in
     this workspace. Pass ``hitl_timeout_s: null`` to fall back to the global default.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -484,6 +508,7 @@ async def workspace_reviews(
     workspace_id: int,
     status: str = Query("pending", description="Filter by status"),
     limit: int = Query(50, le=200),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """List HITL reviews for all runs in a workspace.
@@ -491,6 +516,8 @@ async def workspace_reviews(
     Useful for reviewer dashboards that need pending reviews across all runs
     in a workspace without knowing individual run IDs.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     if not result.first():
         raise WorkspaceNotFoundError(workspace_id)
@@ -512,6 +539,7 @@ async def workspace_reviews(
 async def set_slack_webhook(
     workspace_id: int,
     body: UpdateSlack,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Set or clear the per-workspace Slack webhook URL for HITL notifications.
@@ -519,6 +547,8 @@ async def set_slack_webhook(
     When set, HITL review notifications are sent to this URL (Slack incoming webhook format)
     instead of the global HITL_WEBHOOK_URL env var. Pass ``slack_webhook_url: null`` to clear.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -572,6 +602,7 @@ async def _hooks_with_events(
 async def set_slack_tokens(
     workspace_id: int,
     body: UpdateSlackTokens,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Store per-workspace Slack bot and (optionally) app tokens, encrypted at rest.
@@ -585,6 +616,8 @@ async def set_slack_tokens(
     These tokens override the global SLACK_BOT_TOKEN / SLACK_APP_TOKEN env vars
     for HITL notifications sent to this workspace's Slack channel.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -606,9 +639,12 @@ async def set_slack_tokens(
                dependencies=[Depends(require_role("admin"))])
 async def clear_slack_tokens(
     workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     """Remove per-workspace Slack tokens, reverting to global env-var tokens."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:
@@ -674,9 +710,12 @@ async def test_slack(
 @router.get("/{workspace_id}/webhooks", response_model=list[WebhookConfigOut])
 async def list_webhook_configs(
     workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """List registered webhooks for a workspace, including their subscribed event types."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     if not result.first():
         raise WorkspaceNotFoundError(workspace_id)
@@ -688,6 +727,7 @@ async def list_webhook_configs(
 async def create_webhook_config(
     workspace_id: int,
     body: CreateWebhookConfig,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Register a webhook URL for a workspace.
@@ -696,6 +736,8 @@ async def create_webhook_config(
     Each registered URL receives a ``WebhookDelivery`` row and is retried up to 5 times
     on failure with exponential backoff.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     if not result.first():
         raise WorkspaceNotFoundError(workspace_id)
@@ -726,9 +768,12 @@ async def create_webhook_config(
 async def delete_webhook_config(
     workspace_id: int,
     webhook_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Remove a registered webhook and its event subscriptions."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(
         select(WebhookConfig)
         .where(WebhookConfig.id == webhook_id)
@@ -753,9 +798,12 @@ async def delete_webhook_config(
 async def toggle_webhook_config(
     workspace_id: int,
     webhook_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Flip enabled/disabled on a webhook without deleting it."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(
         select(WebhookConfig)
         .where(WebhookConfig.id == webhook_id)
@@ -801,9 +849,12 @@ async def list_webhook_deliveries(
     workspace_id: int,
     webhook_id: Optional[int] = Query(None, description="Filter to a specific webhook"),
     limit: int = Query(50, le=200),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ):
     """Return recent webhook delivery attempts for this workspace."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     # Get the URLs of webhooks in this workspace (deliveries joined by URL)
     hook_query = select(WebhookConfig.url).where(WebhookConfig.workspace_id == workspace_id)
     if webhook_id is not None:
@@ -824,7 +875,13 @@ async def list_webhook_deliveries(
 
 @router.delete("/{workspace_id}", status_code=204,
                dependencies=[Depends(require_role("admin"))])
-async def delete_workspace(workspace_id: int, session: AsyncSession = Depends(get_session)):
+async def delete_workspace(
+    workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
     ws = result.first()
     if not ws:

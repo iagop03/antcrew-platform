@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import WorkspaceContext, require_api_key, require_role, ws_accessible
+from app.core.auth import WorkspaceContext, get_workspace_context, require_api_key, require_role, ws_accessible, ws_filter
 from app.core.database import get_session
 from app.models.run import CustomAgentDef, PipelineDef
 
@@ -248,11 +248,12 @@ async def list_agent_types() -> list[dict]:
 
 @router.get("/conditions")
 async def list_known_conditions(
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> list[str]:
     """Return condition strings for autocomplete: built-in templates + user pipelines."""
     conditions: set[str] = set(_KNOWN_CONDITIONS)
-    rows = (await session.exec(select(PipelineDef))).all()
+    rows = (await session.exec(ws_filter(select(PipelineDef), PipelineDef.workspace_id, ctx))).all()
     for row in rows:
         try:
             defn = json.loads(row.definition) if isinstance(row.definition, str) else row.definition
@@ -268,6 +269,7 @@ async def list_known_conditions(
 @router.get("/", response_model=list[PipelineOut])
 async def list_pipelines(
     workspace_id: Optional[int] = None,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> list[PipelineOut]:
     """Return static templates + user pipelines for the given workspace."""
@@ -275,7 +277,11 @@ async def list_pipelines(
 
     q = select(PipelineDef)
     if workspace_id is not None:
+        if not ws_accessible(workspace_id, ctx):
+            raise HTTPException(403, "This workspace is not accessible with the current API key")
         q = q.where(PipelineDef.workspace_id == workspace_id)
+    else:
+        q = ws_filter(q, PipelineDef.workspace_id, ctx)
     rows = (await session.exec(q)).all()
     results += [_row_to_out(r) for r in rows]
     return results
@@ -284,6 +290,7 @@ async def list_pipelines(
 @router.get("/{pipeline_id}", response_model=PipelineOut)
 async def get_pipeline(
     pipeline_id: str,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> PipelineOut:
     if isinstance(pipeline_id, str) and pipeline_id.startswith("template:"):
@@ -298,6 +305,8 @@ async def get_pipeline(
     row = await session.get(PipelineDef, pid)
     if not row:
         raise HTTPException(404, "Pipeline not found")
+    if not ws_accessible(row.workspace_id, ctx):
+        raise HTTPException(404, "Pipeline not found")  # mask existence
     return _row_to_out(row)
 
 
@@ -305,8 +314,11 @@ async def get_pipeline(
              dependencies=[Depends(require_role("admin"))])
 async def create_pipeline(
     body: PipelineCreate,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> PipelineOut:
+    if body.workspace_id is not None and not ws_accessible(body.workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
     row = PipelineDef(
         workspace_id=body.workspace_id,
         name=body.name,
@@ -325,11 +337,14 @@ async def create_pipeline(
 async def update_pipeline(
     pipeline_id: int,
     body: PipelineUpdate,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> PipelineOut:
     row = await session.get(PipelineDef, pipeline_id)
     if not row:
         raise HTTPException(404, "Pipeline not found")
+    if not ws_accessible(row.workspace_id, ctx):
+        raise HTTPException(404, "Pipeline not found")  # mask existence
     if row.is_template:
         raise HTTPException(400, "Cannot modify a built-in template")
     if body.name is not None:
@@ -348,11 +363,14 @@ async def update_pipeline(
                dependencies=[Depends(require_role("admin"))])
 async def delete_pipeline(
     pipeline_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     row = await session.get(PipelineDef, pipeline_id)
     if not row:
         raise HTTPException(404, "Pipeline not found")
+    if not ws_accessible(row.workspace_id, ctx):
+        raise HTTPException(404, "Pipeline not found")  # mask existence
     if row.is_template:
         raise HTTPException(400, "Cannot delete a built-in template")
     await session.delete(row)

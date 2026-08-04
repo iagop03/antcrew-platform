@@ -50,7 +50,9 @@ class _Connection:
         # Workspace isolation: drop events from runs outside this connection's workspaces.
         if self.workspace_ids is not None and event.run_id:
             ws_id = _run_workspace.get(event.run_id)
-            if ws_id is not None and ws_id not in self.workspace_ids:
+            # Fail-closed: if run is not in the workspace map (deregistered or unknown),
+            # don't broadcast to workspace-scoped clients.
+            if ws_id is None or ws_id not in self.workspace_ids:
                 return
         try:
             self._queue.put_nowait(event)
