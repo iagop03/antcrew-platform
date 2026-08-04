@@ -477,6 +477,37 @@
             </a>
           </div>
 
+          <!-- Write-back result -->
+          <template x-if="writeBackResult">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-2">
+              <div class="flex items-center gap-2 mb-1">
+                <svg class="w-4 h-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"/>
+                </svg>
+                <h4 class="text-sm font-medium text-gray-300">Write-back</h4>
+                <span class="ml-auto text-xs px-1.5 py-0.5 rounded font-medium"
+                  :class="writeBackResult.pushed
+                    ? 'bg-green-900/50 text-green-300'
+                    : 'bg-red-900/50 text-red-300'"
+                  x-text="writeBackResult.pushed ? 'pushed' : 'push failed'"></span>
+              </div>
+              <div class="text-xs text-gray-400 space-y-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-gray-600 shrink-0">Branch</span>
+                  <code class="font-mono text-indigo-300 truncate" x-text="writeBackResult.branch"></code>
+                </div>
+                <div class="flex items-start gap-1.5">
+                  <span class="text-gray-600 shrink-0">Diff</span>
+                  <pre class="font-mono text-gray-300 whitespace-pre-wrap break-all leading-tight"
+                       x-text="writeBackResult.diff_summary"></pre>
+                </div>
+                <template x-if="!writeBackResult.pushed && writeBackResult.push_error">
+                  <div class="text-red-400 font-mono text-xs break-all" x-text="writeBackResult.push_error"></div>
+                </template>
+              </div>
+            </div>
+          </template>
+
           <!-- State JSON -->
           <div x-show="stateJson">
             <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">State</h2>
@@ -535,6 +566,7 @@ function runDetail() {
     activeTab: 'events',
     activity: [],
     loadingActivity: false,
+    writeBackResult: null,
 
     async init() {
       const match = location.pathname.match(/^\/run\/(.+?)\/?$/);
@@ -618,6 +650,9 @@ function runDetail() {
           this.engineOutputDir = state.output_dir || '';
         } else {
           this.stateJson = JSON.stringify(state, null, 2);
+        }
+        if (state && state.write_back_result) {
+          this.writeBackResult = state.write_back_result;
         }
       } catch {}
     },

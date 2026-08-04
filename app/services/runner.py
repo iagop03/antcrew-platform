@@ -346,6 +346,82 @@ async def _store_result(result) -> None:
 
 
 
+async def _do_write_back(result, repo_dir: Path, run_id: str, repo_url: str) -> None:
+    """Write artifacts to the cloned repo and push to a new branch."""
+    import subprocess
+    from antcrew.core.writeback import write_back as _wb
+
+    # 1. Write artifacts to disk
+    _wb(result, repo_dir, yes=True, print_fn=lambda m: log.info("writeback: %s", m))
+
+    # 2. Check if there are any changes
+    diff_proc = subprocess.run(
+        ["git", "-C", str(repo_dir), "diff", "--stat", "HEAD"],
+        capture_output=True, text=True, timeout=30
+    )
+    diff_summary = diff_proc.stdout.strip()
+    if not diff_summary:
+        log.info("runner: write-back: no changes detected for run %s", run_id)
+        shutil.rmtree(repo_dir, ignore_errors=True)
+        return
+
+    # 3. Create branch antcrew/wb-{run_id[:8]}
+    branch = f"antcrew/wb-{run_id[:8]}"
+    subprocess.run(
+        ["git", "-C", str(repo_dir), "checkout", "-b", branch],
+        capture_output=True, timeout=30
+    )
+
+    # 4. Commit changes
+    request_text = ""
+    if isinstance(result, dict):
+        request_text = (result.get("request") or "")[:60]
+    elif hasattr(result, "state"):
+        request_text = (result.state.get("request") or "")[:60]
+
+    subprocess.run(["git", "-C", str(repo_dir), "add", "-A"], capture_output=True, timeout=30)
+    subprocess.run(
+        ["git", "-C", str(repo_dir), "commit",
+         "-m", f"antcrew: {request_text or 'AI-generated changes'}\n\nRun: {run_id}"],
+        capture_output=True, timeout=30
+    )
+
+    # 5. Push branch
+    push_proc = subprocess.run(
+        ["git", "-C", str(repo_dir), "push", "origin", branch],
+        capture_output=True, text=True, timeout=60
+    )
+
+    pushed_ok = push_proc.returncode == 0
+
+    # 6. Store write-back result in run state
+    try:
+        from sqlmodel import select as _sel
+        from app.models.run import Run
+        async with AsyncSession(engine, expire_on_commit=False) as _sess:
+            _run = (await _sess.exec(_sel(Run).where(Run.run_id == run_id))).first()
+            if _run and _run.state:
+                wb_result = {
+                    "branch": branch,
+                    "diff_summary": diff_summary,
+                    "pushed": pushed_ok,
+                    "push_error": push_proc.stderr[:200] if not pushed_ok else None,
+                }
+                _run.state = {**(_run.state or {}), "write_back_result": wb_result}
+                _sess.add(_run)
+                await _sess.commit()
+    except Exception as exc:
+        log.warning("runner: could not store write-back result: %s", exc)
+
+    log.info(
+        "runner: write-back for run %s — branch=%s pushed=%s",
+        run_id, branch, pushed_ok
+    )
+
+    # 7. Clean up
+    shutil.rmtree(repo_dir, ignore_errors=True)
+
+
 async def dispatch(
     team_name: str,
     request: str,
@@ -359,6 +435,7 @@ async def dispatch(
     repo_url: Optional[str] = None,
     repo_token: Optional[str] = None,
     client_label: Optional[str] = None,
+    write_back: bool = False,
 ) -> Optional[str]:
     """Start a team run in the background. Returns run_id once pipeline.start fires.
 
@@ -369,6 +446,11 @@ async def dispatch(
     prepended to the request so agents have codebase context. repo_token can be
     a GitHub/GitLab personal access token for private repos (injected into the
     HTTPS URL — never stored or logged).
+
+    write_back=True writes generated artifacts back to the cloned repo on a new
+    branch (antcrew/wb-<run_id[:8]>) and pushes it to origin. Only applies when
+    repo_url is also set. The temp clone dir is deleted after the push (or on
+    error); without write_back it is deleted immediately after the run.
     """
     if workspace_id is not None:
         async with _get_budget_lock(workspace_id):
@@ -422,13 +504,25 @@ async def dispatch(
             await _store_result(result)
             if workspace_id is not None:
                 await _mark_workspace_budget_status(workspace_id)
+            if write_back and _tmp_repo_dir is not None:
+                _run_id = run_id_future.result() if run_id_future.done() else ""
+                if not _run_id:
+                    if isinstance(result, dict):
+                        _run_id = result.get("_run_id") or ""
+                    elif hasattr(result, "state"):
+                        _run_id = (result.state or {}).get("_run_id") or ""
+                try:
+                    await _do_write_back(result, _tmp_repo_dir, _run_id, repo_url or "")
+                except Exception as exc:
+                    log.error("runner: write-back failed for run %s: %s", _run_id, exc)
+                    shutil.rmtree(_tmp_repo_dir, ignore_errors=True)
         except Exception as exc:
             log.error("runner: %s failed: %s", team_name, exc)
             if not run_id_future.done():
                 loop.call_soon_threadsafe(run_id_future.set_result, None)
         finally:
             bus.unsubscribe("pipeline.start", _on_pipeline_start)
-            if _tmp_repo_dir is not None:
+            if _tmp_repo_dir is not None and not write_back:
                 shutil.rmtree(_tmp_repo_dir, ignore_errors=True)
             if workspace_id is not None:
                 try:

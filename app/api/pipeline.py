@@ -29,6 +29,7 @@ class RunRequest(BaseModel):
     repo_url: Optional[str] = None  # public or private git repo to inject as context
     repo_token: Optional[str] = None  # PAT for private HTTPS repos (never stored)
     client_label: Optional[str] = None  # cost-center / client tag for spend breakdown
+    write_back: bool = False  # if True, write artifacts back to repo branch after run
 
     @field_validator("team")
     @classmethod
@@ -112,6 +113,7 @@ async def trigger_run(
             repo_url=effective_repo_url,
             repo_token=body.repo_token,
             client_label=body.client_label,
+            write_back=body.write_back,
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc))
