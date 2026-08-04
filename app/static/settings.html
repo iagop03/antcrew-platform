@@ -483,6 +483,67 @@ export ANTCREW_API_KEY="<span class="text-amber-400">acw_...</span>"  <span clas
             </template>
           </div>
         </div>
+
+        <!-- ── Modelo por defecto ─────────────────────────────────────────── -->
+        <div class="border-t border-gray-800 pt-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-medium text-gray-300">Modelo por defecto</h3>
+              <p class="text-xs text-gray-600 mt-0.5">Modelo que usan los pipelines de este workspace cuando no se especifica otro en el run.</p>
+            </div>
+            <button @click="saveAgentModels()"
+              class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-md transition-colors">
+              Guardar
+            </button>
+          </div>
+
+          <!-- Default model row -->
+          <div class="flex items-center gap-3 p-3 bg-gray-900/40 rounded-lg border border-gray-800 mb-3">
+            <span class="font-mono text-xs text-gray-500 w-36 shrink-0">default (todos)</span>
+            <select x-model="agentModelsDefault"
+              class="flex-1 bg-gray-900 border border-gray-800 rounded-md px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-indigo-500">
+              <template x-for="opt in modelOptions" :key="opt.value">
+                <option :value="opt.value" x-text="opt.label"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- Per-agent overrides -->
+          <div x-show="agentModelRows.length > 0" class="rounded-lg border border-gray-800 overflow-hidden mb-3">
+            <template x-for="(row, idx) in agentModelRows" :key="idx">
+              <div class="flex items-center gap-2 px-3 py-2 border-b border-gray-800/40 last:border-0">
+                <input x-model="row.agent" placeholder="BackendDevAgent"
+                  class="font-mono text-xs bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-gray-300 w-44 focus:outline-none focus:border-indigo-500" />
+                <span class="text-gray-700 shrink-0">→</span>
+                <select x-model="row.model"
+                  class="flex-1 bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500">
+                  <template x-for="opt in modelOptions.filter(o => o.value)" :key="opt.value">
+                    <option :value="opt.value" x-text="opt.label"></option>
+                  </template>
+                </select>
+                <button @click="agentModelRows.splice(idx,1)"
+                  class="text-gray-700 hover:text-red-400 px-2 py-1 rounded hover:bg-gray-800 transition-colors shrink-0 text-sm">✕</button>
+              </div>
+            </template>
+          </div>
+
+          <button @click="agentModelRows.push({agent:'',model:'deepseek:deepseek-chat'})"
+            class="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-400 transition-colors mb-2">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Añadir override por agente
+          </button>
+
+          <p x-show="agentModelsDefault || agentModelRows.length" class="text-xs text-gray-700 mt-1">
+            Precedencia: <span class="text-indigo-400 font-mono">run.model</span> &gt;
+            <span class="text-indigo-400 font-mono">run.model_overrides[agente]</span> &gt;
+            <span class="text-indigo-400 font-mono">workspace[agente]</span> &gt;
+            <span class="text-indigo-400 font-mono">workspace[default]</span> &gt; claude
+          </p>
+          <p x-show="agentModelsMsg" class="text-xs mt-2"
+            :class="agentModelsMsg.startsWith('Error') ? 'text-red-400' : 'text-emerald-400'"
+            x-text="agentModelsMsg"></p>
+        </div>
+
       </div>
     </div>
   </div>
@@ -1250,6 +1311,23 @@ function settings() {
     proxyConfigured: false, proxyUrl: '', proxyUrlInput: '', proxyToken: '', proxyDockerCmd: '',
     addKeyForm: { provider: 'anthropic', api_key: '', base_url: '', confirm_overwrite: false },
     matrixData: [], matrixRows: [], matrixLoading: false,
+    agentModelsDefault: '', agentModelRows: [], agentModelsMsg: '',
+    modelOptions: [
+      { value: '', label: '— default de plataforma (claude) —' },
+      { value: 'claude:claude-sonnet-5', label: 'Claude Sonnet 5' },
+      { value: 'claude:claude-opus-5', label: 'Claude Opus 5' },
+      { value: 'claude:claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+      { value: 'gpt-4o', label: 'OpenAI GPT-4o' },
+      { value: 'o3-mini', label: 'OpenAI o3-mini' },
+      { value: 'deepseek:deepseek-chat', label: 'DeepSeek Chat' },
+      { value: 'deepseek:deepseek-reasoner', label: 'DeepSeek Reasoner' },
+      { value: 'groq:llama-3.3-70b-versatile', label: 'Groq Llama 3.3 70B' },
+      { value: 'groq:mixtral-8x7b-32768', label: 'Groq Mixtral 8x7B' },
+      { value: 'gemini:gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+      { value: 'mistral:mistral-large-latest', label: 'Mistral Large' },
+      { value: 'xai:grok-2', label: 'xAI Grok-2' },
+      { value: 'simulated', label: 'Simulated (testing)' },
+    ],
 
     // Schedules
     schedules: [], schedulesLoading: false, schedulesError: '',
@@ -1598,6 +1676,11 @@ function settings() {
         const ws = this.workspaces.find(w => w.id == this.llmWsId);
         this.llmMode = ws?.llm_key_mode || 'managed';
         this.byokManagedFallback = ws?.byok_managed_fallback || false;
+        const agentModels = ws?.agent_models || {};
+        this.agentModelsDefault = agentModels['default'] || '';
+        this.agentModelRows = Object.entries(agentModels)
+          .filter(([k]) => k !== 'default')
+          .map(([agent, model]) => ({ agent, model }));
         const r = await fetch(`/workspaces/${this.llmWsId}/llm-keys`, { headers: this.apiHeaders() });
         if (!r.ok) throw new Error(await r.text());
         this.llmKeys = await r.json();
@@ -1630,6 +1713,26 @@ function settings() {
         if (!r.ok) { const e = await r.json(); this.llmError = e.detail || 'Error al guardar'; }
         else await this.loadWorkspaces();
       } catch(e) { this.llmError = e.message; }
+    },
+
+    async saveAgentModels() {
+      this.agentModelsMsg = '';
+      const map = {};
+      if (this.agentModelsDefault) map['default'] = this.agentModelsDefault;
+      for (const row of this.agentModelRows) {
+        if (row.agent.trim() && row.model.trim()) map[row.agent.trim()] = row.model.trim();
+      }
+      try {
+        const r = await fetch(`/workspaces/${this.llmWsId}/agent-models`, {
+          method: 'PATCH',
+          headers: this.apiHeaders(),
+          body: JSON.stringify({ agent_models: Object.keys(map).length ? map : null }),
+        });
+        if (!r.ok) { const e = await r.json(); this.agentModelsMsg = `Error: ${e.detail || r.statusText}`; return; }
+        await this.loadWorkspaces();
+        this.agentModelsMsg = 'Guardado';
+        setTimeout(() => { this.agentModelsMsg = ''; }, 3000);
+      } catch(e) { this.agentModelsMsg = `Error: ${e.message}`; }
     },
 
     /* ── Proxy mode ── */

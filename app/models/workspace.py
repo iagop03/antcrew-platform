@@ -45,6 +45,9 @@ class Workspace(SQLModel, table=True):
     owner_user_id: Optional[int] = Field(default=None, index=True)  # user.id of the registering user
     ticket_prefix: str = Field(default="TKT")   # e.g. "PROJ" → ticket display IDs are PROJ-00001
     ticket_counter: int = Field(default=0)       # incremented atomically on each new ticket
+    # Per-agent model defaults: {"default": "deepseek:deepseek-chat", "BackendDevAgent": "claude:claude-sonnet-5"}
+    # "default" key applies to any agent not explicitly listed; overridden by run-level model_overrides.
+    agent_models: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=_utcnow)
 
 

@@ -30,6 +30,8 @@ class RunRequest(BaseModel):
     repo_token: Optional[str] = None  # PAT for private HTTPS repos (never stored)
     client_label: Optional[str] = None  # cost-center / client tag for spend breakdown
     write_back: bool = False  # if True, write artifacts back to repo branch after run
+    model: Optional[str] = None  # override default model for the whole run (e.g. "groq:llama-3.3-70b")
+    model_overrides: Optional[dict] = None  # per-agent overrides: {"BackendDevAgent": "claude:claude-sonnet-5"}
 
     @field_validator("team")
     @classmethod
@@ -114,6 +116,8 @@ async def trigger_run(
             repo_token=body.repo_token,
             client_label=body.client_label,
             write_back=body.write_back,
+            model=body.model or "",
+            model_overrides=body.model_overrides,
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc))

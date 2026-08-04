@@ -258,14 +258,36 @@ def _run_sync(
     byok_api_key: Optional[str] = None,
     byok_base_url: Optional[str] = None,
     model: str = "",
+    agent_llm_configs: Optional[dict] = None,
 ):
     """Run a team synchronously in the executor thread.
 
     When force_hitl=True all agents get the platform channel and run_interactive is used.
     Otherwise only agents already marked approval_required=True get the channel.
+
+    agent_llm_configs: {AgentClassName: (model, api_key, base_url)} for per-agent LLM overrides.
     """
     team = _make_team(team_name, max_cost_usd=max_cost_usd, model=model, byok_api_key=byok_api_key, byok_base_url=byok_base_url)
     all_agents = list(getattr(team, "_agents", {}).values())
+
+    if agent_llm_configs:
+        from antcrew import build_llm as _build_llm
+        for _agent in all_agents:
+            _atype = type(_agent).__name__
+            if _atype in agent_llm_configs:
+                _amodel, _akey, _aurl = agent_llm_configs[_atype]
+                _kw: dict = {}
+                if _akey is not None:
+                    _kw["api_key"] = _akey
+                if _aurl is not None:
+                    _kw["base_url"] = _aurl
+                try:
+                    _new_llm = _build_llm(_amodel, **_kw)
+                    if max_cost_usd is not None:
+                        _new_llm.max_cost_usd = max_cost_usd
+                    _agent.llm = _new_llm
+                except Exception as _e:
+                    log.warning("runner: LLM override for %s failed: %s", _atype, _e)
 
     if force_hitl:
         # Force HITL on all agents regardless of their approval_required flag
@@ -290,6 +312,7 @@ async def _set_run_attribution(
     created_by: Optional[str],
     workspace_id: Optional[int],
     client_label: Optional[str] = None,
+    model_overrides: Optional[dict] = None,
 ) -> None:
     from sqlmodel import select
     from app.models.run import Run
@@ -304,6 +327,8 @@ async def _set_run_attribution(
                     run.workspace_id = workspace_id
                 if client_label is not None:
                     run.client_label = client_label
+                if model_overrides:
+                    run.model_overrides = model_overrides
                 session.add(run)
                 await session.commit()
     except Exception as exc:
@@ -468,6 +493,7 @@ async def dispatch(
     thread_id: str = "default",
     *,
     model: str = "",
+    model_overrides: Optional[dict] = None,
     max_cost_usd: Optional[float] = None,
     created_by: Optional[str] = None,
     workspace_id: Optional[int] = None,
@@ -501,6 +527,7 @@ async def dispatch(
     _byok_api_key: Optional[str] = None
     _byok_base_url: Optional[str] = None
     _github_installation_id: Optional[int] = None
+    _agent_llm_configs: dict = {}
     if workspace_id is not None:
         from sqlmodel import select as _sel
         from app.models.run import Workspace as _WS
@@ -509,8 +536,22 @@ async def dispatch(
             if _ws:
                 if _ws.hitl_timeout_s is not None:
                     _hitl_timeout = _ws.hitl_timeout_s
+                # Resolve effective model: run-level > workspace agent_models default > "claude"
+                _ws_agent_models = getattr(_ws, "agent_models", None) or {}
+                if not model:
+                    model = _ws_agent_models.get("default", "") or ""
                 from app.services.runner_base import resolve_workspace_llm_config
                 _byok_api_key, _byok_base_url = await resolve_workspace_llm_config(_sess, _ws, model or "claude")
+                # Resolve per-agent overrides: workspace non-default entries + run-level overrides
+                _effective_agent_overrides: dict = {
+                    k: v for k, v in _ws_agent_models.items() if k != "default" and v
+                }
+                for _k, _v in (model_overrides or {}).items():
+                    if _v:
+                        _effective_agent_overrides[_k] = _v
+                for _agent_name, _agent_model in _effective_agent_overrides.items():
+                    _akey, _aurl = await resolve_workspace_llm_config(_sess, _ws, _agent_model)
+                    _agent_llm_configs[_agent_name] = (_agent_model, _akey, _aurl)
             # Look up GitHub App installation for this workspace (used by write-back)
             if write_back and repo_url:
                 try:
@@ -563,6 +604,7 @@ async def dispatch(
             fn = functools.partial(
                 _run_sync, team_name, effective_request, thread_id,
                 max_cost_usd, platform_channel, force_hitl, _byok_api_key, _byok_base_url, model,
+                _agent_llm_configs or None,
             )
             result = await loop.run_in_executor(_executor, fn)
             await _store_result(result)
@@ -607,7 +649,7 @@ async def dispatch(
         if (created_by or workspace_id is not None) and run_id:
             # Await attribution before returning so workspace_id is set before the
             # 202 response reaches the client — eliminates the race on GET /runs/.
-            await _set_run_attribution(run_id, created_by, workspace_id, client_label)
+            await _set_run_attribution(run_id, created_by, workspace_id, client_label, model_overrides)
         if run_id and workspace_id is not None:
             from app.api.stream import register_run as _register_run
             _register_run(run_id, workspace_id)

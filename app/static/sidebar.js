@@ -20,8 +20,6 @@
     { group: 'Observar' },
     { label: 'Evals',    href: '/evals',    icon: 'ti-chart-bar', ac: '/evals',    i18n: 'nav.evals' },
     { label: 'Webhooks', href: '/webhooks', icon: 'ti-webhook',   ac: '/webhooks', i18n: 'nav.webhooks' },
-    { divider: true },
-    { label: 'Docs', href: 'https://docs.antcrew.org', icon: 'ti-book-2', external: true },
     { group: 'Configurar', collapsible: true },
     { label: 'LLM / BYOK', href: '/settings?tab=llm',       icon: 'ti-robot',        ac: '/settings', acTab: 'llm',       cfg: true },
     { label: 'Schedules',  href: '/settings?tab=schedules',  icon: 'ti-calendar',     ac: '/settings', acTab: 'schedules', cfg: true },
@@ -86,6 +84,10 @@
       'max-height:40px;box-sizing:border-box;}' +
     '#ac-cfg-tog:hover{color:rgba(107,114,128,.9);}' +
     '.ac-sb-div{height:1px;background:rgba(31,41,55,.6);margin:6px 12px;}' +
+    '#ac-sb.ac-collapsed .ac-sbi{justify-content:center;padding:6px;gap:0;}' +
+    '#ac-sb.ac-collapsed .ac-sbi.on{padding:6px;padding-left:6px;box-shadow:none;}' +
+    '#ac-sb.ac-collapsed #ac-sb-u{justify-content:center;}' +
+    '#ac-sb.ac-collapsed #ac-sb-tut-btn{width:auto;}' +
     '@media(max-width:767px){' +
       '#ac-sb{transform:translateX(-100%);transition:transform .22s ease,width .2s ease;}' +
       '#ac-sb.open{transform:translateX(0);}' +
@@ -200,6 +202,17 @@
   foot.id = 'ac-sb-foot';
   foot.style.cssText = 'flex-shrink:0;border-top:1px solid rgba(31,41,55,.5);padding:6px;';
   foot.innerHTML =
+    '<a href="https://docs.antcrew.org" target="_blank" rel="noopener" class="ac-sbi">' +
+      '<i class="ti ti-book-2 ac-sbi-ic"></i>' +
+      '<span class="ac-sbl">Docs</span>' +
+      '<i class="ti ti-external-link ac-sbl" style="font-size:9px;margin-left:auto;flex-shrink:0;opacity:.5;"></i>' +
+    '</a>' +
+    '<button id="ac-sb-tut-btn" class="ac-sbi" ' +
+      'style="width:calc(100% - 16px);background:none;border:none;text-align:left;cursor:pointer;color:rgb(107,114,128);">' +
+      '<i class="ti ti-sparkles ac-sbi-ic"></i>' +
+      '<span class="ac-sbl">Tutorial</span>' +
+    '</button>' +
+    '<div style="height:1px;background:rgba(31,41,55,.5);margin:4px 8px 2px;"></div>' +
     '<div id="ac-sb-u" style="display:flex;align-items:center;gap:8px;padding:5px 6px;' +
       'border-radius:6px;cursor:pointer;overflow:hidden;" title="Account">' +
       '<div id="ac-sb-av" style="width:26px;height:26px;border-radius:50%;background:#4338ca;' +
@@ -240,6 +253,18 @@
   sb.appendChild(foot);
 
   document.body.insertBefore(sb, document.body.firstChild);
+
+  // Tutorial button — lazy-loads tutorial-modal.js on first click
+  var tutBtnEl = document.getElementById('ac-sb-tut-btn');
+  if (tutBtnEl) {
+    tutBtnEl.addEventListener('click', function () {
+      if (window.acTutorial) { window.acTutorial.open(); return; }
+      var s = document.createElement('script');
+      s.src = '/static/tutorial-modal.js';
+      s.onload = function () { window.acTutorial && window.acTutorial.open(); };
+      document.head.appendChild(s);
+    });
+  }
   document.body.style.paddingLeft = w0 + 'px';
 
   // Mobile bar
@@ -292,6 +317,7 @@
     localStorage.setItem(SK, c ? '1' : '0');
     sb.style.width = (c ? COL : EXP) + 'px';
     document.body.style.paddingLeft = (c ? COL : EXP) + 'px';
+    sb.classList.toggle('ac-collapsed', c);
 
     // Header: show ant SVG when collapsed, antcrew text when expanded
     var hdrEl = document.getElementById('ac-sb-hdr');

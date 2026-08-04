@@ -187,6 +187,7 @@ class WorkspacePublic(BaseModel):
     is_trial: bool = True
     byok_providers: list[str] = []
     ticket_prefix: str = "TKT"
+    agent_models: Optional[dict] = None
     created_at: datetime
 
     @model_validator(mode="before")
@@ -218,6 +219,7 @@ class WorkspacePublic(BaseModel):
                 "is_trial": getattr(data, "is_trial", True),
                 "byok_providers": getattr(data, "_byok_providers", []),
                 "ticket_prefix": getattr(data, "ticket_prefix", "TKT"),
+                "agent_models": getattr(data, "agent_models", None),
                 "created_at": data.created_at,
             }
         return data
@@ -497,6 +499,43 @@ async def set_hitl_timeout(
     if body.hitl_timeout_s is not None and body.hitl_timeout_s <= 0:
         raise HTTPException(422, "hitl_timeout_s must be positive")
     ws.hitl_timeout_s = body.hitl_timeout_s
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+    return ws
+
+
+class UpdateAgentModels(BaseModel):
+    """Map of agent-name → model string for workspace-level LLM defaults.
+
+    Use the key "default" to set the fallback model for all agents not explicitly listed.
+    Example: {"default": "deepseek:deepseek-chat", "BackendDevAgent": "claude:claude-sonnet-5"}
+    Set to null to clear all overrides and fall back to the global platform default.
+    """
+    agent_models: Optional[dict] = None
+
+
+@router.patch("/{workspace_id}/agent-models", response_model=WorkspacePublic,
+              dependencies=[Depends(require_role("admin"))])
+async def set_agent_models(
+    workspace_id: int,
+    body: UpdateAgentModels,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    """Set per-agent model defaults for a workspace.
+
+    Precedence at run time: run.model_overrides[agent] > workspace.agent_models[agent]
+    > workspace.agent_models["default"] > platform default ("claude").
+    Pass ``agent_models: null`` to clear all workspace-level overrides.
+    """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "This workspace is not accessible with the current API key")
+    result = await session.exec(select(Workspace).where(Workspace.id == workspace_id))
+    ws = result.first()
+    if not ws:
+        raise WorkspaceNotFoundError(workspace_id)
+    ws.agent_models = body.agent_models
     session.add(ws)
     await session.commit()
     await session.refresh(ws)
