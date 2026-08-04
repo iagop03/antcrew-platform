@@ -135,45 +135,110 @@
   </template>
 
   <div class="grid grid-cols-3 gap-6">
-    <!-- Events timeline -->
+    <!-- Events / Activity tabbed panel -->
     <div class="col-span-2">
-      <h2 class="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
-        Event Timeline
-        <span class="text-gray-600 normal-case font-normal" x-text="'(' + events.length + ')'"></span>
-      </h2>
 
-      <!-- Loading -->
-      <template x-if="loadingEvents">
-        <div class="space-y-1">
-          <template x-for="i in [1,2,3,4]" :key="i">
-            <div class="h-10 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+      <!-- Tab bar -->
+      <div class="flex items-center gap-0.5 mb-4 border-b border-gray-800">
+        <button @click="activeTab = 'events'"
+          class="px-3 py-2 text-sm font-medium transition -mb-px border-b-2"
+          :class="activeTab === 'events'
+            ? 'border-indigo-500 text-white'
+            : 'border-transparent text-gray-500 hover:text-gray-300'">
+          Events
+          <span class="text-xs text-gray-600 ml-0.5" x-text="'(' + events.length + ')'"></span>
+        </button>
+        <button @click="if (!activity.length && !loadingActivity) loadActivity(); activeTab = 'activity'"
+          class="px-3 py-2 text-sm font-medium transition -mb-px border-b-2"
+          :class="activeTab === 'activity'
+            ? 'border-indigo-500 text-white'
+            : 'border-transparent text-gray-500 hover:text-gray-300'">
+          Activity
+          <template x-if="activity.length > 0">
+            <span class="text-xs text-gray-600 ml-0.5" x-text="'(' + activity.length + ')'"></span>
           </template>
-        </div>
-      </template>
+        </button>
+      </div>
 
-      <div class="space-y-1" x-show="!loadingEvents">
-        <template x-if="events.length === 0 && !loadingEvents">
-          <p class="text-gray-500 text-sm py-4">No events yet.</p>
-        </template>
-        <template x-for="ev in events" :key="(ev.id || '') + '-' + ev.event_type + '-' + ev.timestamp">
-          <div class="flex gap-3 text-sm">
-            <div class="text-gray-600 font-mono text-xs w-24 pt-0.5 shrink-0"
-                 x-text="formatTime(ev.timestamp)"></div>
-            <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="font-mono text-xs px-1.5 py-0.5 rounded text-indigo-300 bg-indigo-950"
-                      x-text="ev.event_type"></span>
-                <span class="text-xs text-gray-500"
-                      x-show="ev.payload && ev.payload.agent_name"
-                      x-text="ev.payload && ev.payload.agent_name"></span>
-              </div>
-              <div class="text-xs text-gray-400 font-mono"
-                   x-show="ev.payload && Object.keys(ev.payload).length > 0"
-                   x-text="payloadSummary(ev.payload)"></div>
-            </div>
+      <!-- ── Events tab ── -->
+      <div x-show="activeTab === 'events'">
+        <!-- Loading -->
+        <template x-if="loadingEvents">
+          <div class="space-y-1">
+            <template x-for="i in [1,2,3,4]" :key="i">
+              <div class="h-10 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+            </template>
           </div>
         </template>
+
+        <div class="space-y-1" x-show="!loadingEvents">
+          <template x-if="events.length === 0 && !loadingEvents">
+            <p class="text-gray-500 text-sm py-4">No events yet.</p>
+          </template>
+          <template x-for="ev in events" :key="(ev.id || '') + '-' + ev.event_type + '-' + ev.timestamp">
+            <div class="flex gap-3 text-sm">
+              <div class="text-gray-600 font-mono text-xs w-24 pt-0.5 shrink-0"
+                   x-text="formatTime(ev.timestamp)"></div>
+              <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="font-mono text-xs px-1.5 py-0.5 rounded text-indigo-300 bg-indigo-950"
+                        x-text="ev.event_type"></span>
+                  <span class="text-xs text-gray-500"
+                        x-show="ev.payload && ev.payload.agent_name"
+                        x-text="ev.payload && ev.payload.agent_name"></span>
+                </div>
+                <div class="text-xs text-gray-400 font-mono"
+                     x-show="ev.payload && Object.keys(ev.payload).length > 0"
+                     x-text="payloadSummary(ev.payload)"></div>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
+
+      <!-- ── Activity tab ── -->
+      <div x-show="activeTab === 'activity'">
+        <!-- Loading skeleton -->
+        <template x-if="loadingActivity">
+          <div class="space-y-1">
+            <template x-for="i in [1,2,3]" :key="i">
+              <div class="h-10 bg-gray-900 border border-gray-800 rounded-lg animate-pulse"></div>
+            </template>
+          </div>
+        </template>
+
+        <div class="space-y-1" x-show="!loadingActivity">
+          <template x-if="activity.length === 0 && !loadingActivity">
+            <p class="text-gray-500 text-sm py-4">No activity yet.</p>
+          </template>
+          <template x-for="(item, idx) in activity" :key="idx">
+            <div class="flex gap-3 text-sm">
+              <div class="text-gray-600 font-mono text-xs w-24 pt-0.5 shrink-0"
+                   x-text="formatIso(item.ts)"></div>
+              <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
+                <div class="flex items-center gap-2 mb-1">
+                  <!-- type badge -->
+                  <span class="font-mono text-xs px-1.5 py-0.5 rounded"
+                    :class="item.type === 'hitl'
+                      ? 'text-amber-300 bg-amber-950'
+                      : 'text-indigo-300 bg-indigo-950'"
+                    x-text="item.type"></span>
+                  <!-- kind -->
+                  <span class="font-mono text-xs text-gray-300" x-text="item.kind"></span>
+                  <!-- agent_name for HITL -->
+                  <span class="text-xs text-gray-500"
+                        x-show="item.payload && item.payload.agent_name"
+                        x-text="item.payload && item.payload.agent_name"></span>
+                </div>
+                <div class="text-xs text-gray-400 font-mono"
+                     x-show="item.payload && Object.keys(item.payload).length > 0"
+                     x-text="payloadSummary(item.payload)"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
     </div>
 
     <!-- Sidebar: engine or team view -->
@@ -467,6 +532,9 @@ function runDetail() {
     replayLoading: false,
     replayError: '',
     replayResult: null,
+    activeTab: 'events',
+    activity: [],
+    loadingActivity: false,
 
     async init() {
       const match = location.pathname.match(/^\/run\/(.+?)\/?$/);
@@ -674,6 +742,20 @@ function runDetail() {
     formatTime(ts) {
       if (!ts) return '';
       return new Date(ts * 1000).toLocaleTimeString();
+    },
+
+    formatIso(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleTimeString();
+    },
+
+    async loadActivity() {
+      this.loadingActivity = true;
+      try {
+        const r = await fetch(`/runs/${this.runId}/activity`, { headers: this.apiHeaders() });
+        if (r.ok) this.activity = await r.json();
+      } catch {}
+      this.loadingActivity = false;
     },
 
     async submitReview(decision) {

@@ -509,6 +509,78 @@ async def events(
     return await get_run_events(session, run_id)
 
 
+@router.get("/{run_id}/activity")
+async def activity(
+    run_id: str,
+    session: AsyncSession = Depends(get_session),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+) -> list[dict]:
+    """Merged timeline of Event rows and HitlAuditEntry rows for a run, sorted by timestamp.
+
+    Each item has the shape::
+
+        {"ts": "<ISO-8601>", "type": "event"|"hitl", "kind": "<str>", "payload": {...}}
+
+    Events use ``event_type`` as ``kind``; HITL entries use the audit ``action`` as ``kind``.
+    """
+    from sqlmodel import select as _sel
+    from app.models.run import HitlReview, HitlAuditEntry
+    from datetime import timezone
+
+    run = await get_run(session, run_id)
+    if not run:
+        raise RunNotFoundError(run_id)
+    _assert_run_access(run, ctx)
+
+    db_events = await get_run_events(session, run_id)
+
+    # HITL audit entries are linked via HitlReview, which holds the run_id.
+    reviews = (await session.exec(
+        _sel(HitlReview).where(HitlReview.run_id == run_id)
+    )).all()
+
+    review_map: dict[str, Any] = {r.review_id: r for r in reviews}
+
+    audit_entries: list[Any] = []
+    if reviews:
+        review_ids = [r.review_id for r in reviews]
+        audit_entries = (await session.exec(
+            _sel(HitlAuditEntry).where(HitlAuditEntry.review_id.in_(review_ids))
+        )).all()
+
+    items: list[dict] = []
+
+    for ev in db_events:
+        # Event.timestamp is a unix float; convert to UTC ISO-8601.
+        ts_dt = datetime.fromtimestamp(ev.timestamp, tz=timezone.utc) if ev.timestamp else \
+            ev.recorded_at.replace(tzinfo=timezone.utc)
+        items.append({
+            "ts": ts_dt.isoformat(),
+            "type": "event",
+            "kind": ev.event_type,
+            "payload": ev.payload,
+        })
+
+    for ae in audit_entries:
+        review = review_map.get(ae.review_id)
+        ts_dt = ae.created_at.replace(tzinfo=timezone.utc)
+        items.append({
+            "ts": ts_dt.isoformat(),
+            "type": "hitl",
+            "kind": ae.action,
+            "payload": {
+                "review_id": ae.review_id,
+                "actor_label": ae.actor_label,
+                "note": ae.note,
+                "agent_name": review.agent_name if review else None,
+                "decision": review.decision if review else None,
+            },
+        })
+
+    items.sort(key=lambda x: x["ts"])
+    return items
+
+
 class _ReplayRequest(BaseModel):
     model: Optional[str] = None          # override model; defaults to original
     goal: Optional[str] = None           # override goal description
