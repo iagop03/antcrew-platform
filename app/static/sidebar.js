@@ -202,6 +202,7 @@
   foot.id = 'ac-sb-foot';
   foot.style.cssText = 'flex-shrink:0;border-top:1px solid rgba(31,41,55,.5);padding:6px;';
   foot.innerHTML =
+    '<div style="height:1px;background:rgba(31,41,55,.5);margin:2px 8px 4px;"></div>' +
     '<a href="https://docs.antcrew.org" target="_blank" rel="noopener" class="ac-sbi">' +
       '<i class="ti ti-book-2 ac-sbi-ic"></i>' +
       '<span class="ac-sbl">Docs</span>' +
@@ -209,7 +210,7 @@
     '</a>' +
     '<button id="ac-sb-tut-btn" class="ac-sbi" ' +
       'style="width:calc(100% - 16px);background:none;border:none;text-align:left;cursor:pointer;color:rgb(107,114,128);">' +
-      '<i class="ti ti-sparkles ac-sbi-ic"></i>' +
+      '<span class="ac-sbi-ic" style="font-size:14px;">🎓</span>' +
       '<span class="ac-sbl">Tutorial</span>' +
     '</button>' +
     '<div style="height:1px;background:rgba(31,41,55,.5);margin:4px 8px 2px;"></div>' +
