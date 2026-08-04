@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -77,6 +77,7 @@ async def _fetch_session(
 class _CreateBody(BaseModel):
     project_name: str = ""
     model: str = "claude"
+    max_rounds: int = Field(default=7, ge=2, le=20)
 
 
 class _AnswerBody(BaseModel):
@@ -99,7 +100,7 @@ async def create_session(
     from antcrew.core.artifacts import DiscoveryContext
 
     sid = str(uuid.uuid4())
-    ctx_obj = DiscoveryContext(project_name=body.project_name)
+    ctx_obj = DiscoveryContext(project_name=body.project_name, max_rounds=body.max_rounds)
 
     agent = _build_agent(body.model)
     result: dict = await asyncio.to_thread(agent.ask_next, ctx_obj)

@@ -15,49 +15,7 @@
   </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen" x-data="dashboard()" x-init="init()">
 
-<!-- Nav -->
-<link rel="stylesheet" href="/static/tabler-icons/tabler-icons.min.css">
-<style>.ac-nav{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;font-size:.8125rem;font-weight:500;color:rgb(107,114,128);text-decoration:none;transition:background .12s,color .12s;white-space:nowrap}.ac-nav:hover{background:rgba(31,41,55,.7);color:rgb(229,231,235)}.ac-nav.ac-on{background:rgba(31,41,55,.95);color:#fff}.ac-nav .ti{font-size:14px;flex-shrink:0}</style>
-<nav class="sticky top-0 z-40 border-b border-gray-800" style="background:rgba(3,7,18,.96);backdrop-filter:blur(10px)">
-  <div class="h-11 px-3 flex items-center gap-0.5">
-    <a href="/dashboard" class="font-mono font-bold text-indigo-400 text-sm px-3 mr-1 shrink-0">antcrew</a>
-    <div class="w-px h-4 bg-gray-800 mx-0.5 shrink-0"></div>
-    <a href="/dashboard" class="ac-nav" data-ac="/dashboard"><i class="ti ti-layout-dashboard"></i><span data-i18n="nav.dashboard">Dashboard</span></a>
-    <a href="/runs" class="ac-nav" data-ac="/runs"><i class="ti ti-player-play"></i><span data-i18n="nav.runs">Runs</span></a>
-    <a href="/reviews" class="ac-nav" data-ac="/reviews"><i class="ti ti-eye-check"></i><span data-i18n="nav.reviews">Reviews</span><span id="nav-rev-badge" style="display:none" class="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"></span></a>
-    <a href="/evals" class="ac-nav" data-ac="/evals"><i class="ti ti-chart-bar"></i><span data-i18n="nav.evals">Evals</span></a>
-    <a href="/tickets" class="ac-nav" data-ac="/tickets"><i class="ti ti-checklist"></i><span data-i18n="nav.tickets">Tickets</span></a>
-    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
-    <a href="/compare" class="ac-nav" data-ac="/compare"><i class="ti ti-scale"></i><span data-i18n="nav.compare">Compare</span></a>
-    <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span data-i18n="nav.pipelines">Pipelines</span></a>
-    <a href="/discover" class="ac-nav" data-ac="/discover"><i class="ti ti-message-dots"></i><span>Discover</span></a>
-    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
-    <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span data-i18n="nav.webhooks">Webhooks</span></a>
-    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
-    <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i><span data-i18n="nav.settings">Settings</span></a>
-    <div class="ml-auto flex items-center gap-0.5">
-      <a href="https://docs.antcrew.org" target="_blank" rel="noopener" class="ac-nav shrink-0 mr-2" title="Documentaci&oacute;n"><i class="ti ti-book-2"></i><span>Docs</span></a>
-      <div class="relative ml-1" id="ac-pf-w">
-        <button id="ac-pf-b" style="width:28px;height:28px;border-radius:50%;background:#4338ca;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span id="ac-pf-i">?</span></button>
-        <div id="ac-pf-d" style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:192px;background:#111827;border:1px solid #1f2937;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,.5);z-index:100;overflow:hidden">
-          <div style="padding:10px 12px;border-bottom:1px solid #1f2937">
-            <p id="ac-pf-n" style="font-size:.8125rem;font-weight:500;color:#f3f4f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
-            <p id="ac-pf-e" style="font-size:.75rem;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px"></p>
-          </div>
-          <a href="/settings?tab=profile" data-i18n="nav.profile" style="display:block;padding:7px 12px;font-size:.8125rem;color:#9ca3af;text-decoration:none" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">My profile</a>
-          <button data-i18n="nav.logout" onclick="fetch('/auth/token',{method:'DELETE',credentials:'same-origin'}).then(function(){localStorage.removeItem('antcrew_api_key');window.location.replace('/login')})" style="display:block;width:100%;text-align:left;padding:7px 12px;font-size:.8125rem;color:#9ca3af;background:none;border:none;cursor:pointer;box-sizing:border-box" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">Log out</button>
-          <div style="padding:5px 12px 6px;border-top:1px solid #1f2937;display:flex;align-items:center;gap:4px;margin-top:1px">
-            <span data-i18n="nav.lang" style="font-size:.7rem;color:#4b5563;flex:1">Language</span>
-            <button data-lang-btn="en" onclick="window.__i18n&&window.__i18n.setLang('en')" style="font-size:.75rem;background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:3px" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">EN</button>
-            <span style="font-size:.7rem;color:#374151">|</span>
-            <button data-lang-btn="es" onclick="window.__i18n&&window.__i18n.setLang('es')" style="font-size:.75rem;background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:3px" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">ES</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</nav>
-<script>(function(){var p=location.pathname;document.querySelectorAll('.ac-nav[data-ac]').forEach(function(el){var dp=el.dataset.ac;if((dp==='/dashboard'&&(p==='/'||p==='/dashboard'))||(dp!=='/dashboard'&&(p===dp||p.startsWith(dp+'/'))))el.classList.add('ac-on');});document.addEventListener('click',function(e){var w=document.getElementById('ac-pf-w');if(w&&!w.contains(e.target)){var d=document.getElementById('ac-pf-d');if(d)d.style.display='none';}});var pb=document.getElementById('ac-pf-b');if(pb)pb.addEventListener('click',function(e){e.stopPropagation();var d=document.getElementById('ac-pf-d');if(d)d.style.display=d.style.display==='none'?'block':'none';});var k=localStorage.getItem('antcrew_api_key');var h={'Content-Type':'application/json'};if(k)h['X-Api-Key']=k;fetch('/reviews/?status=pending&limit=100',{headers:h,credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&d.length>0){var b=document.getElementById('nav-rev-badge');if(b){b.textContent=d.length>99?'99+':d.length;b.style.display='inline-flex';}}}).catch(function(){});fetch('/auth/me',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(me){if(!me)return;var n=document.getElementById('ac-pf-n');var em=document.getElementById('ac-pf-e');var i=document.getElementById('ac-pf-i');if(n)n.textContent=me.display_name||'';if(em)em.textContent=me.email||'';if(i){var s=(me.display_name||me.email||'').trim();var pts=s.split(/\s+/);i.textContent=(pts.length>1?pts[0][0]+pts[pts.length-1][0]:s.slice(0,2)).toUpperCase();}}).catch(function(){});})();</script>
+<script src="/static/sidebar.js"></script>
 
 <!-- Header -->
 <div class="px-6 py-5 flex items-center justify-between">
