@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#3730a3">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discover — antcrew</title>
+<link rel="stylesheet" href="/static/tailwind.css">
+<script src="/static/i18n.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<link rel="stylesheet" href="/static/tabler-icons/tabler-icons.min.css">
+<style>
+  [x-cloak]{display:none}
+  .chat-bubble { max-width: 80%; word-break: break-word; }
+  .typing-dot { animation: blink 1.2s infinite both; }
+  .typing-dot:nth-child(2) { animation-delay: .2s; }
+  .typing-dot:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+</style>
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}</script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="discoverApp()" x-init="init()">
+
+<!-- Nav -->
+<style>.ac-nav{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:6px;font-size:.8125rem;font-weight:500;color:rgb(107,114,128);text-decoration:none;transition:background .12s,color .12s;white-space:nowrap}.ac-nav:hover{background:rgba(31,41,55,.7);color:rgb(229,231,235)}.ac-nav.ac-on{background:rgba(31,41,55,.95);color:#fff}.ac-nav .ti{font-size:14px;flex-shrink:0}</style>
+<nav class="sticky top-0 z-40 border-b border-gray-800" style="background:rgba(3,7,18,.96);backdrop-filter:blur(10px)">
+  <div class="h-11 px-3 flex items-center gap-0.5">
+    <a href="/dashboard" class="font-mono font-bold text-indigo-400 text-sm px-3 mr-1 shrink-0">antcrew</a>
+    <div class="w-px h-4 bg-gray-800 mx-0.5 shrink-0"></div>
+    <a href="/dashboard" class="ac-nav" data-ac="/dashboard"><i class="ti ti-layout-dashboard"></i><span data-i18n="nav.dashboard">Dashboard</span></a>
+    <a href="/runs" class="ac-nav" data-ac="/runs"><i class="ti ti-player-play"></i><span data-i18n="nav.runs">Runs</span></a>
+    <a href="/reviews" class="ac-nav" data-ac="/reviews"><i class="ti ti-eye-check"></i><span data-i18n="nav.reviews">Reviews</span><span id="nav-rev-badge" style="display:none" class="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-black text-xs font-bold"></span></a>
+    <a href="/evals" class="ac-nav" data-ac="/evals"><i class="ti ti-chart-bar"></i><span data-i18n="nav.evals">Evals</span></a>
+    <a href="/tickets" class="ac-nav" data-ac="/tickets"><i class="ti ti-checklist"></i><span data-i18n="nav.tickets">Tickets</span></a>
+    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
+    <a href="/compare" class="ac-nav" data-ac="/compare"><i class="ti ti-scale"></i><span data-i18n="nav.compare">Compare</span></a>
+    <a href="/pipelines" class="ac-nav" data-ac="/pipelines"><i class="ti ti-sitemap"></i><span data-i18n="nav.pipelines">Pipelines</span></a>
+    <a href="/discover" class="ac-nav" data-ac="/discover"><i class="ti ti-message-dots"></i><span>Discover</span></a>
+    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
+    <a href="/webhooks" class="ac-nav" data-ac="/webhooks"><i class="ti ti-webhook"></i><span data-i18n="nav.webhooks">Webhooks</span></a>
+    <div class="w-px h-4 bg-gray-800 mx-1.5 shrink-0"></div>
+    <a href="/settings" class="ac-nav" data-ac="/settings"><i class="ti ti-settings"></i><span data-i18n="nav.settings">Settings</span></a>
+    <div class="ml-auto flex items-center gap-0.5">
+      <a href="https://docs.antcrew.org" target="_blank" rel="noopener" class="ac-nav shrink-0 mr-2" title="Documentaci&oacute;n"><i class="ti ti-book-2"></i><span>Docs</span></a>
+      <div class="relative ml-1" id="ac-pf-w">
+        <button id="ac-pf-b" style="width:28px;height:28px;border-radius:50%;background:#4338ca;color:#fff;font-size:11px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span id="ac-pf-i">?</span></button>
+        <div id="ac-pf-d" style="display:none;position:absolute;right:0;top:calc(100% + 6px);width:192px;background:#111827;border:1px solid #1f2937;border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,.5);z-index:100;overflow:hidden">
+          <div style="padding:10px 12px;border-bottom:1px solid #1f2937">
+            <p id="ac-pf-n" style="font-size:.8125rem;font-weight:500;color:#f3f4f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+            <p id="ac-pf-e" style="font-size:.75rem;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px"></p>
+          </div>
+          <a href="/settings?tab=profile" style="display:block;padding:7px 12px;font-size:.8125rem;color:#9ca3af;text-decoration:none" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">My profile</a>
+          <button onclick="fetch('/auth/token',{method:'DELETE',credentials:'same-origin'}).then(function(){localStorage.removeItem('antcrew_api_key');window.location.replace('/login')})" style="display:block;width:100%;text-align:left;padding:7px 12px;font-size:.8125rem;color:#9ca3af;background:none;border:none;cursor:pointer;box-sizing:border-box" onmouseover="this.style.background='rgba(31,41,55,.8)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='#9ca3af'">Log out</button>
+          <div style="padding:5px 12px 6px;border-top:1px solid #1f2937;display:flex;align-items:center;gap:4px;margin-top:1px">
+            <span style="font-size:.7rem;color:#4b5563;flex:1">Language</span>
+            <button data-lang-btn="en" onclick="window.__i18n&&window.__i18n.setLang('en')" style="font-size:.75rem;background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:3px" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">EN</button>
+            <span style="font-size:.7rem;color:#374151">|</span>
+            <button data-lang-btn="es" onclick="window.__i18n&&window.__i18n.setLang('es')" style="font-size:.75rem;background:none;border:none;cursor:pointer;padding:2px 5px;border-radius:3px" onmouseover="this.style.background='rgba(255,255,255,.06)'" onmouseout="this.style.background=''">ES</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+<script>(function(){var p=location.pathname;document.querySelectorAll('.ac-nav[data-ac]').forEach(function(el){var dp=el.dataset.ac;if((dp==='/dashboard'&&(p==='/'||p==='/dashboard'))||(dp!=='/dashboard'&&(p===dp||p.startsWith(dp+'/'))))el.classList.add('ac-on');});document.addEventListener('click',function(e){var w=document.getElementById('ac-pf-w');if(w&&!w.contains(e.target)){var d=document.getElementById('ac-pf-d');if(d)d.style.display='none';}});var pb=document.getElementById('ac-pf-b');if(pb)pb.addEventListener('click',function(e){e.stopPropagation();var d=document.getElementById('ac-pf-d');if(d)d.style.display=d.style.display==='none'?'block':'none';});var k=localStorage.getItem('antcrew_api_key');var h={'Content-Type':'application/json'};if(k)h['X-Api-Key']=k;fetch('/reviews/?status=pending&limit=100',{headers:h,credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(d){if(d&&d.length>0){var b=document.getElementById('nav-rev-badge');if(b){b.textContent=d.length>99?'99+':d.length;b.style.display='inline-flex';}}}).catch(function(){});fetch('/auth/me',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():null}).then(function(me){if(!me)return;var n=document.getElementById('ac-pf-n');var em=document.getElementById('ac-pf-e');var i=document.getElementById('ac-pf-i');if(n)n.textContent=me.display_name||'';if(em)em.textContent=me.email||'';if(i){var s=(me.display_name||me.email||'').trim();var pts=s.split(/\s+/);i.textContent=(pts.length>1?pts[0][0]+pts[pts.length-1][0]:s.slice(0,2)).toUpperCase();}}).catch(function(){});})();</script>
+
+<!-- Header -->
+<div class="px-6 py-5 flex items-center justify-between border-b border-gray-800">
+  <div>
+    <h1 class="text-xl font-semibold">Project Discovery</h1>
+    <p class="text-gray-400 text-sm mt-0.5">Answer a few questions — the agent builds your PRD</p>
+  </div>
+  <template x-if="sessionId">
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-gray-500">Round <span class="text-indigo-400 font-semibold" x-text="round"></span> / 7</span>
+      <div class="w-32 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div class="h-full bg-indigo-500 rounded-full transition-all duration-500"
+             :style="`width:${Math.min(100, Math.round(round/7*100))}%`"></div>
+      </div>
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+            :class="isComplete ? 'bg-green-900/50 text-green-300' : 'bg-yellow-900/50 text-yellow-300'"
+            x-text="isComplete ? 'Complete' : 'Active'"></span>
+    </div>
+  </template>
+</div>
+
+<!-- Start form (shown when no session exists) -->
+<div x-show="!sessionId" x-cloak class="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
+        <i class="ti ti-message-dots text-white text-lg"></i>
+      </div>
+      <div>
+        <h2 class="text-lg font-semibold">Start a discovery session</h2>
+        <p class="text-gray-400 text-sm">The agent will ask up to 7 questions to understand your project</p>
+      </div>
+    </div>
+
+    <form @submit.prevent="startSession()">
+      <div class="mb-5">
+        <label class="block text-sm text-gray-400 mb-1.5" for="proj-name">Project name (optional)</label>
+        <input id="proj-name" type="text" x-model="projectName" :disabled="starting"
+          placeholder="e.g. Customer portal, Inventory tracker…"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 disabled:opacity-50 transition">
+      </div>
+      <div class="mb-6">
+        <label class="block text-sm text-gray-400 mb-1.5" for="model-sel">Model</label>
+        <select id="model-sel" x-model="selectedModel" :disabled="starting"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 disabled:opacity-50 transition">
+          <option value="claude">claude (default)</option>
+          <option value="simulated">simulated (testing)</option>
+        </select>
+      </div>
+      <button type="submit" :disabled="starting"
+        class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+        <template x-if="!starting">
+          <span><i class="ti ti-sparkles mr-1"></i>Start discovery</span>
+        </template>
+        <template x-if="starting">
+          <span class="flex items-center gap-2">
+            <span class="inline-flex gap-1">
+              <span class="typing-dot w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
+              <span class="typing-dot w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
+              <span class="typing-dot w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
+            </span>
+            Starting…
+          </span>
+        </template>
+      </button>
+      <p x-show="error" class="text-red-400 text-xs mt-3 text-center" x-text="error"></p>
+    </form>
+  </div>
+</div>
+
+<!-- Chat interface (shown once session starts) -->
+<div x-show="sessionId" x-cloak class="flex flex-col" style="height:calc(100vh - 9rem)">
+
+  <!-- Messages list -->
+  <div id="chat-messages" class="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+       x-ref="msgList">
+
+    <template x-for="(msg, idx) in messages" :key="idx">
+      <div class="flex" :class="msg.role === 'agent' ? 'justify-start' : 'justify-end'">
+
+        <!-- Agent bubble -->
+        <template x-if="msg.role === 'agent'">
+          <div class="flex items-start gap-3 chat-bubble">
+            <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+              <i class="ti ti-robot text-white" style="font-size:13px"></i>
+            </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-100 leading-relaxed"
+                 x-text="msg.text"></div>
+          </div>
+        </template>
+
+        <!-- User bubble -->
+        <template x-if="msg.role === 'user'">
+          <div class="chat-bubble">
+            <div class="bg-indigo-600 rounded-2xl rounded-tr-sm px-4 py-3 text-sm text-white leading-relaxed"
+                 x-text="msg.text"></div>
+          </div>
+        </template>
+
+      </div>
+    </template>
+
+    <!-- Typing indicator -->
+    <template x-if="agentThinking">
+      <div class="flex justify-start">
+        <div class="flex items-start gap-3">
+          <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">
+            <i class="ti ti-robot text-white" style="font-size:13px"></i>
+          </div>
+          <div class="bg-gray-800 border border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3">
+            <span class="inline-flex gap-1">
+              <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full inline-block"></span>
+              <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full inline-block"></span>
+              <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full inline-block"></span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Complete state -->
+    <template x-if="isComplete && !agentThinking">
+      <div class="flex justify-center">
+        <div class="bg-green-900/30 border border-green-800 rounded-xl px-5 py-4 text-center max-w-sm">
+          <i class="ti ti-check text-green-400 text-xl mb-2 block"></i>
+          <p class="text-green-300 text-sm font-medium">Discovery complete!</p>
+          <p class="text-gray-400 text-xs mt-1">Click the button below to generate your PRD and start a run.</p>
+        </div>
+      </div>
+    </template>
+
+  </div>
+
+  <!-- Error banner -->
+  <div x-show="error" class="px-6 pb-2">
+    <div class="bg-red-950 border border-red-800 rounded-lg px-4 py-2.5 text-sm text-red-300 flex items-center gap-3">
+      <i class="ti ti-alert-triangle"></i>
+      <span x-text="error"></span>
+      <button @click="error=''" class="ml-auto text-xs text-red-400 hover:text-red-200">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- Input area -->
+  <div class="border-t border-gray-800 px-6 py-4 bg-gray-950">
+    <template x-if="!isComplete">
+      <form @submit.prevent="sendAnswer()" class="flex gap-3">
+        <textarea x-model="answerDraft" :disabled="agentThinking || submitting"
+          @keydown.enter.exact.prevent="sendAnswer()"
+          @keydown.enter.shift.prevent="answerDraft += '\n'"
+          placeholder="Type your answer… (Enter to send, Shift+Enter for new line)"
+          rows="2"
+          class="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 disabled:opacity-50 resize-none transition"></textarea>
+        <button type="submit" :disabled="!answerDraft.trim() || agentThinking || submitting"
+          class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white px-4 py-2.5 rounded-xl transition flex items-center gap-2 self-end">
+          <i class="ti ti-send"></i>
+        </button>
+      </form>
+    </template>
+
+    <template x-if="isComplete">
+      <div class="flex gap-3">
+        <div class="flex-1">
+          <label class="block text-xs text-gray-500 mb-1.5">Team for the run</label>
+          <select x-model="selectedTeam"
+            class="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500 transition">
+            <option value="DevTeam">DevTeam</option>
+            <option value="FullStackTeam">FullStackTeam</option>
+            <option value="ResearchTeam">ResearchTeam</option>
+            <option value="ContentTeam">ContentTeam</option>
+            <option value="FeatureTeam">FeatureTeam</option>
+          </select>
+        </div>
+        <button @click="createRun()" :disabled="creatingRun"
+          class="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition flex items-center gap-2 self-end">
+          <template x-if="!creatingRun">
+            <span><i class="ti ti-player-play mr-1"></i>Finalize &amp; create run</span>
+          </template>
+          <template x-if="creatingRun">
+            <span class="flex items-center gap-2">
+              <span class="inline-flex gap-1">
+                <span class="typing-dot w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
+                <span class="typing-dot w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
+                <span class="typing-dot w-1.5 h-1.5 bg-white rounded-full inline-block"></span>
+              </span>
+              Creating…
+            </span>
+          </template>
+        </button>
+      </div>
+    </template>
+  </div>
+
+</div>
+
+<script>
+function discoverApp() {
+  return {
+    // start form
+    projectName: '',
+    selectedModel: 'claude',
+    starting: false,
+
+    // session state
+    sessionId: null,
+    round: 0,
+    isComplete: false,
+    messages: [],
+    agentThinking: false,
+    submitting: false,
+    answerDraft: '',
+    error: '',
+
+    // run creation
+    selectedTeam: 'DevTeam',
+    creatingRun: false,
+
+    apiHeaders(extra) {
+      const k = localStorage.getItem('antcrew_api_key');
+      const h = { 'Content-Type': 'application/json', ...extra };
+      if (k) h['X-Api-Key'] = k;
+      return h;
+    },
+
+    async init() {
+      // nothing to pre-load
+    },
+
+    async startSession() {
+      this.error = '';
+      this.starting = true;
+      try {
+        const r = await fetch('/discovery/sessions', {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          credentials: 'same-origin',
+          body: JSON.stringify({ project_name: this.projectName.trim(), model: this.selectedModel }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || `HTTP ${r.status}`);
+        }
+        const d = await r.json();
+        this.sessionId = d.session_id;
+        this.round = 1;
+        this.isComplete = false;
+        this.messages = [];
+        if (d.question) {
+          this.messages.push({ role: 'agent', text: d.question });
+        }
+        this.$nextTick(() => this.scrollToBottom());
+      } catch (err) {
+        this.error = err.message;
+      } finally {
+        this.starting = false;
+      }
+    },
+
+    async sendAnswer() {
+      const answer = this.answerDraft.trim();
+      if (!answer || this.agentThinking || this.submitting) return;
+
+      this.answerDraft = '';
+      this.submitting = true;
+      this.error = '';
+
+      // show user message immediately
+      this.messages.push({ role: 'user', text: answer });
+      this.$nextTick(() => this.scrollToBottom());
+
+      // show typing indicator
+      this.agentThinking = true;
+
+      try {
+        const r = await fetch(`/discovery/sessions/${this.sessionId}/answer`, {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          credentials: 'same-origin',
+          body: JSON.stringify({ answer }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || `HTTP ${r.status}`);
+        }
+        const d = await r.json();
+        this.isComplete = d.is_complete;
+        this.round = (this.round || 1) + 1;
+
+        if (d.question) {
+          this.messages.push({ role: 'agent', text: d.question });
+        }
+        this.$nextTick(() => this.scrollToBottom());
+      } catch (err) {
+        this.error = err.message;
+        // put the draft back so the user can retry
+        this.answerDraft = answer;
+        // remove the user message we optimistically pushed
+        this.messages.pop();
+      } finally {
+        this.agentThinking = false;
+        this.submitting = false;
+      }
+    },
+
+    async createRun() {
+      this.error = '';
+      this.creatingRun = true;
+      try {
+        const r = await fetch(`/discovery/sessions/${this.sessionId}/run`, {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          credentials: 'same-origin',
+          body: JSON.stringify({ team: this.selectedTeam }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || `HTTP ${r.status}`);
+        }
+        const d = await r.json();
+        window.location = '/run/' + d.run_id;
+      } catch (err) {
+        this.error = err.message;
+      } finally {
+        this.creatingRun = false;
+      }
+    },
+
+    scrollToBottom() {
+      const el = this.$refs.msgList;
+      if (el) el.scrollTop = el.scrollHeight;
+    },
+  };
+}
+</script>
+</body>
+</html>

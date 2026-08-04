@@ -95,6 +95,11 @@ async def admin_page():
     return _html("admin.html")
 
 
+@router.get("/discover")
+async def discover_page():
+    return _html("discover.html")
+
+
 @router.get("/sw.js")
 async def service_worker():
     content = (_STATIC / "sw.js").read_bytes()
