@@ -112,6 +112,12 @@
     class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
     <span>Security</span>
   </button>
+  <button @click="tab='github'"
+    :class="tab==='github' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
+    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
+    <span>GitHub</span>
+    <span x-show="ghInstallations.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="ghInstallations.length"></span>
+  </button>
   <button @click="tab='profile'"
     :class="tab==='profile' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
     class="px-1 py-3 text-sm border-b-2 -mb-px transition-colors">
@@ -732,6 +738,100 @@ export ANTCREW_API_KEY="<span class="text-amber-400">acw_...</span>"  <span clas
     </div>
   </div>
 
+  <!-- ── GITHUB APP ── -->
+  <div x-show="tab==='github'" class="max-w-2xl">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-base font-semibold">GitHub App</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Conecta repositorios de GitHub a tus workspaces para habilitar write-back automático mediante tokens de instalación.</p>
+      </div>
+    </div>
+
+    <!-- Workspace selector -->
+    <div class="mb-5">
+      <label class="block text-xs text-gray-500 mb-1.5">Workspace</label>
+      <select x-model="ghWsId" @change="loadGhInstallations()"
+        class="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 w-72">
+        <option value="">— selecciona un workspace —</option>
+        <template x-for="ws in workspaces" :key="ws.id">
+          <option :value="ws.id" x-text="`${ws.name} (${ws.slug})`"></option>
+        </template>
+      </select>
+    </div>
+
+    <div x-show="!ghWsId" class="text-gray-700 text-sm">Selecciona un workspace para gestionar su integración con GitHub.</div>
+
+    <div x-show="!!ghWsId">
+      <p x-show="ghError" class="text-red-400 text-sm mb-3" x-text="ghError"></p>
+      <div x-show="ghLoading" class="text-gray-600 text-sm py-4">Cargando…</div>
+
+      <div x-show="!ghLoading">
+        <!-- No installation -->
+        <div x-show="ghInstallationsForWs.length === 0"
+          class="bg-gray-900 border border-gray-800 rounded-xl p-6 flex flex-col items-start gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <svg class="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+              <h3 class="text-sm font-semibold text-gray-100">Conectar GitHub App</h3>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed">
+              Instala la antcrew GitHub App en tu cuenta u organización para que los runners puedan crear branches, commits y pull requests usando tokens de instalación — sin necesidad de PATs de usuario.
+            </p>
+          </div>
+          <a :href="`https://github.com/apps/antcrew/installations/new?state=${ghWsId}`"
+            target="_blank" rel="noopener"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-white text-gray-900 text-sm font-medium rounded-lg transition-colors">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            Instalar en GitHub
+          </a>
+        </div>
+
+        <!-- Has installations -->
+        <div x-show="ghInstallationsForWs.length > 0" class="flex flex-col gap-3">
+          <template x-for="inst in ghInstallationsForWs" :key="inst.installation_id">
+            <div class="bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center shrink-0">
+                  <svg class="w-4 h-4 text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm text-white truncate" x-text="inst.account_login"></span>
+                    <span class="text-xs px-1.5 py-0.5 rounded font-mono"
+                      :class="inst.account_type === 'Organization' ? 'bg-indigo-900/50 text-indigo-300' : 'bg-gray-800 text-gray-400'"
+                      x-text="inst.account_type === 'Organization' ? 'org' : 'user'"></span>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-0.5">
+                    Installation ID: <span class="font-mono" x-text="inst.installation_id"></span>
+                    · conectado <span x-text="fmtDate(inst.created_at)"></span>
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <span class="flex items-center gap-1 text-xs text-teal-400">
+                  <span class="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0"></span>
+                  Activo
+                </span>
+                <button @click="disconnectGh(inst)"
+                  class="px-2.5 py-1 text-xs text-gray-600 hover:text-red-400 rounded hover:bg-gray-800 transition-colors">
+                  Desconectar
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- Add another installation -->
+          <a :href="`https://github.com/apps/antcrew/installations/new?state=${ghWsId}`"
+            target="_blank" rel="noopener"
+            class="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors mt-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Conectar otra cuenta/organización
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── PERFIL ── -->
   <div x-show="tab==='profile'" class="max-w-md">
     <p x-show="profileMsg" class="mb-4 text-sm px-3 py-2 rounded-lg"
@@ -1205,7 +1305,7 @@ export ANTCREW_API_KEY="<span class="text-amber-400">acw_...</span>"  <span clas
 <script>
 function settings() {
   return {
-    tab: new URLSearchParams(location.search).get('tab') || 'workspaces',
+    tab: new URLSearchParams(location.search).get('tab') || (new URLSearchParams(location.search).get('github') ? 'github' : 'workspaces'),
     apiKey: localStorage.getItem('antcrew_api_key') || '',
     keyInput: '',
     profileForm: { display_name: '', email: '' },
@@ -1245,6 +1345,10 @@ function settings() {
     // Security / Quick Audit
     auditForm: { github_repo: '', github_token: '', github_branch: 'main', max_cost_usd: '5' },
     auditLoading: false, auditError: '', auditResult: null,
+
+    // GitHub App
+    ghWsId: '', ghInstallations: [], ghInstallationsForWs: [],
+    ghLoading: false, ghError: '',
 
     getCsrfToken() {
       return document.cookie.split(';').map(c => c.trim())
@@ -1818,6 +1922,32 @@ function settings() {
         else { this.mfaEnabled = false; this.showDisableMfa = false; this.mfaCode = ''; this.mfaMsg = 'MFA desactivado.'; }
       } catch(e) { this.mfaMsg = e.message; this.mfaError = true; }
       this.mfaLoading = false;
+    },
+
+    /* ── GitHub App ── */
+    async loadGhInstallations() {
+      if (!this.ghWsId) return;
+      this.ghLoading = true; this.ghError = '';
+      try {
+        const r = await fetch(`/github/installations?workspace_id=${this.ghWsId}`, { headers: this.apiHeaders() });
+        if (!r.ok) throw new Error(await r.text());
+        const all = await r.json();
+        this.ghInstallationsForWs = all;
+        // Merge into global list for badge count
+        const existing = this.ghInstallations.filter(i => i.workspace_id !== parseInt(this.ghWsId));
+        this.ghInstallations = [...existing, ...all];
+      } catch(e) { this.ghError = e.message; }
+      this.ghLoading = false;
+    },
+
+    async disconnectGh(inst) {
+      if (!confirm(`¿Desconectar la instalación de "${inst.account_login}"? Los runners dejarán de poder usar tokens de instalación para este workspace.`)) return;
+      this.ghError = '';
+      try {
+        const r = await fetch(`/github/installations/${inst.installation_id}`, { method: 'DELETE', headers: this.apiHeaders() });
+        if (r.status !== 204 && !r.ok) { this.ghError = 'Error al desconectar la instalación'; return; }
+        await this.loadGhInstallations();
+      } catch(e) { this.ghError = e.message; }
     },
 
     /* ── Security ── */

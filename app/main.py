@@ -43,6 +43,7 @@ from app.api import bootstrap as bootstrap_api
 from app.api import admin as admin_api
 from app.api import feedback as feedback_api
 from app.api import discovery as discovery_api
+from app.api import github_app as github_app_api
 
 # Re-export for backward compatibility — tests import these names from app.main
 from app.core.startup import _check_auth_mode, _check_slack_config  # noqa: F401
@@ -188,6 +189,8 @@ app.include_router(bootstrap_api.router)
 app.include_router(admin_api.router,  dependencies=_csrf)
 app.include_router(feedback_api.router, dependencies=_csrf)
 app.include_router(discovery_api.router,  dependencies=_csrf)
+app.include_router(github_app_api.webhook_router)               # OAuth callback + HMAC-signed webhook — no CSRF
+app.include_router(github_app_api.router,    dependencies=_csrf)
 
 app.mount("/static", StaticFiles(directory=_STATIC), name="static")
 
