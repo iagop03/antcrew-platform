@@ -10,7 +10,10 @@ from pydantic import BaseModel, field_validator
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import require_api_key, require_role, _hash, _key_prefix
+from app.core.auth import (
+    require_api_key, require_role, _hash, _key_prefix,
+    get_workspace_context, WorkspaceContext, ws_filter, ws_accessible,
+)
 from app.core.database import get_session
 from app.models.run import ApiKey
 
@@ -58,7 +61,11 @@ class UpdateKeyRequest(BaseModel):
 
 
 @router.post("/", status_code=201, dependencies=[Depends(require_role("admin"))])
-async def create_key(body: CreateKeyRequest, session: AsyncSession = Depends(get_session)):
+async def create_key(
+    body: CreateKeyRequest,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
     """Create a new API key. The raw key is returned once — store it securely.
 
     Roles:
@@ -70,7 +77,9 @@ async def create_key(body: CreateKeyRequest, session: AsyncSession = Depends(get
     Set workspace_id to scope the key to a specific workspace.
     Requires: admin role.
     """
-    ws_id = body.workspace_id
+    if body.workspace_id is not None and not ws_accessible(body.workspace_id, ctx):
+        raise HTTPException(403, "workspace_id is not accessible with the current API key")
+    ws_id = body.workspace_id or ctx.workspace_id
     result = await session.exec(
         select(ApiKey).where(ApiKey.label == body.label, ApiKey.workspace_id == ws_id)
     )
@@ -97,11 +106,14 @@ async def create_key(body: CreateKeyRequest, session: AsyncSession = Depends(get
 
 
 @router.get("/", dependencies=[Depends(require_role("admin"))])
-async def list_keys(session: AsyncSession = Depends(get_session)):
-    """List all active (non-revoked) API keys. Raw keys are never returned."""
-    result = await session.exec(
-        select(ApiKey).where(ApiKey.revoked_at == None)  # noqa: E711
-    )
+async def list_keys(
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    """List active (non-revoked) API keys scoped to the caller's workspace."""
+    stmt = select(ApiKey).where(ApiKey.revoked_at == None)  # noqa: E711
+    stmt = ws_filter(stmt, ApiKey.workspace_id, ctx)
+    result = await session.exec(stmt)
     return [
         {
             "label": k.label,
@@ -117,12 +129,16 @@ async def list_keys(session: AsyncSession = Depends(get_session)):
 
 
 @router.patch("/{label}", dependencies=[Depends(require_role("admin"))])
-async def update_key(label: str, body: UpdateKeyRequest, session: AsyncSession = Depends(get_session)):
+async def update_key(
+    label: str,
+    body: UpdateKeyRequest,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
     """Update mutable fields on an API key (email, role). Requires: admin role."""
-    result = await session.exec(
-        select(ApiKey).where(ApiKey.label == label, ApiKey.revoked_at == None)  # noqa: E711
-    )
-    key = result.first()
+    stmt = select(ApiKey).where(ApiKey.label == label, ApiKey.revoked_at == None)  # noqa: E711
+    stmt = ws_filter(stmt, ApiKey.workspace_id, ctx)
+    key = (await session.exec(stmt)).first()
     if not key:
         raise HTTPException(404, f"Key {label!r} not found or already revoked")
     if body.email is not None:
@@ -145,10 +161,14 @@ async def update_key(label: str, body: UpdateKeyRequest, session: AsyncSession =
 
 
 @router.delete("/{label}", status_code=204, dependencies=[Depends(require_role("admin"))])
-async def revoke_key(label: str, session: AsyncSession = Depends(get_session)):
+async def revoke_key(
+    label: str,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
     """Revoke an API key by label. Requires: admin role."""
-    result = await session.exec(select(ApiKey).where(ApiKey.label == label))
-    key = result.first()
+    stmt = ws_filter(select(ApiKey).where(ApiKey.label == label), ApiKey.workspace_id, ctx)
+    key = (await session.exec(stmt)).first()
     if not key:
         raise HTTPException(404, f"Key {label!r} not found")
     key.revoked_at = _utcnow()

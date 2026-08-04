@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import require_api_key, require_role
+from app.core.auth import require_api_key, require_role, get_workspace_context, WorkspaceContext, ws_accessible
 from app.core.database import get_session
 from app.models.run import Workspace
 from app.services import billing as _billing
@@ -137,9 +137,12 @@ class BillingOut(BaseModel):
 )
 async def get_workspace_billing(
     workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> BillingOut:
     """Return billing details for a workspace."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Access to this workspace is not allowed")
     ws = (await session.exec(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
@@ -165,6 +168,7 @@ async def get_workspace_billing(
 async def attach_stripe(
     workspace_id: int,
     body: AttachBilling,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> BillingOut:
     """Link a workspace to an existing Stripe Customer and (optionally) subscription.
@@ -172,6 +176,8 @@ async def attach_stripe(
     Call this after creating the Customer in Stripe (via dashboard or API).
     To auto-create a Customer, omit the body and use POST /billing/workspaces/{id}/create-customer.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Access to this workspace is not allowed")
     ws = (await session.exec(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
@@ -209,6 +215,7 @@ async def attach_stripe(
 )
 async def create_stripe_customer(
     workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> BillingOut:
     """Auto-create a Stripe Customer for this workspace and link it.
@@ -216,6 +223,8 @@ async def create_stripe_customer(
     Requires STRIPE_SECRET_KEY to be set.  Returns 422 if Stripe is not configured
     or if the workspace already has a customer ID.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Access to this workspace is not allowed")
     ws = (await session.exec(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
@@ -263,9 +272,12 @@ async def create_stripe_customer(
 )
 async def detach_stripe(
     workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     """Remove Stripe billing linkage from a workspace (does NOT cancel in Stripe)."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Access to this workspace is not allowed")
     ws = (await session.exec(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()
@@ -289,6 +301,7 @@ class CheckoutOut(BaseModel):
 )
 async def create_checkout_session(
     workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> CheckoutOut:
     """Create a Stripe Checkout Session and return the hosted payment URL.
@@ -311,6 +324,8 @@ async def create_checkout_session(
             "Checkout requires STRIPE_PRICE_ID, STRIPE_SUCCESS_URL, and STRIPE_CANCEL_URL env vars.",
         )
 
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Access to this workspace is not allowed")
     ws = (await session.exec(
         select(Workspace).where(Workspace.id == workspace_id)
     )).first()

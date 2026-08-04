@@ -284,20 +284,8 @@ async def register(
             session.add(api_key)
             await session.flush()
 
-        # Create session
-        token = _make_token()
-        from app.models.run import UserSession
-
-        user_session = UserSession(
-            token=token,
-            user_id=user.id,
-            api_key_id=api_key.id,
-            created_at=_utcnow(),
-            expires_at=_utcnow() + timedelta(seconds=COOKIE_MAX_AGE),
-            revoked=False,
-        )
-        session.add(user_session)
-        await session.commit()
+        # Create session — stores token_hash only, plaintext never touches the DB.
+        token = await _create_session(user.id, api_key.id, session)
 
     except HTTPException:
         raise
@@ -598,12 +586,14 @@ async def verify_email(
         )
     )).first()
 
+    if verification is None:
+        raise HTTPException(400, "Invalid or expired verification code")
     # Compare by hash (new) or plaintext fallback (pre-033 rows)
     code_matches = (
         (verification.code_hash is not None and verification.code_hash == _hash_verification_code(code))
         or (verification.code is not None and verification.code == code)
     )
-    if verification is None or not code_matches:
+    if not code_matches:
         raise HTTPException(400, "Invalid or expired verification code")
 
     verification.used = True
@@ -681,9 +671,11 @@ def _sign_mfa_token(user_id: int) -> str:
     import hmac
     import time
 
+    secret = os.environ.get("SECRET_KEY", "")
+    if not secret:
+        raise RuntimeError("SECRET_KEY must be set to use MFA — forged tokens are possible without it")
     exp = int(time.time()) + 300  # 5 min
     payload = f"{user_id}:{exp}"
-    secret = os.environ.get("SECRET_KEY", "")
     sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
     import base64
     return base64.urlsafe_b64encode(f"{payload}:{sig}".encode()).decode()
@@ -1065,11 +1057,13 @@ async def update_profile(
         changed = True
         # Revoke all other active sessions so a stolen cookie can't persist
         # after the owner changes their password.
+        # Compare by primary key — token-column comparison fails for NULL-token
+        # (login-created) sessions where NULL != :token evaluates to NULL, not TRUE.
         from app.models.run import UserSession
         other_sessions = (await session.exec(
             select(UserSession).where(
                 UserSession.user_id == user.id,
-                UserSession.token != token,
+                UserSession.id != user_session.id,
                 UserSession.revoked == False,  # noqa: E712
             )
         )).all()

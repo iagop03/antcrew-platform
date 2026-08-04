@@ -9,7 +9,7 @@ from pydantic import BaseModel, field_validator
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role
+from app.core.auth import require_api_key, get_workspace_context, WorkspaceContext, require_role, ws_accessible
 from app.core.database import get_session
 from app.services.runner import dispatch, AVAILABLE_TEAMS, ALL_PIPELINE_TYPES
 
@@ -215,7 +215,14 @@ async def trigger_visual_pipeline(
         row = await session.get(PipelineDef, pid)
         if not row:
             raise HTTPException(404, "Pipeline not found")
+        # Treat cross-workspace pipeline access as not-found to avoid confirming existence.
+        if row.workspace_id is not None and not ws_accessible(row.workspace_id, ctx):
+            raise HTTPException(404, "Pipeline not found")
         definition = json.loads(row.definition)
+
+    # Validate that the caller can actually use the requested workspace.
+    if body.workspace_id is not None and not ws_accessible(body.workspace_id, ctx):
+        raise HTTPException(403, "workspace_id is not accessible with the current API key")
 
     effective_hitl = body.hitl
     if ctx.workspace_id is not None:

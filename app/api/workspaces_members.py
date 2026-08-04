@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.auth import require_api_key, require_role
+from app.core.auth import require_api_key, require_role, get_workspace_context, WorkspaceContext, ws_accessible
 from app.core.database import get_session
 from app.models.run import Workspace, ApiKey, WorkspaceMembership
 
@@ -38,9 +38,12 @@ class MembershipOut(BaseModel):
             dependencies=[Depends(require_role("admin"))])
 async def list_members(
     workspace_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> list[MembershipOut]:
     """List API keys that have membership access to this workspace."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Access to this workspace is not allowed")
     ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
     if not ws:
         raise WorkspaceNotFoundError(workspace_id)
@@ -71,6 +74,7 @@ async def list_members(
 async def add_member(
     workspace_id: int,
     body: MembershipCreate,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> MembershipOut:
     """Grant an API key access to a workspace (multi-workspace membership).
@@ -78,6 +82,8 @@ async def add_member(
     Unlike the key's primary workspace_id, memberships let one key read across
     multiple workspaces without changing the key's primary scope for writes.
     """
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Access to this workspace is not allowed")
     ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
     if not ws:
         raise WorkspaceNotFoundError(workspace_id)
@@ -115,9 +121,12 @@ async def add_member(
 async def remove_member(
     workspace_id: int,
     api_key_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
 ) -> None:
     """Revoke a key's multi-workspace membership for this workspace."""
+    if not ws_accessible(workspace_id, ctx):
+        raise HTTPException(403, "Access to this workspace is not allowed")
     m = (await session.exec(
         select(WorkspaceMembership)
         .where(WorkspaceMembership.api_key_id == api_key_id)
