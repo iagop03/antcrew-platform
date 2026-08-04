@@ -135,7 +135,7 @@
       var cls = 'ac-sbi' + (on ? ' on' : '') + (item.cfg ? ' ac-cfg-item' : '');
       var i18n = item.i18n ? ' data-i18n="' + item.i18n + '"' : '';
       return (
-        '<a href="' + item.href + '" class="' + cls + '"' + i18n + '>' +
+        '<a href="' + item.href + '" class="' + cls + '">' +
         '<i class="ti ' + item.icon + ' ac-sbi-ic"></i>' +
         '<span class="ac-sbl"' + i18n + '>' + item.label + '</span>' +
         (item.badge
@@ -163,7 +163,8 @@
     '<a href="/dashboard" id="ac-sb-la" style="flex:1;display:flex;align-items:center;' +
       'gap:8px;text-decoration:none;overflow:hidden;min-width:0;">' +
       '<img id="ac-sb-ant" src="/static/favicon.svg" alt="antcrew" ' +
-        'style="width:24px;height:24px;flex-shrink:0;display:none;">' +
+        'style="width:24px;height:24px;flex-shrink:0;display:none;' +
+        'filter:brightness(0) invert(1);">' +
       '<span id="ac-sb-lt" style="font-family:monospace;font-weight:700;color:#818cf8;' +
         'font-size:.875rem;white-space:nowrap;overflow:hidden;flex:1;">antcrew</span>' +
     '</a>' +
@@ -289,6 +290,8 @@
       hdrEl.style.justifyContent = c ? 'center' : 'space-between';
       hdrEl.style.padding = c ? '0' : '0 8px 0 14px';
     }
+    var la = document.getElementById('ac-sb-la');
+    if (la) la.style.flex = c ? '0 0 auto' : '1';
     if (ant) ant.style.display = c ? 'block' : 'none';
     if (lt) lt.style.display = c ? 'none' : '';
     if (tog) tog.style.display = c ? 'none' : 'flex';
