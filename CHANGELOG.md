@@ -1,5 +1,27 @@
 # Changelog — antcrew-platform
 
+## v0.6.6 (2026-08-04)
+
+### Added
+
+- **Conversational discovery** — full `/discovery/*` API (4 endpoints) and `discover.html` chat UI. A user answers 1–7 questions from the `DiscoveryAgent` and clicks "Finalizar y crear run" to start a pipeline run seeded with the gathered requirements. `DiscoverySession` model stored in `discovery_session` table (migration 049). Alpine.js chat interface with typing indicator, round progress bar, and team selector. "Discover" nav link added to all authenticated pages.
+
+- **Brownfield write-back** — when a run is dispatched with `write_back=true` (field on `POST /run` and pipeline dispatcher), after the pipeline completes the platform: writes generated artifacts to the cloned repo using `antcrew.core.writeback.write_back()`, creates a branch `antcrew/wb-{run_id[:8]}`, commits, pushes to origin, and records the branch name + diff summary + push status in `run.state["write_back_result"]`. The "Write-back" card in `run.html` shows branch, diff summary, and a pushed/failed badge.
+
+- **Activity tab** in run detail (`run.html`) — new "Activity" tab merges `Event` rows and `HitlAuditEntry` rows by timestamp for a given run. Each entry shows a type badge (`event` in indigo, `hitl` in amber), kind label, and a payload summary. Backend: `GET /runs/{run_id}/activity`.
+
+- **WorkspaceMembership user_id** (migrations 047–048) — `workspace_membership` gains a `user_id INTEGER REFERENCES "user"(id)` column. Migration 047 adds it nullable and backfills via the `api_key` join; migration 048 enforces `NOT NULL` and adds a unique constraint on `(workspace_id, user_id)`. Auth paths now resolve memberships by both `api_key_id` and `user_id`.
+
+### Changed
+
+- `SECURITY.md` — prepended public vulnerability reporting policy (72-hour SLA, `security@antcrew.org`) and documented the intentional HMAC-SHA256-for-OTPs / bcrypt-for-passwords cryptographic choices.
+
+### Deferred debt declared
+
+- Discovery sessions do not yet expire; stale sessions accumulate indefinitely. A cleanup job (e.g. delete `status='active'` sessions older than 24 h) is tracked for the next maintenance release.
+
+---
+
 ## v0.6.5 (2026-07-29)
 
 ### Security
