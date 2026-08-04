@@ -12,7 +12,8 @@
 <script src="/static/i18n.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}</script>
-  </head>
+  <link rel="stylesheet" href="/static/tabler-icons/tabler-icons.min.css">
+</head>
 <body class="bg-gray-950 text-gray-100 min-h-screen" x-data="settings()" x-init="init()">
 
 <script src="/static/sidebar.js"></script>
@@ -41,48 +42,6 @@
   <button @click="clearApiKey()" class="ml-auto text-xs text-gray-700 hover:text-red-400 transition-colors">Limpiar</button>
 </div>
 
-<!-- Tab bar -->
-<div class="px-6 border-b border-gray-800 flex">
-  <button @click="tab='workspaces'"
-    :class="tab==='workspaces' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
-    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    <span data-i18n="tab.workspaces">Workspaces</span>
-    <span x-show="workspaces.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="workspaces.length"></span>
-  </button>
-  <button @click="tab='reviewers'"
-    :class="tab==='reviewers' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
-    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    <span data-i18n="tab.reviewers">Reviewers</span>
-    <span x-show="keys.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="keys.length"></span>
-  </button>
-  <button @click="tab='llm'"
-    :class="tab==='llm' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
-    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    <span data-i18n="tab.llm">LLM Mode</span>
-  </button>
-  <button @click="tab='schedules'"
-    :class="tab==='schedules' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
-    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    <span>Schedules</span>
-    <span x-show="schedules.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="schedules.length"></span>
-  </button>
-  <button @click="tab='security'"
-    :class="tab==='security' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
-    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    <span>Security</span>
-  </button>
-  <button @click="tab='github'"
-    :class="tab==='github' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
-    class="px-1 py-3 text-sm border-b-2 -mb-px mr-6 transition-colors">
-    <span>GitHub</span>
-    <span x-show="ghInstallations.length > 0" class="ml-1.5 text-xs text-gray-600" x-text="ghInstallations.length"></span>
-  </button>
-  <button @click="tab='profile'"
-    :class="tab==='profile' ? 'border-indigo-400 text-white' : 'border-transparent text-gray-400 hover:text-gray-200'"
-    class="px-1 py-3 text-sm border-b-2 -mb-px transition-colors">
-    <span data-i18n="tab.profile">My profile</span>
-  </button>
-</div>
 
 <div class="px-6 py-6 max-w-5xl">
 
