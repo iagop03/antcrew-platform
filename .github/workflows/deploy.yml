@@ -345,13 +345,13 @@ jobs:
           SHUTDOWN_MINS=$(( ${{ github.event.inputs.uat_hours || '1' }} * 60 ))
           echo "UAT live at http://$UAT_IP:8000 (auto-deletes in $SHUTDOWN_MINS min)"
 
-      # ── INT / PROD: Fly.io ────────────────────────────────────────────────────
+      # ── INT: Fly.io ──────────────────────────────────────────────────────────
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
-        if: needs.build.outputs.env_name != 'uat'
+        if: needs.build.outputs.env_name == 'int'
 
-      - name: Push secrets to Fly.io
-        if: needs.build.outputs.env_name != 'uat'
+      - name: Push secrets to Fly.io (INT)
+        if: needs.build.outputs.env_name == 'int'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           S_DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -368,7 +368,6 @@ jobs:
           S_GH_WEBHOOK_SECRET: ${{ secrets.GH_WEBHOOK_SECRET }}
           S_DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          APP="antcrew-${{ needs.build.outputs.env_name }}"
           flyctl secrets set \
             DATABASE_URL="$S_DATABASE_URL" \
             SECRET_KEY="$S_SECRET_KEY" \
@@ -382,10 +381,89 @@ jobs:
             GITHUB_PRIVATE_KEY="$S_GH_APP_PRIVATE_KEY" \
             GITHUB_WEBHOOK_SECRET="$S_GH_WEBHOOK_SECRET" \
             DEEPSEEK_API_KEY="$S_DEEPSEEK_API_KEY" \
-            --app "$APP" --stage
+            --app antcrew-int --stage
 
-      - name: Deploy to Fly.io
-        if: needs.build.outputs.env_name != 'uat'
-        run: flyctl deploy --remote-only --config fly.${{ needs.build.outputs.env_name }}.toml
+      - name: Deploy to Fly.io (INT)
+        if: needs.build.outputs.env_name == 'int'
+        run: flyctl deploy --remote-only --config fly.int.toml
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # ── PROD: Hetzner permanent server ───────────────────────────────────────
+
+      - name: Set up SSH key (PROD)
+        if: needs.build.outputs.env_name == 'prod'
+        env:
+          HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$HETZNER_SSH_KEY" > ~/.ssh/hetzner_prod
+          chmod 600 ~/.ssh/hetzner_prod
+          printf 'Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' >> ~/.ssh/config
+
+      - name: Deploy application to PROD
+        if: needs.build.outputs.env_name == 'prod'
+        env:
+          PROD_IP: ${{ secrets.PROD_SERVER_IP }}
+          P_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          P_SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          P_PLATFORM_API_KEY: ${{ secrets.PLATFORM_API_KEY }}
+          P_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          P_BYOK_ENCRYPTION_KEY: ${{ secrets.BYOK_ENCRYPTION_KEY }}
+          P_BASE_URL: ${{ secrets.BASE_URL }}
+          P_PLATFORM_BASE_URL: ${{ secrets.PLATFORM_BASE_URL }}
+          P_PLATFORM_ADMIN_TOKEN: ${{ secrets.PLATFORM_ADMIN_TOKEN }}
+          P_SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          P_SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          P_SMTP_USER: ${{ secrets.SMTP_USER }}
+          P_SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          P_SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          # GH_ prefix because GitHub reserves GITHUB_* for its own vars
+          P_GH_APP_ID: ${{ secrets.GH_APP_ID }}
+          P_GH_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          P_GH_WEBHOOK_SECRET: ${{ secrets.GH_WEBHOOK_SECRET }}
+          P_DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_ACTOR: ${{ github.actor }}
+          PLATFORM_IMAGE: ghcr.io/${{ github.repository }}:prod-latest
+        run: |
+          # Write .env.prod locally (runner expands secrets), then SCP it
+          cat > /tmp/env.prod <<EOF
+          DATABASE_URL=${P_DATABASE_URL}
+          SECRET_KEY=${P_SECRET_KEY}
+          PLATFORM_API_KEY=${P_PLATFORM_API_KEY}
+          ANTHROPIC_API_KEY=${P_ANTHROPIC_API_KEY}
+          BYOK_ENCRYPTION_KEY=${P_BYOK_ENCRYPTION_KEY}
+          BASE_URL=${P_BASE_URL}
+          PLATFORM_BASE_URL=${P_PLATFORM_BASE_URL}
+          PLATFORM_ADMIN_TOKEN=${P_PLATFORM_ADMIN_TOKEN}
+          SMTP_HOST=${P_SMTP_HOST}
+          SMTP_PORT=${P_SMTP_PORT}
+          SMTP_USER=${P_SMTP_USER}
+          SMTP_PASSWORD=${P_SMTP_PASSWORD}
+          SMTP_FROM=${P_SMTP_FROM}
+          GITHUB_APP_ID=${P_GH_APP_ID}
+          GITHUB_PRIVATE_KEY=${P_GH_PRIVATE_KEY}
+          GITHUB_WEBHOOK_SECRET=${P_GH_WEBHOOK_SECRET}
+          DEEPSEEK_API_KEY=${P_DEEPSEEK_API_KEY}
+          EOF
+          ssh -i ~/.ssh/hetzner_prod root@"$PROD_IP" "mkdir -p /opt/antcrew"
+          scp -i ~/.ssh/hetzner_prod /tmp/env.prod root@"$PROD_IP":/opt/antcrew/.env.prod
+          rm -f /tmp/env.prod
+
+          # Copy compose file (standalone, no base file needed)
+          scp -i ~/.ssh/hetzner_prod docker-compose.prod.yml root@"$PROD_IP":/opt/antcrew/
+
+          ssh -i ~/.ssh/hetzner_prod root@"$PROD_IP" bash <<REMOTE
+          set -euo pipefail
+          cd /opt/antcrew
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+          export PLATFORM_IMAGE="$PLATFORM_IMAGE"
+          docker compose -f docker-compose.prod.yml pull platform
+          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          echo "Deploy complete. Waiting for health check…"
+          sleep 10
+          docker compose -f docker-compose.prod.yml ps
+          REMOTE
+
+          echo "PROD live at https://antcrew.org"

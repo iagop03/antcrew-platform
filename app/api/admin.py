@@ -496,15 +496,16 @@ async def admin_analytics(
     )).all()
     tickets_by_team = {r.team: int(r.tickets) for r in ticket_team_rows}
 
+    _effective_mode = func.coalesce(_Run.llm_key_mode, Workspace.llm_key_mode).label("effective_mode")
     mode_rows = (await session.execute(
         sa_select(
-            Workspace.llm_key_mode,
+            _effective_mode,
             func.count(_Run.id).label("runs"),
             func.coalesce(func.sum(_Run.cost_usd), 0.0).label("cost"),
         )
-        .join(Workspace, _Run.workspace_id == Workspace.id)
+        .join(Workspace, _Run.workspace_id == Workspace.id, isouter=True)
         .where(_Run.created_at >= cutoff)
-        .group_by(Workspace.llm_key_mode)
+        .group_by(func.coalesce(_Run.llm_key_mode, Workspace.llm_key_mode))
         .order_by(func.coalesce(func.sum(_Run.cost_usd), 0.0).desc())
     )).all()
 
@@ -548,7 +549,7 @@ async def admin_analytics(
         ],
         "by_llm_mode": [
             {
-                "mode": r.llm_key_mode,
+                "mode": r.effective_mode,
                 "runs": int(r.runs),
                 "cost_usd": round(float(r.cost), 4),
             }
@@ -614,3 +615,85 @@ async def set_user_admin(
     await session.commit()
     await session.refresh(user)
     return user
+
+
+# ---------------------------------------------------------------------------
+# Analytics: HITL resolution time
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics/hitl-resolution")
+async def hitl_resolution_stats(
+    _admin=Depends(require_platform_admin),
+    session=Depends(get_session),
+):
+    """Average HITL review resolution time and count of resolved reviews."""
+    from app.models.run import HitlReview as _HitlReview
+
+    result = (await session.execute(
+        sa_select(
+            func.avg(
+                extract("epoch", _HitlReview.resolved_at - _HitlReview.created_at) / 60.0
+            ).label("avg_min"),
+            func.count().label("resolved_count"),
+        )
+        .where(_HitlReview.resolved_at.isnot(None))
+    )).one()
+
+    return {
+        "avg_resolution_min": round(float(result.avg_min or 0), 2),
+        "resolved_count": int(result.resolved_count),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Analytics: workspace churn
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics/churn")
+async def workspace_churn(
+    _admin=Depends(require_platform_admin),
+    session=Depends(get_session),
+    days: int = 30,
+):
+    """Workspaces that have run at least once but made no runs in the last *days* days."""
+    from app.models.run import Run as _ChurnRun
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    subq = (
+        sa_select(
+            _ChurnRun.workspace_id,
+            func.max(_ChurnRun.created_at).label("last_run"),
+        )
+        .where(_ChurnRun.workspace_id.isnot(None))
+        .group_by(_ChurnRun.workspace_id)
+        .subquery()
+    )
+
+    rows = (await session.execute(
+        sa_select(
+            Workspace.id,
+            Workspace.name,
+            Workspace.slug,
+            subq.c.last_run,
+        )
+        .join(subq, Workspace.id == subq.c.workspace_id)
+        .where(subq.c.last_run < cutoff)
+        .order_by(subq.c.last_run.asc())
+    )).all()
+
+    now = datetime.utcnow()
+    return {
+        "window_days": days,
+        "count": len(rows),
+        "churned_workspaces": [
+            {
+                "workspace_id": r.id,
+                "name": r.name,
+                "slug": r.slug,
+                "last_run_at": r.last_run.isoformat() if r.last_run else None,
+                "days_since_last_run": (now - r.last_run).days if r.last_run else None,
+            }
+            for r in rows
+        ],
+    }

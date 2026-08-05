@@ -719,6 +719,7 @@ async def _set_run_attribution(
     from sqlmodel.ext.asyncio.session import AsyncSession
     from app.core.database import engine as _db_engine
     from app.models.run import Run
+    from app.models.workspace import Workspace
 
     try:
         async with AsyncSession(_db_engine, expire_on_commit=False) as session:
@@ -729,6 +730,11 @@ async def _set_run_attribution(
                     run.created_by = created_by
                 if workspace_id is not None:
                     run.workspace_id = workspace_id
+                    ws = (await session.exec(
+                        select(Workspace).where(Workspace.id == workspace_id)
+                    )).first()
+                    if ws:
+                        run.llm_key_mode = ws.llm_key_mode
                 session.add(run)
                 await session.commit()
     except Exception as exc:

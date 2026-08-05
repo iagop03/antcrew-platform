@@ -1,5 +1,41 @@
 # Changelog — antcrew-platform
 
+## v0.6.8 (2026-08-06)
+
+### Added
+
+- **HITL UX — deep-link from run list to pending review** (`app/static/runs.html`) — the run
+  list now cross-references pending HITL reviews. When a run has a pending review, an amber
+  "Review" chip appears in the Status column; clicking it navigates directly to `/reviews/`.
+  The chip is updated on load and whenever the WebSocket emits `hitl.review_required`.
+
+- **HITL UX — re-run from list** (`app/static/runs.html`) — hovering any team run row reveals
+  a `⟳` button in the Started column. Clicking it opens the New Run modal pre-filled with the
+  same team and request text, without navigating to the run detail page.
+
+- **HITL UX — bulk approve** (`app/static/reviews.html`) — each review card now has a checkbox.
+  When any card is selected, an action bar appears with "Approve selected" (fires all approve
+  requests in parallel) and "Clear". A "Select all" button selects the entire visible queue
+  in one click. Addresses the pattern of approving the same checkpoint type repeatedly.
+
+### Fixed
+
+- **`by_llm_mode` attribution bug** (`app/api/admin.py`) — the analytics query now uses
+  `COALESCE(run.llm_key_mode, workspace.llm_key_mode)` so that historical runs retain the
+  mode that was active when they were created, rather than the workspace's current mode.
+  New runs have `llm_key_mode` snapshotted in `_set_run_attribution()` (migration 054).
+
+- **Discovery sessions never expired** (`app/core/background.py`) — added
+  `_discovery_session_cleanup_loop()` that sweeps sessions idle for more than
+  `DISCOVERY_SESSION_TTL_DAYS` (default: 7) every 6 hours. Resolves the known accumulation
+  noted in the CHANGELOG for v0.6.3.
+
+### Changed
+
+- **Data retention documentation** (`antcrew-docs/platform/data-retention.md`) — added
+  documentation for all retention policies, GDPR/LOPDGDD implications for `run.request`,
+  and manual deletion SQL for administrator use.
+
 ## v0.6.7 (2026-08-04)
 
 ### Added

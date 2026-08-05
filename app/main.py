@@ -23,6 +23,7 @@ from app.core.background import (
     _data_retention_loop,
     _eval_scheduler_loop,
     _run_scheduler_loop,
+    _discovery_session_cleanup_loop,
 )
 from app.core.database import init_db, get_session
 from app.core.listener import start_listening, stop_listening
@@ -110,6 +111,7 @@ async def lifespan(app: FastAPI):
             security_audit_api.run_schedule_loop(), name="security-audit-scheduler"
         )
         asyncio.create_task(_run_scheduler_loop(), name="run-scheduler")
+        asyncio.create_task(_discovery_session_cleanup_loop(), name="discovery-cleanup")
     yield
     if not _TESTING:
         stop_listening()

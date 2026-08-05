@@ -220,6 +220,32 @@
   </div>
 </template>
 
+<!-- Bulk action bar — appears when any review is selected -->
+<div x-show="!loading && reviews.length > 0 && activeTab !== 'analytics' && activeTab !== 'history'" class="px-6 mb-3">
+  <div class="flex items-center justify-between">
+    <!-- Select all -->
+    <button @click="reviews.forEach(r => { bulkSelected[r.review_id] = true })"
+      class="text-xs text-gray-500 hover:text-gray-300 transition">
+      Select all
+    </button>
+    <!-- Floating approve bar -->
+    <div x-show="Object.values(bulkSelected).some(v => v)" x-cloak x-transition
+      class="flex items-center gap-3 bg-amber-900/80 border border-amber-700 rounded-xl px-4 py-2">
+      <span class="text-sm text-amber-200">
+        <span x-text="Object.values(bulkSelected).filter(v => v).length" class="font-semibold"></span> selected
+      </span>
+      <button @click="Object.keys(bulkSelected).forEach(k => delete bulkSelected[k])"
+        class="text-xs text-amber-400 hover:text-white transition">
+        Clear
+      </button>
+      <button @click="bulkApprove()" :disabled="bulkApproving"
+        class="text-xs px-3 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white font-medium transition disabled:opacity-50"
+        x-text="bulkApproving ? 'Approving…' : 'Approve selected'">
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Review cards -->
 <div class="px-6 space-y-5" x-show="!loading && reviews.length > 0 && activeTab !== 'analytics' && activeTab !== 'history'">
   <template x-for="review in reviews" :key="review.review_id">
@@ -228,6 +254,11 @@
       <!-- Card header -->
       <div class="px-5 py-3 border-b border-gray-800 flex items-center justify-between bg-amber-900/10">
         <div class="flex items-center gap-3 flex-wrap">
+          <!-- Bulk selection checkbox -->
+          <input type="checkbox" :id="'bulk-' + review.review_id"
+            x-model="bulkSelected[review.review_id]"
+            @click.stop
+            class="w-3.5 h-3.5 rounded border-gray-600 bg-gray-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0 shrink-0 cursor-pointer">
           <span class="inline-flex items-center gap-1.5 bg-amber-900/40 text-amber-300 text-xs font-medium px-2.5 py-1 rounded-full">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
             <span x-text="review.agent_name"></span>
@@ -479,6 +510,8 @@ function reviewQueue() {
     inlineLabel: '',
     history: [],
     historyLoading: false,
+    bulkSelected: {},
+    bulkApproving: false,
 
     async init() {
       const meR = await fetch('/auth/me', { credentials: 'same-origin' }).catch(() => null);
@@ -637,6 +670,17 @@ function reviewQueue() {
         this.editingId = null;
         this.editedJson = '';
       }
+    },
+
+    async bulkApprove() {
+      if (this.bulkApproving) return;
+      const selected = Object.keys(this.bulkSelected).filter(id => this.bulkSelected[id]);
+      if (!selected.length) return;
+      this.bulkApproving = true;
+      const targets = this.reviews.filter(r => selected.includes(r.review_id));
+      await Promise.all(targets.map(review => this.resolve(review, 'approve')));
+      this.bulkSelected = {};
+      this.bulkApproving = false;
     },
 
     async resolve(review, decision, _unused, editedJson) {

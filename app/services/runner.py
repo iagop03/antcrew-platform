@@ -316,6 +316,7 @@ async def _set_run_attribution(
 ) -> None:
     from sqlmodel import select
     from app.models.run import Run
+    from app.models.workspace import Workspace
     try:
         async with AsyncSession(engine, expire_on_commit=False) as session:
             result = await session.exec(select(Run).where(Run.run_id == run_id))
@@ -325,6 +326,11 @@ async def _set_run_attribution(
                     run.created_by = created_by
                 if workspace_id is not None:
                     run.workspace_id = workspace_id
+                    ws = (await session.exec(
+                        select(Workspace).where(Workspace.id == workspace_id)
+                    )).first()
+                    if ws:
+                        run.llm_key_mode = ws.llm_key_mode
                 if client_label is not None:
                     run.client_label = client_label
                 if model_overrides:

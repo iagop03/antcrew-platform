@@ -15,3 +15,6 @@ dist/
 
 platform.db
 *.db-journal
+
+# Local ops notes — not for version control
+PROD_DEPLOY.md

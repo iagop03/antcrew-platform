@@ -138,3 +138,34 @@ async def _run_scheduler_loop() -> None:
                 log.info("run scheduler dispatched %d engine run(s)", n)
         except Exception as exc:
             log.warning("run scheduler error: %s", exc)
+
+
+async def _discovery_session_cleanup_loop() -> None:
+    """Delete stale DiscoverySession rows every 6 hours.
+
+    A session is eligible if updated_at has not changed in DISCOVERY_SESSION_TTL_DAYS
+    (default 7). Covers both abandoned in-progress sessions and completed ones.
+    """
+    import os as _os
+    from datetime import datetime, timedelta, timezone
+    from sqlmodel.ext.asyncio.session import AsyncSession
+    from app.core.database import engine as _engine
+    from app.models.discovery import DiscoverySession
+
+    ttl_days = int(_os.environ.get("DISCOVERY_SESSION_TTL_DAYS", "7"))
+    log.info("discovery session cleanup started (ttl=%dd)", ttl_days)
+    while True:
+        await asyncio.sleep(21600)  # 6 hours
+        try:
+            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=ttl_days)
+            async with AsyncSession(_engine, expire_on_commit=False) as session:
+                stale = (await session.exec(
+                    select(DiscoverySession).where(DiscoverySession.updated_at <= cutoff)
+                )).all()
+                for s in stale:
+                    await session.delete(s)
+                if stale:
+                    await session.commit()
+                    log.info("discovery cleanup: deleted %d stale session(s)", len(stale))
+        except Exception as exc:
+            log.warning("discovery cleanup error: %s", exc)

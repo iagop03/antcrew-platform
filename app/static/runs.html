@@ -102,7 +102,7 @@
         </template>
         <!-- Rows -->
         <template x-for="run in runs" :key="run.run_id">
-          <tr class="border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer transition"
+          <tr class="group border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer transition"
               @click="window.location='/run/' + run.run_id">
             <td class="px-4 py-3 font-mono text-xs text-gray-400" x-text="run.run_id.slice(0,12) + '…'"></td>
             <td class="px-4 py-3 font-medium">
@@ -117,20 +117,43 @@
             </td>
             <td class="px-4 py-3 text-gray-300 max-w-xs truncate" x-text="run.request"></td>
             <td class="px-4 py-3">
-              <span class="px-2 py-0.5 rounded-full text-xs font-medium"
-                :class="{
-                  'bg-yellow-900/50 text-yellow-300': run.status === 'running',
-                  'bg-green-900/50 text-green-300': run.status === 'success',
-                  'bg-red-900/50 text-red-300': run.status === 'error',
-                  'bg-gray-800 text-gray-400': !['running','success','error'].includes(run.status)
-                }"
-                x-text="run.status"></span>
+              <div class="flex items-center gap-1.5">
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                  :class="{
+                    'bg-yellow-900/50 text-yellow-300': run.status === 'running',
+                    'bg-green-900/50 text-green-300': run.status === 'success',
+                    'bg-red-900/50 text-red-300': run.status === 'error',
+                    'bg-gray-800 text-gray-400': !['running','success','error'].includes(run.status)
+                  }"
+                  x-text="run.status"></span>
+                <!-- Deep-link to review queue when a pending HITL review exists for this run -->
+                <template x-if="pendingReviewRunIds[run.run_id]">
+                  <a href="/reviews/" @click.stop
+                    title="This run has a pending HITL review"
+                    class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300 hover:bg-amber-800/70 transition">
+                    <span class="w-1 h-1 rounded-full bg-amber-400 animate-pulse"></span>
+                    Review
+                  </a>
+                </template>
+              </div>
             </td>
             <td class="px-4 py-3 text-right text-gray-300 font-mono text-xs"
                 x-text="run.cost_usd ? '€' + run.cost_usd.toFixed(4) : '—'"></td>
             <td class="px-4 py-3 text-right text-gray-400 text-xs"
                 x-text="run.duration_s ? run.duration_s.toFixed(0) + 's' : '—'"></td>
-            <td class="px-4 py-3 text-right text-gray-400 text-xs" x-text="timeAgo(run.created_at)"></td>
+            <td class="px-4 py-3 text-right text-gray-400 text-xs">
+              <div class="flex items-center justify-end gap-2">
+                <span x-text="timeAgo(run.created_at)"></span>
+                <!-- Re-run: pre-fills the modal with same team + request, no navigation -->
+                <template x-if="run.team && !run.team.startsWith('pipeline:') && run.team !== 'engine'">
+                  <button @click.stop="reRun(run)"
+                    title="Re-run with same team and request"
+                    class="opacity-0 group-hover:opacity-100 transition-opacity text-xs px-1.5 py-0.5 rounded border border-gray-700 text-gray-500 hover:border-indigo-500 hover:text-indigo-300">
+                    ⟳
+                  </button>
+                </template>
+              </div>
+            </td>
           </tr>
         </template>
       </tbody>
@@ -422,6 +445,7 @@ function dashboard() {
     teamOptions: [],
     templates: [],
     pendingReviews: 0,
+    pendingReviewRunIds: {},
     runningEvals: 0,
     form: {
       mode: 'team',
@@ -562,7 +586,13 @@ function dashboard() {
     async loadPendingReviews() {
       try {
         const r = await fetch('/reviews/?status=pending&limit=100', { headers: this.apiHeaders() });
-        if (r.ok) this.pendingReviews = (await r.json()).length;
+        if (r.ok) {
+          const reviews = await r.json();
+          this.pendingReviews = reviews.length;
+          const ids = {};
+          reviews.forEach(rv => { if (rv.run_id) ids[rv.run_id] = true; });
+          this.pendingReviewRunIds = ids;
+        }
       } catch {}
     },
 
@@ -765,6 +795,19 @@ function dashboard() {
       } finally {
         this.submitting = false;
       }
+    },
+
+    reRun(run) {
+      this.form.mode = 'team';
+      this.form.team = run.team;
+      this.form.request = run.request;
+      this.form.max_cost_usd = null;
+      this.form.hitl = false;
+      this.form.repo_url = '';
+      this.form.model = '';
+      this.agentModels = {};
+      this.agentConfigOpen = false;
+      this.showModal = true;
     },
 
     timeAgo(iso) {

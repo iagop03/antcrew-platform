@@ -72,6 +72,7 @@ class Run(SQLModel, table=True):
     client_label: Optional[str] = Field(default=None, index=True)  # cost-center / client tag for spend breakdown
     model: Optional[str] = Field(default=None, index=True)         # LLM model used (e.g. "claude-sonnet-4-5"); populated when known
     model_overrides: Optional[dict] = Field(default=None, sa_column=Column(JSON))  # per-agent overrides: {"BackendDevAgent": "groq:llama-3.3-70b"}
+    llm_key_mode: Optional[str] = Field(default=None)  # snapshotted from workspace at run creation; use for attribution queries
 
 
 class Ticket(SQLModel, table=True):

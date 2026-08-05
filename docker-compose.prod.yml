@@ -1,15 +1,17 @@
-# Production environment overlay.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# PROD — standalone compose for the permanent Hetzner server.
+# Not an override of docker-compose.yml; deployed alone on the remote host.
 #
-# Requires: .env.prod  (copy from .env.prod.example, fill in secrets — NEVER commit)
+# PLATFORM_IMAGE must be set before running:
+#   export PLATFORM_IMAGE=ghcr.io/<owner>/<repo>:prod-latest
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Secrets come from .env.prod (written by the deploy workflow — never commit it).
+# Alembic migrations run automatically before uvicorn starts.
 
 services:
   platform:
-    build:
-      args:
-        APP_ENV: prod
-    env_file:
-      - .env.prod
+    image: ${PLATFORM_IMAGE}
+    env_file: .env.prod
     environment:
       APP_ENV: prod
       HOST: 0.0.0.0
@@ -17,25 +19,11 @@ services:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
       ANTCREW_REQUIRE_AUTH: "true"
-    volumes:
-      - []
+    ports:
+      - "80:8000"
     restart: unless-stopped
     command: >
-      uvicorn app.main:app
+      sh -c "python -m alembic upgrade head && uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
-      --workers 4
-
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    env_file:
-      - .env.prod
-    environment:
-      POSTGRES_DB: antcrew_prod
-    volumes:
-      - postgres_prod:/var/lib/postgresql/data
-
-volumes:
-  platform_data: null
-  postgres_prod:
+      --workers 1"
