@@ -17,7 +17,7 @@ from sqlalchemy import func, select as sa_select
 from app.core.auth import require_api_key, require_role, get_workspace_context, WorkspaceContext, ws_accessible, ws_filter
 from app.core.database import get_session
 from app.core.security import validate_external_url
-from app.models.run import Workspace, Run, HitlReview, WebhookConfig, WebhookEvent, WebhookDelivery
+from app.models.run import Workspace, Run, HitlReview, WebhookConfig, WebhookEvent, WebhookDelivery, RunPreset
 
 router = APIRouter(
     prefix="/workspaces",
@@ -1167,3 +1167,81 @@ async def workspace_analytics(
             for r in model_rows
         ],
     }
+
+
+# ── Run presets ───────────────────────────────────────────────────────────────
+
+class RunPresetPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    workspace_id: int
+    name: str
+    team: str
+    model_overrides: Optional[dict] = None
+    created_at: Optional[datetime] = None
+
+
+class CreateRunPreset(BaseModel):
+    name: str
+    team: str
+    model_overrides: Optional[dict] = None
+
+
+@router.get("/{workspace_id}/presets", response_model=list[RunPresetPublic],
+            dependencies=[Depends(require_role("admin", "write"))])
+async def list_presets(
+    workspace_id: int,
+    team: Optional[str] = Query(None),
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+    if not ws or not ws_accessible(ws.id, ctx):
+        raise HTTPException(404, "Workspace not found")
+    q = select(RunPreset).where(RunPreset.workspace_id == workspace_id)
+    if team:
+        q = q.where(RunPreset.team == team)
+    results = (await session.exec(q.order_by(RunPreset.name))).all()
+    return results
+
+
+@router.post("/{workspace_id}/presets", response_model=RunPresetPublic, status_code=201,
+             dependencies=[Depends(require_role("admin", "write"))])
+async def create_preset(
+    workspace_id: int,
+    body: CreateRunPreset,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+    if not ws or not ws_accessible(ws.id, ctx):
+        raise HTTPException(404, "Workspace not found")
+    preset = RunPreset(
+        workspace_id=workspace_id,
+        name=body.name,
+        team=body.team,
+        model_overrides=body.model_overrides or None,
+        created_by=ctx.created_by,
+    )
+    session.add(preset)
+    await session.commit()
+    await session.refresh(preset)
+    return preset
+
+
+@router.delete("/{workspace_id}/presets/{preset_id}", status_code=204,
+               dependencies=[Depends(require_role("admin", "write"))])
+async def delete_preset(
+    workspace_id: int,
+    preset_id: int,
+    ctx: WorkspaceContext = Depends(get_workspace_context),
+    session: AsyncSession = Depends(get_session),
+):
+    ws = (await session.exec(select(Workspace).where(Workspace.id == workspace_id))).first()
+    if not ws or not ws_accessible(ws.id, ctx):
+        raise HTTPException(404, "Workspace not found")
+    preset = await session.get(RunPreset, preset_id)
+    if not preset or preset.workspace_id != workspace_id:
+        raise HTTPException(404, "Preset not found")
+    await session.delete(preset)
+    await session.commit()

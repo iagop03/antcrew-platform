@@ -134,6 +134,48 @@ async def list_teams():
     return {"teams": ALL_PIPELINE_TYPES}
 
 
+_TEAM_AGENTS: dict[str, list[dict]] = {
+    "DevTeam": [
+        {"name": "BusinessAnalystAgent", "description": "Analiza el brief y produce un spec estructurado de requisitos mediante Q&A.", "artifact_type": "requirements_spec", "position": 0},
+        {"name": "PMAgent", "description": "Convierte el spec en un backlog de tickets priorizados.", "artifact_type": "tickets", "position": 1},
+        {"name": "BackendDevAgent", "description": "Implementa el código backend, APIs REST y modelos de datos.", "artifact_type": "implementation_plan", "position": 2},
+    ],
+    "FullStackTeam": [
+        {"name": "CodebaseScannerAgent", "description": "Escanea el repositorio existente para dar contexto antes de planificar.", "artifact_type": None, "position": 0},
+        {"name": "BusinessAnalystAgent", "description": "Analiza requisitos y produce un spec estructurado.", "artifact_type": "requirements_spec", "position": 1},
+        {"name": "PMAgent", "description": "Convierte el spec en un sprint backlog priorizado.", "artifact_type": "tickets", "position": 2},
+        {"name": "SprintPlannerAgent", "description": "Planifica la capacidad del sprint y asigna tickets.", "artifact_type": None, "position": 3},
+        {"name": "BackendDevAgent", "description": "Implementa APIs y capa de datos.", "artifact_type": "implementation_plan", "position": 4},
+        {"name": "FrontendDevAgent", "description": "Construye componentes UI y páginas.", "artifact_type": None, "position": 5},
+        {"name": "QAAgent", "description": "Escribe y ejecuta tests para la implementación.", "artifact_type": None, "position": 6},
+        {"name": "ReviewerAgent", "description": "Revisa los artefactos y puede pausar para aprobación HITL.", "artifact_type": None, "position": 7},
+        {"name": "DevOpsAgent", "description": "Configura CI/CD, Docker y despliegue.", "artifact_type": None, "position": 8},
+        {"name": "DocWriterAgent", "description": "Escribe documentación de desarrollador y README.", "artifact_type": None, "position": 9},
+    ],
+    "ResearchTeam": [
+        {"name": "ResearcherAgent", "description": "Investiga el tema desde múltiples fuentes y sintetiza los hallazgos clave.", "artifact_type": "research_report", "position": 0},
+        {"name": "CopywriterAgent", "description": "Convierte los hallazgos en un escrito estructurado y pulido.", "artifact_type": None, "position": 1},
+    ],
+    "ContentTeam": [
+        {"name": "IdeaAgent", "description": "Genera ideas de contenido y esquemas basados en el brief.", "artifact_type": None, "position": 0},
+        {"name": "CopywriterAgent", "description": "Redacta el contenido a partir del esquema aprobado.", "artifact_type": None, "position": 1},
+        {"name": "EditorAgent", "description": "Edita por claridad, tono y precisión.", "artifact_type": None, "position": 2},
+    ],
+    "FeatureTeam": [
+        {"name": "FeatureAgent", "description": "Implementa una feature completa de extremo a extremo: requisitos, código y revisión en un solo paso.", "artifact_type": None, "position": 0},
+    ],
+}
+
+
+@router.get("/teams/{team}/agents")
+async def get_team_agents(team: str):
+    """Return the ordered agent list for a team, with descriptions and artifact types."""
+    if team not in AVAILABLE_TEAMS:
+        raise HTTPException(404, f"Team {team!r} not found. Available: {AVAILABLE_TEAMS}")
+    agents = _TEAM_AGENTS.get(team, [])
+    return {"team": team, "agents": agents}
+
+
 class AgentStepConfig(BaseModel):
     """One agent step definition — mirrors TemplateAgent YAML fields."""
     name: str

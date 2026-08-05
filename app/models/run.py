@@ -128,6 +128,20 @@ class RunTemplate(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
 
 
+class RunPreset(SQLModel, table=True):
+    """Named model-override configuration for a team, scoped to a workspace."""
+
+    __tablename__ = "run_preset"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(index=True)
+    name: str
+    team: str
+    model_overrides: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    created_by: Optional[str] = None
+    created_at: Optional[datetime] = Field(default_factory=_utcnow)
+
+
 class RunSchedule(SQLModel, table=True):
     """Recurring engine run — fires on a cron expression, scoped to a workspace."""
 
@@ -187,5 +201,6 @@ __all__ = [
     "Ticket",
     "Event",
     "RunTemplate",
+    "RunPreset",
     "RunSchedule",
 ]
