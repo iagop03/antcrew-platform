@@ -487,3 +487,123 @@ async def test_slack_webhook_null_clears_without_validation(client: AsyncClient,
     )
     assert r.status_code == 200
     assert r.json()["slack_webhook_url"] is None
+
+
+# ---------------------------------------------------------------------------
+# Run presets (GET / POST / DELETE /{workspace_id}/presets)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_list_presets_empty(client: AsyncClient, session):
+    ws = Workspace(name="Preset WS", slug="preset-ws-list")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    r = await client.get(f"/workspaces/{ws.id}/presets")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_create_preset(client: AsyncClient, session):
+    ws = Workspace(name="Preset WS2", slug="preset-ws-create")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    payload = {
+        "name": "Groq Sprint",
+        "team": "DevTeam",
+        "model_overrides": {"BackendDevAgent": "groq:llama-3.3-70b-versatile"},
+    }
+    r = await client.post(f"/workspaces/{ws.id}/presets", json=payload)
+    assert r.status_code == 201
+    data = r.json()
+    assert data["name"] == "Groq Sprint"
+    assert data["team"] == "DevTeam"
+    assert data["model_overrides"] == {"BackendDevAgent": "groq:llama-3.3-70b-versatile"}
+    assert data["workspace_id"] == ws.id
+    assert "id" in data
+
+
+@pytest.mark.asyncio
+async def test_create_and_list_presets(client: AsyncClient, session):
+    ws = Workspace(name="Preset WS3", slug="preset-ws-both")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    await client.post(f"/workspaces/{ws.id}/presets", json={"name": "Alpha", "team": "DevTeam"})
+    await client.post(f"/workspaces/{ws.id}/presets", json={"name": "Beta", "team": "ResearchTeam"})
+
+    r = await client.get(f"/workspaces/{ws.id}/presets")
+    assert r.status_code == 200
+    names = [p["name"] for p in r.json()]
+    assert "Alpha" in names
+    assert "Beta" in names
+
+
+@pytest.mark.asyncio
+async def test_list_presets_filter_by_team(client: AsyncClient, session):
+    ws = Workspace(name="Preset WS4", slug="preset-ws-filter")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    await client.post(f"/workspaces/{ws.id}/presets", json={"name": "Dev preset", "team": "DevTeam"})
+    await client.post(f"/workspaces/{ws.id}/presets", json={"name": "Research preset", "team": "ResearchTeam"})
+
+    r = await client.get(f"/workspaces/{ws.id}/presets?team=DevTeam")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["name"] == "Dev preset"
+
+
+@pytest.mark.asyncio
+async def test_delete_preset(client: AsyncClient, session):
+    ws = Workspace(name="Preset WS5", slug="preset-ws-delete")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    r_create = await client.post(f"/workspaces/{ws.id}/presets", json={"name": "ToDelete", "team": "DevTeam"})
+    assert r_create.status_code == 201
+    preset_id = r_create.json()["id"]
+
+    r_del = await client.delete(f"/workspaces/{ws.id}/presets/{preset_id}")
+    assert r_del.status_code == 204
+
+    r_list = await client.get(f"/workspaces/{ws.id}/presets")
+    assert r_list.json() == []
+
+
+@pytest.mark.asyncio
+async def test_delete_preset_wrong_workspace_returns_404(client: AsyncClient, session):
+    ws1 = Workspace(name="WS-A", slug="preset-ws-a-del")
+    ws2 = Workspace(name="WS-B", slug="preset-ws-b-del")
+    session.add(ws1)
+    session.add(ws2)
+    await session.commit()
+    await session.refresh(ws1)
+    await session.refresh(ws2)
+
+    r_create = await client.post(f"/workspaces/{ws1.id}/presets", json={"name": "P", "team": "DevTeam"})
+    preset_id = r_create.json()["id"]
+
+    # Attempt to delete from ws2 — must 404
+    r = await client.delete(f"/workspaces/{ws2.id}/presets/{preset_id}")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_preset_null_model_overrides(client: AsyncClient, session):
+    ws = Workspace(name="Preset WS6", slug="preset-ws-null")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    r = await client.post(f"/workspaces/{ws.id}/presets", json={"name": "Bare", "team": "ContentTeam"})
+    assert r.status_code == 201
+    assert r.json()["model_overrides"] is None

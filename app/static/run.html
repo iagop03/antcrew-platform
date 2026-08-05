@@ -117,6 +117,14 @@
             <span class="text-xs text-gray-600 ml-0.5" x-text="'(' + activity.length + ')'"></span>
           </template>
         </button>
+        <button @click="activeTab = 'trace'"
+          class="px-3 py-2 text-sm font-medium transition -mb-px border-b-2"
+          :class="activeTab === 'trace'
+            ? 'border-indigo-500 text-white'
+            : 'border-transparent text-gray-500 hover:text-gray-300'">
+          Trace
+          <span class="text-xs text-gray-600 ml-0.5" x-text="capabilityRuns.length ? '(' + capabilityRuns.length + ')' : ''"></span>
+        </button>
       </div>
 
       <!-- ── Events tab ── -->
@@ -193,6 +201,51 @@
                      x-show="item.payload && Object.keys(item.payload).length > 0"
                      x-text="payloadSummary(item.payload)"></div>
               </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- ── Trace tab ── -->
+      <div x-show="activeTab === 'trace'">
+        <template x-if="capabilityRuns.length === 0">
+          <p class="text-gray-500 text-sm py-4">No hay trazas aún — el run aún no ha iniciado agentes.</p>
+        </template>
+        <div class="space-y-2">
+          <template x-for="(cap, idx) in capabilityRuns" :key="cap.name + idx">
+            <div class="bg-gray-900 border rounded-lg overflow-hidden"
+                 :class="cap.done ? 'border-gray-800' : 'border-indigo-900/70'">
+              <div class="flex items-center gap-3 px-3 py-2.5"
+                   :class="cap.done && (cap.produced && cap.produced.length > 0) ? 'border-b border-gray-800/60' : ''">
+                <div class="w-2 h-2 rounded-full shrink-0"
+                     :class="!cap.done ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500'"></div>
+                <span class="font-mono text-sm text-white font-medium" x-text="cap.name"></span>
+                <div class="ml-auto flex items-center gap-3 text-xs">
+                  <template x-if="run && run.model_overrides && run.model_overrides[cap.name]">
+                    <span class="text-indigo-400 font-mono" x-text="run.model_overrides[cap.name]"></span>
+                  </template>
+                  <template x-if="cap.done">
+                    <span class="text-gray-500 tabular-nums" x-text="cap.duration + 's'"></span>
+                  </template>
+                  <template x-if="!cap.done">
+                    <span class="text-yellow-400">running…</span>
+                  </template>
+                </div>
+              </div>
+              <template x-if="cap.produced && cap.produced.length > 0">
+                <div class="px-3 py-2 text-xs flex items-center gap-1.5 flex-wrap">
+                  <span class="text-gray-600">produced:</span>
+                  <template x-for="key in cap.produced" :key="key">
+                    <span class="font-mono text-indigo-300 bg-indigo-950/50 border border-indigo-900/50 px-1.5 py-0.5 rounded"
+                          x-text="key"></span>
+                  </template>
+                </div>
+              </template>
+              <template x-if="!cap.done && liveTokens[cap.name]">
+                <pre class="px-3 py-2 text-xs font-mono text-green-400/80 bg-black/20 leading-tight
+                            max-h-36 overflow-auto whitespace-pre-wrap break-all border-t border-gray-800"
+                     x-text="liveTokens[cap.name]"></pre>
+              </template>
             </div>
           </template>
         </div>
@@ -424,6 +477,29 @@
             </div>
           </div>
 
+          <!-- Re-run -->
+          <template x-if="run.status === 'success' || run.status === 'error'">
+            <div class="border border-gray-800 rounded-xl overflow-hidden">
+              <button @click="triggerRerun()"
+                :disabled="rerunLoading"
+                class="w-full flex items-center justify-between px-3 py-2.5 bg-gray-900 hover:bg-gray-800 transition text-sm text-gray-300 disabled:opacity-50">
+                <span class="flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                  </svg>
+                  Re-run
+                </span>
+                <span x-show="rerunLoading" class="text-xs text-gray-500">iniciando…</span>
+              </button>
+              <template x-if="rerunRunId">
+                <div class="px-3 py-2 bg-gray-900/50 border-t border-gray-800 text-xs text-emerald-400">
+                  Iniciado →
+                  <a :href="'/run/' + rerunRunId" class="underline font-mono" x-text="rerunRunId.slice(0,12)"></a>
+                </div>
+              </template>
+            </div>
+          </template>
+
           <!-- Download artifacts (team run) -->
           <div x-show="run.status === 'success' && stateJson">
             <a :href="'/runs/' + runId + '/artifacts.zip'"
@@ -534,6 +610,8 @@ function runDetail() {
     activity: [],
     loadingActivity: false,
     writeBackResult: null,
+    rerunLoading: false,
+    rerunRunId: null,
 
     async init() {
       const match = location.pathname.match(/^\/run\/(.+?)\/?$/);
@@ -711,6 +789,21 @@ function runDetail() {
         const r = await fetch(`/runs/${this.runId}/cancel`, { method: 'POST', headers: this.apiHeaders() });
         if (r.ok) this.run = await r.json();
       } catch {}
+    },
+
+    async triggerRerun() {
+      if (!this.run) return;
+      this.rerunLoading = true;
+      try {
+        const r = await fetch('/run/', {
+          method: 'POST',
+          headers: this.apiHeaders(),
+          body: JSON.stringify({ team: this.run.team, request: this.run.request }),
+        });
+        if (r.ok) this.rerunRunId = (await r.json()).run_id;
+      } catch {} finally {
+        this.rerunLoading = false;
+      }
     },
 
     async triggerReplay() {
