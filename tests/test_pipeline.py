@@ -22,6 +22,44 @@ async def test_list_teams(client):
 
 
 # ---------------------------------------------------------------------------
+# GET /run/teams/{team}/agents
+# ---------------------------------------------------------------------------
+
+async def test_get_team_agents_devteam(client):
+    r = await client.get("/run/teams/DevTeam/agents")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["team"] == "DevTeam"
+    agents = data["agents"]
+    assert len(agents) == 3
+    names = [a["name"] for a in agents]
+    assert "BusinessAnalystAgent" in names
+    assert "PMAgent" in names
+    assert "BackendDevAgent" in names
+    assert agents[0]["position"] == 0
+
+
+async def test_get_team_agents_fullstackteam(client):
+    r = await client.get("/run/teams/FullStackTeam/agents")
+    assert r.status_code == 200
+    assert len(r.json()["agents"]) == 10
+
+
+async def test_get_team_agents_unknown_returns_404(client):
+    r = await client.get("/run/teams/UnknownTeam/agents")
+    assert r.status_code == 404
+
+
+async def test_get_team_agents_has_required_fields(client):
+    r = await client.get("/run/teams/ResearchTeam/agents")
+    assert r.status_code == 200
+    for ag in r.json()["agents"]:
+        assert ag["name"]
+        assert ag["description"]
+        assert "position" in ag
+
+
+# ---------------------------------------------------------------------------
 # POST /run — validation
 # ---------------------------------------------------------------------------
 

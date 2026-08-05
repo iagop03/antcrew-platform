@@ -607,3 +607,75 @@ async def test_preset_null_model_overrides(client: AsyncClient, session):
     r = await client.post(f"/workspaces/{ws.id}/presets", json={"name": "Bare", "team": "ContentTeam"})
     assert r.status_code == 201
     assert r.json()["model_overrides"] is None
+
+
+# ---------------------------------------------------------------------------
+# PATCH /{workspace_id}/agent-models
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_set_agent_models(client: AsyncClient, session):
+    ws = Workspace(name="AM WS", slug="agent-models-set")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    r = await client.patch(f"/workspaces/{ws.id}/agent-models", json={
+        "agent_models": {
+            "default": "groq:llama-3.3-70b-versatile",
+            "BackendDevAgent": "claude:claude-sonnet-5",
+        }
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["agent_models"]["default"] == "groq:llama-3.3-70b-versatile"
+    assert data["agent_models"]["BackendDevAgent"] == "claude:claude-sonnet-5"
+
+
+@pytest.mark.asyncio
+async def test_clear_agent_models(client: AsyncClient, session):
+    ws = Workspace(name="AM WS2", slug="agent-models-clear")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    await client.patch(f"/workspaces/{ws.id}/agent-models", json={"agent_models": {"default": "simulated"}})
+    r = await client.patch(f"/workspaces/{ws.id}/agent-models", json={"agent_models": None})
+    assert r.status_code == 200
+    assert r.json()["agent_models"] is None
+
+
+@pytest.mark.asyncio
+async def test_agent_models_returned_in_workspace_get(client: AsyncClient, session):
+    """agent_models is included in GET /workspaces/{id} response."""
+    ws = Workspace(name="AM WS3", slug="agent-models-get")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    await client.patch(f"/workspaces/{ws.id}/agent-models", json={
+        "agent_models": {"default": "deepseek:deepseek-chat"}
+    })
+
+    r = await client.get(f"/workspaces/{ws.id}")
+    assert r.status_code == 200
+    assert r.json()["agent_models"] == {"default": "deepseek:deepseek-chat"}
+
+
+@pytest.mark.asyncio
+async def test_agent_models_returned_in_workspace_list(client: AsyncClient, session):
+    """agent_models is included in GET /workspaces/ list response."""
+    ws = Workspace(name="AM WS4", slug="agent-models-list")
+    session.add(ws)
+    await session.commit()
+    await session.refresh(ws)
+
+    await client.patch(f"/workspaces/{ws.id}/agent-models", json={
+        "agent_models": {"default": "simulated"}
+    })
+
+    r = await client.get("/workspaces/")
+    assert r.status_code == 200
+    match = next((w for w in r.json() if w["slug"] == "agent-models-list"), None)
+    assert match is not None
+    assert match["agent_models"]["default"] == "simulated"
