@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Request
@@ -21,6 +22,10 @@ from sqlmodel import select
 
 from app.core.database import get_session
 from app.models.auth import User, UserSession
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 log = logging.getLogger(__name__)
 
@@ -41,11 +46,13 @@ async def get_session_user(
     if not raw_token:
         raise HTTPException(401, "Authentication required")
 
+    now = _utcnow()
     token_hash = _hash_token(raw_token)
     user_session: Optional[UserSession] = (await session.exec(
         select(UserSession)
         .where(UserSession.token_hash == token_hash)
         .where(UserSession.revoked.is_(False))
+        .where(UserSession.expires_at > now)
     )).first()
 
     # Fallback for pre-033 sessions stored with plaintext token
@@ -54,6 +61,7 @@ async def get_session_user(
             select(UserSession)
             .where(UserSession.token == raw_token)
             .where(UserSession.revoked.is_(False))
+            .where(UserSession.expires_at > now)
         )).first()
 
     if user_session is None or user_session.user_id is None:
@@ -80,6 +88,7 @@ async def require_platform_admin(
         select(UserSession)
         .where(UserSession.token_hash == token_hash)
         .where(UserSession.revoked.is_(False))
+        .where(UserSession.expires_at > _utcnow())
     )).first()
 
     if user_session is None or user_session.user_id is None:

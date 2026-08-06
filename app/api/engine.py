@@ -12,6 +12,7 @@ Run lifecycle is identical to team runs:
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -81,6 +82,19 @@ class EngineRunRequest(BaseModel):
         p = Path(v.strip())
         if not p.is_absolute():
             raise ValueError("path must be absolute on the server")
+        sandbox_root = os.environ.get("ENGINE_FS_ROOT")
+        if sandbox_root:
+            try:
+                p.resolve().relative_to(Path(sandbox_root).resolve())
+            except ValueError:
+                raise ValueError(
+                    f"path must be under ENGINE_FS_ROOT ({sandbox_root})"
+                )
+        elif os.environ.get("APP_ENV", "dev").lower() != "dev":
+            raise ValueError(
+                "source_dir/output_dir are disabled in non-dev environments unless "
+                "ENGINE_FS_ROOT is configured"
+            )
         return str(p)
 
 

@@ -89,8 +89,37 @@ def _hash_verification_code(code: str) -> str:
     import hmac as _hmac
     secret = os.environ.get("SECRET_KEY", "")
     if not secret:
-        return _hl.sha256(code.encode()).hexdigest()
+        raise RuntimeError(
+            "SECRET_KEY must be set. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
     return _hmac.new(secret.encode(), code.encode(), _hl.sha256).hexdigest()
+
+
+def _encrypt_totp(secret: str) -> str:
+    """Encrypt TOTP secret with Fernet. Requires TOTP_ENCRYPTION_KEY in non-dev."""
+    key = os.environ.get("TOTP_ENCRYPTION_KEY", "")
+    if not key:
+        if os.environ.get("APP_ENV", "dev").lower() != "dev":
+            raise RuntimeError(
+                "TOTP_ENCRYPTION_KEY is required in non-dev environments. "
+                "Generate: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
+        return secret  # dev only: plaintext
+    from cryptography.fernet import Fernet
+    return Fernet(key.encode()).encrypt(secret.encode()).decode()
+
+
+def _decrypt_totp(stored: str) -> str:
+    """Decrypt TOTP secret. Falls back to plaintext for pre-encryption rows."""
+    key = os.environ.get("TOTP_ENCRYPTION_KEY", "")
+    if not key:
+        return stored
+    from cryptography.fernet import Fernet, InvalidToken
+    try:
+        return Fernet(key.encode()).decrypt(stored.encode()).decode()
+    except (InvalidToken, Exception):
+        return stored  # plaintext secret stored before encryption was enabled
 
 
 async def _create_session(user_id: Optional[int], api_key_id: Optional[int], session) -> str:
@@ -791,7 +820,7 @@ async def mfa_enable(
     if user is None:
         raise HTTPException(404, "User not found")
 
-    user.totp_secret = body.secret
+    user.totp_secret = _encrypt_totp(body.secret)
     user.mfa_enabled = True
     session.add(user)
     await session.commit()
@@ -829,7 +858,7 @@ async def mfa_disable(
     if not user.mfa_enabled or not user.totp_secret:
         return {"mfa_enabled": False, "message": "MFA was not enabled"}
 
-    totp = pyotp.TOTP(user.totp_secret)
+    totp = pyotp.TOTP(_decrypt_totp(user.totp_secret))
     if not totp.verify(body.code.strip(), valid_window=1):
         raise HTTPException(400, "Invalid TOTP code")
 
@@ -867,7 +896,7 @@ async def mfa_challenge(
     if user is None or not user.mfa_enabled or not user.totp_secret:
         raise HTTPException(400, "MFA is not configured for this account")
 
-    totp = pyotp.TOTP(user.totp_secret)
+    totp = pyotp.TOTP(_decrypt_totp(user.totp_secret))
     if not totp.verify(body.code.strip(), valid_window=1):
         raise HTTPException(400, "Invalid TOTP code")
 
