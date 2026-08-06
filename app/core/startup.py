@@ -383,25 +383,31 @@ async def _check_cors_config() -> None:
 
 
 async def _check_rate_limit_workers() -> None:
-    """Warn when multiple workers are configured alongside the in-memory rate limiter.
+    """Block or warn when multiple workers run without a shared Redis rate limiter.
 
-    The rate limiter uses a per-process sliding window — each worker process has
-    its own independent bucket, so the effective limit is RATE_LIMIT_RPM × workers.
-    This is only a warning (not a hard error) because single-process deployments
-    (Fly.io with min_machines=1) are the current production topology; replace the
-    limiter with a Redis-backed implementation before enabling horizontal scaling.
+    The in-memory fallback has a per-process bucket — N workers means N×RPM effective.
+    When REDIS_URL is set the shared Redis backend is used and multi-worker is safe.
+    Without Redis, more than one worker in production is a hard startup error.
     """
     rpm = int(os.environ.get("RATE_LIMIT_RPM", "60"))
     if rpm <= 0:
         return
+    if os.environ.get("REDIS_URL"):
+        log.info("rate_limit: Redis backend active (REDIS_URL set) — multi-worker safe")
+        return
     workers = int(os.environ.get("ANTCREW_WORKERS", "1"))
-    if workers > 1:
-        log.warning(
-            "rate_limit: ANTCREW_WORKERS=%d but rate limiter is in-memory — "
-            "effective limit is %d RPM per process (%d × %d). "
-            "Replace with a Redis-backed implementation before horizontal scaling.",
-            workers, rpm, rpm, workers,
-        )
+    if workers <= 1:
+        log.info("rate_limit: in-process backend (single worker) — OK")
+        return
+    msg = (
+        f"rate_limit: ANTCREW_WORKERS={workers} but REDIS_URL is not set. "
+        f"The in-memory rate limiter is per-process — effective limit is "
+        f"{rpm} × {workers} = {rpm * workers} RPM. "
+        "Set REDIS_URL to enable the shared Redis backend (redis://localhost:6379/0)."
+    )
+    if os.environ.get("APP_ENV") == "prod":
+        raise RuntimeError(msg)
+    log.warning(msg)
 
 
 async def run_startup_checks(testing: bool) -> None:

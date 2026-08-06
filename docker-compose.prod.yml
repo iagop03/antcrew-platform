@@ -9,6 +9,15 @@
 # Alembic migrations run automatically before uvicorn starts.
 
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # 128 MB cap with LRU eviction — plenty for rate-limit keys at current scale.
+    # Adjust maxmemory upward before launching session-cache or queue features.
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save ""
+    volumes:
+      - redis_data:/data
+
   platform:
     image: ${PLATFORM_IMAGE}
     env_file: .env.prod
@@ -19,11 +28,17 @@ services:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
       ANTCREW_REQUIRE_AUTH: "true"
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "80:8000"
     restart: unless-stopped
+    depends_on:
+      - redis
     command: >
       sh -c "python -m alembic upgrade head && uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
       --workers 1"
+
+volumes:
+  redis_data:

@@ -1,5 +1,29 @@
 # Changelog — antcrew-platform
 
+## v0.6.10 (2026-08-06)
+
+### Added
+
+- **Redis sliding-window rate limiter** (`app/core/rate_limit.py`, `pyproject.toml`,
+  `docker-compose.prod.yml`, `docker-compose.uat.yml`) — complete replacement of the in-process
+  deque fallback with a Redis-backed Lua sliding window (`ZREMRANGEBYSCORE` + `ZCARD` + conditional
+  `ZADD`). Atomic across processes and servers; fails open (passes traffic) on Redis unavailability
+  so a Redis outage never blocks legitimate requests. Both compose files now include a
+  `redis:7-alpine` service with LRU eviction (`128 MB` prod, `64 MB` UAT). `redis[asyncio]>=5.0`
+  added as a core dependency. In-process deque fallback retained for local development when
+  `REDIS_URL` is unset.
+
+- **Startup worker-safety check** (`app/core/startup.py`) — on startup, the platform now validates
+  that multi-worker deployments have Redis configured. If `ANTCREW_WORKERS > 1` and `REDIS_URL` is
+  unset, the check raises `RuntimeError` in prod and logs a warning in UAT/INT, preventing the
+  silent per-process rate limit multiplication that would allow up to `RPM × workers` real RPM.
+
+### Changed
+
+- **UAT compose fixed: `--workers 2` now safe** — prior UAT configuration ran two uvicorn workers
+  with no Redis, doubling the effective rate limit silently. Now covered by the Redis service and
+  the startup check.
+
 ## v0.6.9 (2026-08-06)
 
 ### Added

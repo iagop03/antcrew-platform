@@ -8,6 +8,11 @@
 # DATABASE_URL (Neon) and SECRET_KEY come from .env.uat (written by the deploy workflow).
 
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru --save ""
+
   platform:
     image: ${PLATFORM_IMAGE}
     env_file: .env.uat
@@ -18,9 +23,12 @@ services:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
       ANTCREW_REQUIRE_AUTH: "true"
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "80:8000"
     restart: unless-stopped
+    depends_on:
+      - redis
     command: >
       uvicorn app.main:app
       --host 0.0.0.0

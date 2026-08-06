@@ -37,6 +37,7 @@ dependencies = [
     "antcrew>=0.33.10,<0.34",
     "antcrew-engine>=0.3.11,<0.4",
     "PyJWT[cryptography]>=2.8",
+    "redis[asyncio]>=5.0",
 ]
 
 [project.optional-dependencies]
