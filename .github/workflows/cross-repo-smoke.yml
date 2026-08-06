@@ -75,6 +75,6 @@ jobs:
           os.environ['PROXY_TOKEN'] = 'ci-smoke'
           sys.path.insert(0, 'antcrew-proxy')
           import main
-          assert main.__version__ == '1.0.0'
+          assert main.__version__ == '1.1.0'
           print('antcrew-proxy: OK')
           "
