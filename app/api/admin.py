@@ -697,3 +697,99 @@ async def workspace_churn(
             for r in rows
         ],
     }
+
+
+@router.post("/users/{user_id}/erase", status_code=200)
+async def erase_user_data(
+    user_id: int,
+    _admin=Depends(require_platform_admin),
+    session=Depends(get_session),
+):
+    """GDPR Art. 17 right to erasure.
+
+    Anonymises the user's PII and replaces run.request content across all workspaces
+    they own or are a member of with a datestamped placeholder. Billing records (run rows)
+    are retained for legal obligation but their content is erased. Irreversible.
+    """
+    from app.models.auth import UserSession, ApiKey, WorkspaceMembership
+    from app.models.workspace import Workspace
+    from app.models.run import Run
+    from app.models.discovery import DiscoverySession
+
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "User not found")
+    if user.email.startswith("erased_") and user.email.endswith("@erased.antcrew"):
+        raise HTTPException(409, "User data has already been erased")
+
+    erased_at = datetime.utcnow().replace(microsecond=0).isoformat()
+    placeholder = f"[erased {erased_at}]"
+
+    # Anonymise user PII — keep the row for FK integrity
+    user.email = f"erased_{user_id}@erased.antcrew"
+    user.display_name = "[erased]"
+    user.totp_secret = None
+    user.mfa_enabled = False
+    user.password_hash = "erased"
+    session.add(user)
+
+    # Collect all workspace IDs the user owns or has membership in
+    owned_ids = {
+        ws.id for ws in (await session.exec(
+            select(Workspace).where(Workspace.owner_user_id == user_id)
+        )).all()
+        if ws.id is not None
+    }
+    member_ids = {
+        m.workspace_id for m in (await session.exec(
+            select(WorkspaceMembership).where(WorkspaceMembership.user_id == user_id)
+        )).all()
+    }
+    all_ws_ids = owned_ids | member_ids
+
+    # Erase run.request across all affected workspaces
+    runs_erased = 0
+    for ws_id in all_ws_ids:
+        for run in (await session.exec(select(Run).where(Run.workspace_id == ws_id))).all():
+            if run.request and not run.request.startswith("[erased"):
+                run.request = placeholder
+                session.add(run)
+                runs_erased += 1
+
+    # Delete DiscoverySessions (raw conversation turns)
+    disc_count = 0
+    for ws_id in all_ws_ids:
+        for ds in (await session.exec(
+            select(DiscoverySession).where(DiscoverySession.workspace_id == ws_id)
+        )).all():
+            await session.delete(ds)
+            disc_count += 1
+
+    # Revoke API keys
+    keys = (await session.exec(
+        select(ApiKey).where(ApiKey.user_id == user_id).where(ApiKey.revoked_at == None)  # noqa: E711
+    )).all()
+    now_dt = datetime.utcnow()
+    for key in keys:
+        key.revoked_at = now_dt
+        session.add(key)
+
+    # Delete browser sessions
+    user_sessions = (await session.exec(
+        select(UserSession).where(UserSession.user_id == user_id)
+    )).all()
+    for us in user_sessions:
+        await session.delete(us)
+
+    await session.commit()
+
+    return {
+        "erased_at": erased_at,
+        "user_id": user_id,
+        "email_anonymised": f"erased_{user_id}@erased.antcrew",
+        "runs_request_erased": runs_erased,
+        "discovery_sessions_deleted": disc_count,
+        "api_keys_revoked": len(keys),
+        "browser_sessions_deleted": len(user_sessions),
+        "workspaces_affected": sorted(all_ws_ids),
+    }

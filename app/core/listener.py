@@ -229,6 +229,14 @@ async def _persist_event(event: "Event") -> None:
                         if hookable:
                             notify_new_delivery()
 
+            elif event.type == "agent.end" and event.run_id:
+                stmt = select(Run).where(Run.run_id == event.run_id)
+                run = (await session.exec(stmt)).first()
+                if run:
+                    run.tokens_in = (run.tokens_in or 0) + int(event.payload.get("tokens_in", 0))
+                    run.tokens_out = (run.tokens_out or 0) + int(event.payload.get("tokens_out", 0))
+                    session.add(run)
+
             elif event.type == "hitl.review_required" and event.run_id:
                 review_id = event.payload.get("review_id")
                 artifact = event.payload.get("artifact", {})

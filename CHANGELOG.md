@@ -1,5 +1,41 @@
 # Changelog — antcrew-platform
 
+## v0.6.9 (2026-08-06)
+
+### Added
+
+- **GDPR Art. 17 right-to-erasure endpoint** (`app/api/admin.py`) — `POST /admin/users/{id}/erase`
+  (platform admin only). Anonymises the user's email, display name, TOTP secret, and password hash;
+  replaces `run.request` across all owned and member workspaces with a datestamped `[erased …]`
+  placeholder; deletes `DiscoverySession` rows (raw conversation turns); revokes all API keys;
+  deletes all browser sessions. Billing records are retained for legal obligation. Returns a
+  machine-readable summary (`erased_at`, counts by resource type). Idempotent check prevents
+  double-erasure (409 if already erased).
+
+- **Token usage materialised on `run` table** (`app/models/run.py`, `app/core/listener.py`,
+  migration 055) — `run.tokens_in` and `run.tokens_out` accumulate per-run token counts from
+  `agent.end` events (requires antcrew-engine ≥ 0.3.13). Previously, token aggregation required
+  JSON extraction across the full `event` table; columns make workspace-level token analytics a
+  single `SUM` query. Back-filled columns default to `0` for runs before this migration.
+
+### Fixed
+
+- **`bulkApprove()` concurrency storm** (`app/static/reviews.html`) — replaced unbounded
+  `Promise.all` with batches of 5 using `Promise.allSettled`. A 50-review bulk approve previously
+  fired 50 simultaneous DB writes + Slack/webhook notifications; now peaks at 5.
+
+- **Billing multiplier silent failure** (`app/core/listener.py`) — campaign/multiplier logic is
+  now isolated in its own `try/except`. A bug in eligibility evaluation previously rolled back the
+  entire `pipeline.end` session, leaving runs stuck at `status="running"` with no cost or webhook.
+  Failures now log at `ERROR` level and fall back to the raw provider cost; run completion is never
+  blocked by billing bugs.
+
+### Changed
+
+- **CHANGELOG correction — MFA implementation date** — the deferred-debt entry in v0.6.5 ("MFA
+  not yet implemented") was incorrect. TOTP MFA was already fully implemented at that version.
+  The v0.6.5 entry has been annotated; this entry records the correction for audit trail purposes.
+
 ## v0.6.8 (2026-08-06)
 
 ### Added
@@ -105,7 +141,7 @@
 ### Deferred debt declared
 
 - Rate limiting (`app/core/rate_limit.py`) uses in-memory token buckets — must be replaced with a Redis-backed implementation before horizontal scaling. Tracked explicitly; `auto_start_machines = false` is the interim guard.
-- MFA (TOTP/passkeys) not yet implemented. Flagged for Q3 evaluation when the first enterprise customer formally requires it.
+- ~~MFA (TOTP/passkeys) not yet implemented. Flagged for Q3 evaluation when the first enterprise customer formally requires it.~~ *(Correction recorded in v0.6.9: TOTP MFA was already fully implemented at this version — `auth_session.py` contained `/auth/mfa/setup`, `/auth/mfa/enable`, and `/auth/mfa/challenge` with `pyotp`. This deferred-debt entry was incorrect. Actual implementation date is prior to v0.6.5.)*
 
 ---
 
