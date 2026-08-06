@@ -87,86 +87,96 @@ async def _persist_event(event: "Event") -> None:
                             select(Workspace).where(Workspace.id == run.workspace_id)
                         )).first()
 
-                    # Apply billing multiplier: trial ×1.0, byok ×0.4, managed ×3.0
-                    if ws_row and raw_cost_usd > 0:
-                        from app.core.byok import get_cost_multiplier
-                        from app.models.admin import Campaign
-                        from datetime import timezone as _tz
-                        _now = datetime.now(_tz.utc).replace(tzinfo=None)
-                        _camp = (await session.exec(
-                            select(Campaign)
-                            .where(Campaign.active.is_(True))
-                            .where(Campaign.starts_at <= _now)
-                            .where(Campaign.ends_at >= _now)
-                            .order_by(Campaign.id.desc())
-                            .limit(1)
-                        )).first()
-                        _campaign_mult: Optional[float] = None
-                        if _camp:
-                            # Determine base eligibility (target: all vs new)
-                            _eligible = False
-                            if _camp.target == "all":
-                                _eligible = True
-                            elif _camp.target == "new":
-                                # Anti-abuse: check user registration date, not workspace creation date.
-                                # A user who signed up before the campaign cannot get the discount
-                                # just by creating a new workspace.
-                                from app.models.auth import User as _User
-                                _owner_id = getattr(ws_row, "owner_user_id", None)
-                                if _owner_id is not None:
-                                    _user = await session.get(_User, _owner_id)
-                                    _registered_at = getattr(_user, "created_at", None) if _user else None
-                                else:
-                                    _registered_at = getattr(ws_row, "created_at", None)
-                                if _registered_at is not None and _registered_at >= _camp.starts_at:
-                                    _eligible = True
+                    # Safe default: if the billing block below throws, the run still
+                    # completes with the raw provider cost rather than staying "running" forever.
+                    run.cost_usd = raw_cost_usd
 
-                            if _eligible:
-                                if _camp.discount_days is None:
-                                    # No per-workspace window — discount active for full campaign range
-                                    _campaign_mult = _camp.multiplier
-                                elif run.workspace_id is not None:
-                                    # Enrollment-based: each workspace gets its own N-day window
-                                    from app.models.admin import CampaignEnrollment
-                                    from datetime import timedelta as _td
-                                    _enr_stmt = (
-                                        select(CampaignEnrollment)
-                                        .where(CampaignEnrollment.campaign_id == _camp.id)
-                                        .where(CampaignEnrollment.workspace_id == run.workspace_id)
-                                    )
-                                    _enr = (await session.exec(_enr_stmt)).first()
-                                    if _enr is None:
-                                        _can_enroll = True
-                                        if _camp.max_participants is not None:
-                                            _all_enr = (await session.exec(
-                                                select(CampaignEnrollment)
-                                                .where(CampaignEnrollment.campaign_id == _camp.id)
-                                            )).all()
-                                            if len(_all_enr) >= _camp.max_participants:
-                                                _can_enroll = False
-                                        if _can_enroll:
-                                            _enr = CampaignEnrollment(
-                                                campaign_id=_camp.id,
-                                                workspace_id=run.workspace_id,
-                                                enrolled_at=_now,
-                                                discount_ends_at=_now + _td(days=_camp.discount_days),
-                                            )
-                                            session.add(_enr)
-                                    if _enr is not None and _enr.discount_ends_at >= _now:
+                    # Apply billing multiplier: trial ×1.0, byok ×0.4, managed ×3.0
+                    # Isolated try/except so a campaign bug never blocks run completion.
+                    if ws_row and raw_cost_usd > 0:
+                        try:
+                            from app.core.byok import get_cost_multiplier
+                            from app.models.admin import Campaign
+                            from datetime import timezone as _tz
+                            _now = datetime.now(_tz.utc).replace(tzinfo=None)
+                            _camp = (await session.exec(
+                                select(Campaign)
+                                .where(Campaign.active.is_(True))
+                                .where(Campaign.starts_at <= _now)
+                                .where(Campaign.ends_at >= _now)
+                                .order_by(Campaign.id.desc())
+                                .limit(1)
+                            )).first()
+                            _campaign_mult: Optional[float] = None
+                            if _camp:
+                                # Determine base eligibility (target: all vs new)
+                                _eligible = False
+                                if _camp.target == "all":
+                                    _eligible = True
+                                elif _camp.target == "new":
+                                    # Anti-abuse: check user registration date, not workspace creation date.
+                                    # A user who signed up before the campaign cannot get the discount
+                                    # just by creating a new workspace.
+                                    from app.models.auth import User as _User
+                                    _owner_id = getattr(ws_row, "owner_user_id", None)
+                                    if _owner_id is not None:
+                                        _user = await session.get(_User, _owner_id)
+                                        _registered_at = getattr(_user, "created_at", None) if _user else None
+                                    else:
+                                        _registered_at = getattr(ws_row, "created_at", None)
+                                    if _registered_at is not None and _registered_at >= _camp.starts_at:
+                                        _eligible = True
+
+                                if _eligible:
+                                    if _camp.discount_days is None:
+                                        # No per-workspace window — discount active for full campaign range
                                         _campaign_mult = _camp.multiplier
-                        multiplier = get_cost_multiplier(
-                            getattr(ws_row, "llm_key_mode", "managed"),
-                            is_trial=getattr(ws_row, "is_trial", False),
-                            multiplier_override=getattr(ws_row, "cost_multiplier_override", None),
-                            multiplier_locked=getattr(ws_row, "multiplier_locked", False),
-                            campaign_multiplier=_campaign_mult,
-                            managed_rate=getattr(ws_row, "base_managed_mult", None),
-                            byok_rate=getattr(ws_row, "base_byok_mult", None),
-                            proxy_rate=getattr(ws_row, "base_proxy_mult", None),
-                        )
-                        run.cost_usd = round(raw_cost_usd * multiplier, 6)
-                    else:
-                        run.cost_usd = raw_cost_usd
+                                    elif run.workspace_id is not None:
+                                        # Enrollment-based: each workspace gets its own N-day window
+                                        from app.models.admin import CampaignEnrollment
+                                        from datetime import timedelta as _td
+                                        _enr_stmt = (
+                                            select(CampaignEnrollment)
+                                            .where(CampaignEnrollment.campaign_id == _camp.id)
+                                            .where(CampaignEnrollment.workspace_id == run.workspace_id)
+                                        )
+                                        _enr = (await session.exec(_enr_stmt)).first()
+                                        if _enr is None:
+                                            _can_enroll = True
+                                            if _camp.max_participants is not None:
+                                                _all_enr = (await session.exec(
+                                                    select(CampaignEnrollment)
+                                                    .where(CampaignEnrollment.campaign_id == _camp.id)
+                                                )).all()
+                                                if len(_all_enr) >= _camp.max_participants:
+                                                    _can_enroll = False
+                                            if _can_enroll:
+                                                _enr = CampaignEnrollment(
+                                                    campaign_id=_camp.id,
+                                                    workspace_id=run.workspace_id,
+                                                    enrolled_at=_now,
+                                                    discount_ends_at=_now + _td(days=_camp.discount_days),
+                                                )
+                                                session.add(_enr)
+                                        if _enr is not None and _enr.discount_ends_at >= _now:
+                                            _campaign_mult = _camp.multiplier
+                            multiplier = get_cost_multiplier(
+                                getattr(ws_row, "llm_key_mode", "managed"),
+                                is_trial=getattr(ws_row, "is_trial", False),
+                                multiplier_override=getattr(ws_row, "cost_multiplier_override", None),
+                                multiplier_locked=getattr(ws_row, "multiplier_locked", False),
+                                campaign_multiplier=_campaign_mult,
+                                managed_rate=getattr(ws_row, "base_managed_mult", None),
+                                byok_rate=getattr(ws_row, "base_byok_mult", None),
+                                proxy_rate=getattr(ws_row, "base_proxy_mult", None),
+                            )
+                            run.cost_usd = round(raw_cost_usd * multiplier, 6)
+                        except Exception as _billing_exc:
+                            log.error(
+                                "platform listener: billing multiplier failed for run %s "
+                                "(workspace %s, raw=$%.6f) — stored at raw cost: %s",
+                                event.run_id, run.workspace_id, raw_cost_usd, _billing_exc,
+                            )
 
                     session.add(run)
 

@@ -678,7 +678,10 @@ function reviewQueue() {
       if (!selected.length) return;
       this.bulkApproving = true;
       const targets = this.reviews.filter(r => selected.includes(r.review_id));
-      await Promise.all(targets.map(review => this.resolve(review, 'approve')));
+      const BATCH = 5;
+      for (let i = 0; i < targets.length; i += BATCH) {
+        await Promise.allSettled(targets.slice(i, i + BATCH).map(r => this.resolve(r, 'approve')));
+      }
       this.bulkSelected = {};
       this.bulkApproving = false;
     },
