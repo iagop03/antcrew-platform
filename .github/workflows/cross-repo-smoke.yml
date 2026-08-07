@@ -45,14 +45,50 @@ jobs:
           pip install -e "antcrew-platform[dev]"
           pip install -r antcrew-proxy/requirements.txt
 
-      - name: Smoke — antcrew-engine build_llm
+      - name: Smoke — antcrew-engine build_llm (executes real code)
         run: |
           python -c "
           from antcrew_engine.config import build_llm
           from antcrew_engine.models.anthropic_model import AnthropicModel
           from antcrew_engine.models.openai_model import OpenAIModel
+
+          # Call build_llm with simulated — no API key required, returns a real object
+          llm = build_llm('simulated')
+          assert llm is not None, 'build_llm returned None'
+          assert hasattr(llm, 'system'), 'build_llm result missing .system() method'
+
+          # Verify AnthropicModel / OpenAIModel instantiate cleanly
+          m = AnthropicModel(model='claude-haiku-4-5-20251001')
+          assert m.model == 'claude-haiku-4-5-20251001'
+
           print('antcrew-engine: OK')
           "
+
+      - name: Smoke — platform HTTP health check (executes real request path)
+        run: |
+          python -c "
+          import asyncio, os
+          os.environ.setdefault('DATABASE_URL', 'sqlite+aiosqlite:///:memory:')
+          os.environ.setdefault('SECRET_KEY', 'ci-test-key')
+          os.environ.setdefault('ANTCREW_TESTING', '1')
+
+          from httpx import AsyncClient, ASGITransport
+          from app.main import app
+
+          async def run():
+              async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as c:
+                  r = await c.get('/health')
+                  assert r.status_code == 200, f'/health returned {r.status_code}: {r.text}'
+                  body = r.json()
+                  assert body.get('ok') is True, f'unexpected body: {body}'
+                  print(f'antcrew-platform /health: OK ({body})')
+
+          asyncio.run(run())
+          "
+        env:
+          PYTHONPATH: antcrew-platform
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: ci-test-key
 
       - name: Smoke — platform critical imports
         run: |
@@ -61,14 +97,14 @@ jobs:
           from app.api.stream import register_run, deregister_run
           from app.services.runner_base import resolve_workspace_llm_config
           from app.api.security_audit import router as audit_router
-          print('antcrew-platform: OK')
+          print('antcrew-platform imports: OK')
           "
         env:
           PYTHONPATH: antcrew-platform
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
           SECRET_KEY: ci-test-key
 
-      - name: Smoke — antcrew-proxy imports
+      - name: Smoke — antcrew-proxy imports and version
         run: |
           python -c "
           import os, sys

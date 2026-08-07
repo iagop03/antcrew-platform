@@ -699,6 +699,74 @@ async def workspace_churn(
     }
 
 
+# ---------------------------------------------------------------------------
+# Analytics: engine capability usage
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics/capabilities")
+async def capability_analytics(
+    _admin=Depends(require_platform_admin),
+    session=Depends(get_session),
+    days: int = 30,
+):
+    """Engine capability usage analytics.
+
+    Aggregates agent.start (dispatched) and agent.end (completed) events from
+    the event table. Payload fields: agent_name, succeeded, duration_s, cost_usd.
+    """
+    from sqlalchemy import text as sa_text
+
+    cutoff = datetime.utcnow() - timedelta(days=max(1, min(days, 365)))
+
+    rows = (await session.execute(
+        sa_text("""
+            SELECT
+                payload->>'agent_name'                                          AS capability,
+                COUNT(*) FILTER (WHERE event_type = 'agent.start')              AS dispatched,
+                COUNT(*) FILTER (WHERE event_type = 'agent.end')                AS completed,
+                COUNT(*) FILTER (
+                    WHERE event_type = 'agent.end'
+                      AND (payload->>'succeeded')::boolean IS TRUE
+                )                                                               AS succeeded,
+                AVG(
+                    CASE WHEN event_type = 'agent.end'
+                         THEN (payload->>'duration_s')::float END
+                )                                                               AS avg_duration_s,
+                SUM(
+                    CASE WHEN event_type = 'agent.end'
+                         THEN (payload->>'cost_usd')::float END
+                )                                                               AS total_cost_usd
+            FROM event
+            WHERE event_type IN ('agent.start', 'agent.end')
+              AND payload->>'agent_name' IS NOT NULL
+              AND recorded_at >= :cutoff
+            GROUP BY payload->>'agent_name'
+            ORDER BY dispatched DESC
+        """),
+        {"cutoff": cutoff},
+    )).all()
+
+    capabilities = []
+    for r in rows:
+        dispatched = int(r.dispatched or 0)
+        completed  = int(r.completed  or 0)
+        succeeded  = int(r.succeeded  or 0)
+        capabilities.append({
+            "capability":     r.capability,
+            "dispatched":     dispatched,
+            "completed":      completed,
+            "succeeded":      succeeded,
+            "success_rate":   round(succeeded / completed, 4) if completed else None,
+            "avg_duration_s": round(float(r.avg_duration_s), 2) if r.avg_duration_s is not None else None,
+            "total_cost_usd": round(float(r.total_cost_usd), 6) if r.total_cost_usd is not None else 0.0,
+        })
+
+    return {
+        "window_days": days,
+        "capabilities": capabilities,
+    }
+
+
 @router.post("/users/{user_id}/erase", status_code=200)
 async def erase_user_data(
     user_id: int,
