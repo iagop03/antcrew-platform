@@ -365,7 +365,7 @@ async def delete_pipeline(
     pipeline_id: int,
     ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
-) -> None:
+):
     row = await session.get(PipelineDef, pipeline_id)
     if not row:
         raise HTTPException(404, "Pipeline not found")
@@ -443,7 +443,7 @@ async def delete_custom_agent(
     workspace_id: int,
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(require_api_key),
-) -> None:
+):
     """Delete a custom agent definition."""
     row = (await session.exec(
         select(CustomAgentDef).where(

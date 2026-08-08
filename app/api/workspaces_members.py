@@ -123,7 +123,7 @@ async def remove_member(
     api_key_id: int,
     ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
-) -> None:
+):
     """Revoke a key's multi-workspace membership for this workspace."""
     if not ws_accessible(workspace_id, ctx):
         raise HTTPException(403, "Access to this workspace is not allowed")

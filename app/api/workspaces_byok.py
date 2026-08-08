@@ -188,7 +188,7 @@ async def delete_llm_key(
     provider: str,
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(require_role("admin")),
-) -> None:
+):
     """Remove a BYOK key. If it was the last key, resets llm_key_mode to 'managed'."""
     if not ws_accessible(workspace_id, ctx):
         raise HTTPException(403, "This workspace is not accessible with the current API key")

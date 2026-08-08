@@ -680,7 +680,7 @@ async def clear_slack_tokens(
     workspace_id: int,
     ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
-) -> None:
+):
     """Remove per-workspace Slack tokens, reverting to global env-var tokens."""
     if not ws_accessible(workspace_id, ctx):
         raise HTTPException(403, "This workspace is not accessible with the current API key")

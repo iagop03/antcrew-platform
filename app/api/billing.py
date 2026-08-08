@@ -274,7 +274,7 @@ async def detach_stripe(
     workspace_id: int,
     ctx: WorkspaceContext = Depends(get_workspace_context),
     session: AsyncSession = Depends(get_session),
-) -> None:
+):
     """Remove Stripe billing linkage from a workspace (does NOT cancel in Stripe)."""
     if not ws_accessible(workspace_id, ctx):
         raise HTTPException(403, "Access to this workspace is not allowed")

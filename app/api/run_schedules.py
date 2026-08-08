@@ -151,7 +151,7 @@ async def delete_schedule(
     schedule_id: int,
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
-) -> None:
+):
     s = (await session.exec(select(RunSchedule).where(RunSchedule.id == schedule_id))).first()
     if not s or s.workspace_id != ctx.workspace_id:
         raise HTTPException(404, "Schedule not found")

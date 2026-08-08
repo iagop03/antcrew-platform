@@ -164,7 +164,7 @@ async def delete_contract_schema(
     contract_name: str,
     session: AsyncSession = Depends(get_session),
     ctx: WorkspaceContext = Depends(get_workspace_context),
-) -> None:
+):
     """Remove the custom_fields schema for a contract from this workspace."""
     from app.core.exceptions import NotAccessibleError
     from fastapi import HTTPException
