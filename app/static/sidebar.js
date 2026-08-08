@@ -61,7 +61,8 @@
     '#ac-sb{position:fixed;left:0;top:0;height:100%;z-index:50;' +
       'background:rgba(3,7,18,.97);border-right:1px solid rgba(31,41,55,.8);' +
       'display:flex;flex-direction:column;overflow:hidden;' +
-      'transition:width .2s ease;will-change:width;box-sizing:border-box;}' +
+      'transition:width .2s ease;will-change:width;box-sizing:border-box;' +
+      'view-transition-name:sidebar;}' +
     '.ac-sbi{display:flex;align-items:center;gap:9px;padding:6px 10px 6px 14px;' +
       'text-decoration:none;color:rgb(107,114,128);font-size:.8rem;font-weight:500;' +
       'border-radius:6px;margin:1px 8px;transition:background .1s,color .1s;cursor:pointer;' +
@@ -99,7 +100,13 @@
     '#ac-sb-mbar{display:none;position:fixed;top:0;left:0;right:0;z-index:40;height:44px;' +
       'align-items:center;gap:8px;padding:0 12px;' +
       'background:rgba(3,7,18,.96);border-bottom:1px solid rgba(31,41,55,.8);' +
-      'backdrop-filter:blur(10px);}';
+      'backdrop-filter:blur(10px);}' +
+    // Prevent white flash on browsers that don't yet support view-transitions
+    'html{background:#030712;}' +
+    // Cross-document view transitions (Chrome 126+, Edge 126+; ignored elsewhere)
+    '@view-transition{navigation:auto;}' +
+    // Keep the sidebar visually locked — no fade in/out during page transitions
+    '::view-transition-old(sidebar),::view-transition-new(sidebar){animation:none;mix-blend-mode:normal;}';
   document.head.appendChild(style);
 
   // Tabler icons — inject early so font is ready when sidebar renders
