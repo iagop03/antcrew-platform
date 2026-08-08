@@ -106,7 +106,16 @@
     // Cross-document view transitions (Chrome 126+, Edge 126+; ignored elsewhere)
     '@view-transition{navigation:auto;}' +
     // Keep the sidebar visually locked — no fade in/out during page transitions
-    '::view-transition-old(sidebar),::view-transition-new(sidebar){animation:none;mix-blend-mode:normal;}';
+    '::view-transition-old(sidebar),::view-transition-new(sidebar){animation:none;mix-blend-mode:normal;}' +
+    // Uniform fade for the content area (old fades out, new fades in after 100ms so Alpine can init)
+    '::view-transition-old(root){animation:140ms ease both ac-vt-out;}' +
+    '::view-transition-new(root){animation:220ms 100ms ease both ac-vt-in;}' +
+    '@keyframes ac-vt-out{to{opacity:0}}' +
+    '@keyframes ac-vt-in{from{opacity:0}}' +
+    '@keyframes ac-spin{to{transform:rotate(360deg)}}' +
+    '#ac-nav-sp{position:fixed;top:14px;right:18px;z-index:9999;width:18px;height:18px;' +
+      'border:2px solid rgba(129,140,248,.25);border-top-color:#818cf8;border-radius:50%;' +
+      'animation:ac-spin .6s linear infinite;opacity:0;transition:opacity .12s ease;pointer-events:none;}';
   document.head.appendChild(style);
 
   // Tabler icons — inject early so font is ready when sidebar renders
@@ -295,6 +304,11 @@
   bd.id = 'ac-sb-bd';
   document.body.insertBefore(bd, mbar.nextSibling);
 
+  // Navigation spinner — shown on nav click, disappears when new page loads
+  var sp = document.createElement('div');
+  sp.id = 'ac-nav-sp';
+  document.body.appendChild(sp);
+
   // ── Configurar group state ─────────────────────────────────────────────────
   function applyCfgState(open) {
     cfgOpen = open;
@@ -421,6 +435,13 @@
   bd.addEventListener('click', function () {
     sb.classList.remove('open');
     bd.classList.remove('open');
+  });
+
+  // Show spinner when an internal nav link is clicked (stays in old-page snapshot)
+  navEl.addEventListener('click', function (e) {
+    var link = e.target.closest('a.ac-sbi');
+    if (!link || link.target === '_blank') return;
+    sp.style.opacity = '1';
   });
 
   // ── Data fetches ──────────────────────────────────────────────────────────

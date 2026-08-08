@@ -18,10 +18,49 @@
 
 <script src="/static/sidebar.js"></script>
 
-<div class="px-6 py-5 border-b border-gray-800/60">
+<div class="px-6 py-5">
   <h1 class="text-xl font-semibold">Settings</h1>
   <p class="text-gray-400 text-sm mt-0.5" data-i18n="settings.subtitle">Workspaces, reviewers and LLM configuration</p>
 </div>
+
+<!-- Tab navigation -->
+<nav class="flex px-2 border-b border-gray-800/60 overflow-x-auto" style="scrollbar-width:none">
+  <button @click="switchTab('workspaces')"
+    :class="tab==='workspaces' ? 'text-indigo-400 border-indigo-500' : 'text-gray-500 hover:text-gray-300 border-transparent'"
+    class="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px">
+    <i class="ti ti-building"></i> Workspaces
+  </button>
+  <button @click="switchTab('reviewers')"
+    :class="tab==='reviewers' ? 'text-indigo-400 border-indigo-500' : 'text-gray-500 hover:text-gray-300 border-transparent'"
+    class="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px">
+    <i class="ti ti-key"></i> Reviewers
+  </button>
+  <button @click="switchTab('llm')"
+    :class="tab==='llm' ? 'text-indigo-400 border-indigo-500' : 'text-gray-500 hover:text-gray-300 border-transparent'"
+    class="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px">
+    <i class="ti ti-robot"></i> LLM / BYOK
+  </button>
+  <button @click="switchTab('schedules')"
+    :class="tab==='schedules' ? 'text-indigo-400 border-indigo-500' : 'text-gray-500 hover:text-gray-300 border-transparent'"
+    class="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px">
+    <i class="ti ti-calendar"></i> Schedules
+  </button>
+  <button @click="switchTab('github')"
+    :class="tab==='github' ? 'text-indigo-400 border-indigo-500' : 'text-gray-500 hover:text-gray-300 border-transparent'"
+    class="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px">
+    <i class="ti ti-brand-github"></i> GitHub App
+  </button>
+  <button @click="switchTab('security')"
+    :class="tab==='security' ? 'text-indigo-400 border-indigo-500' : 'text-gray-500 hover:text-gray-300 border-transparent'"
+    class="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px">
+    <i class="ti ti-shield"></i> Security
+  </button>
+  <button @click="switchTab('profile')"
+    :class="tab==='profile' ? 'text-indigo-400 border-indigo-500' : 'text-gray-500 hover:text-gray-300 border-transparent'"
+    class="flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px">
+    <i class="ti ti-user"></i> Profile
+  </button>
+</nav>
 
 <!-- API key banner -->
 <div x-show="!me && !apiKey"
@@ -1414,6 +1453,11 @@ function settings() {
     isMyKey(key) {
       if (!this.me) return false;
       return key.email && key.email === this.me.email;
+    },
+
+    switchTab(id) {
+      this.tab = id;
+      history.replaceState({}, '', '/settings?tab=' + id);
     },
 
     openCreateWs() {
